@@ -1,0 +1,206 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User and Authentication
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  name          String?
+  password      String
+  ownedFirm     Firm?      @relation("FirmOwner")
+  firmMember    Firm?      @relation("FirmMembers", fields: [firmId], references: [id])
+  firmId        String?
+  role          UserRole   @default(ADVOCATE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  cases         Case[]     @relation("CaseAdvocate")
+  sessions      Session[]
+
+  @@index([firmId])
+  @@index([email])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Firm Management
+model Firm {
+  id            String   @id @default(cuid())
+  name          String
+  address       String?
+  phone         String?
+  email         String?
+  owner         User     @relation("FirmOwner", fields: [ownerId], references: [id])
+  ownerId       String   @unique
+  members       User[]   @relation("FirmMembers")
+  cases         Case[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+// Case Management
+model Case {
+  id                String      @id @default(cuid())
+  caseNumber        String      @unique
+  clientName        String
+  clientEmail       String?
+  clientPhone       String?
+  caseTitle         String
+  description       String?
+  status            CaseStatus  @default(ACTIVE)
+  priority          Priority    @default(MEDIUM)
+  createdBy         User        @relation("CaseAdvocate", fields: [createdById], references: [id])
+  createdById       String
+  firm              Firm        @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  firmId            String
+  opponents         String?     // Comma-separated list of opponents
+  courtName         String?
+  judgeAssigned     String?
+  fileDocuments     FileDocument[]
+  hearings          Hearing[]
+  aiSummary         AISummary?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([firmId])
+  @@index([createdById])
+  @@index([status])
+  @@index([caseNumber])
+}
+
+// Document Management
+model FileDocument {
+  id        String   @id @default(cuid())
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId    String
+  fileName  String
+  fileUrl   String
+  fileType  String   // pdf, doc, docx, txt, etc.
+  fileSize  Int      // in bytes
+  uploadedAt DateTime @default(now())
+
+  @@index([caseId])
+}
+
+// Hearing/Court Date Management
+model Hearing {
+  id              String        @id @default(cuid())
+  case            Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId          String
+  hearingDate     DateTime
+  hearingTime     String?       // HH:MM format
+  hearingType     HearingType   @default(ARGUMENTS)
+  courtRoom       String?
+  notes           String?
+  status          HearingStatus @default(SCHEDULED)
+  reminders       Reminder[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([caseId])
+  @@index([hearingDate])
+}
+
+// Reminders for Hearings
+model Reminder {
+  id          String           @id @default(cuid())
+  hearing     Hearing          @relation(fields: [hearingId], references: [id], onDelete: Cascade)
+  hearingId   String
+  reminderType ReminderType    @default(ONE_DAY_BEFORE)
+  reminderTime DateTime
+  status      ReminderStatus   @default(PENDING)
+  sentAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([hearingId])
+  @@index([reminderTime])
+}
+
+// AI Summary and Insights
+model AISummary {
+  id              String   @id @default(cuid())
+  case            Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId          String   @unique
+  summary         String   // Short summary of the case
+  keyPoints       String   // JSON array of key points
+  insights        String   // AI-generated insights and recommendations
+  generatedAt     DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([caseId])
+}
+
+// Enums
+enum UserRole {
+  ADVOCATE
+  ADMIN
+  SUPPORT_STAFF
+}
+
+enum CaseStatus {
+  ACTIVE
+  PENDING_JUDGMENT
+  CONCLUDED
+  APPEAL
+  DISMISSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum HearingType {
+  ARGUMENTS
+  EVIDENCE_RECORDING
+  FINAL_HEARING
+  INTERIM_HEARING
+  JUDGMENT_DELIVERY
+  PRE_HEARING
+  OTHER
+}
+
+enum HearingStatus {
+  SCHEDULED
+  POSTPONED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReminderType {
+  ONE_DAY_BEFORE
+  THREE_DAYS_BEFORE
+  ONE_WEEK_BEFORE
+  CUSTOM
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
+}
