@@ -7,14 +7,22 @@ import { analyzeCaseWithAI } from '@/lib/openai';
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
+    console.log('[GET /api/cases] Authorization header:', authHeader?.substring(0, 30));
+
     const token = authHeader?.replace('Bearer ', '');
+    console.log('[GET /api/cases] Extracted token (first 20 chars):', token?.substring(0, 20));
+    console.log('[GET /api/cases] Token length:', token?.length);
 
     if (!token) {
+      console.log('[GET /api/cases] No token provided');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await verifyToken(token);
+    console.log('[GET /api/cases] User after verification:', user?.email);
+
     if (!user || !user.firmId) {
+      console.log('[GET /api/cases] User verification failed or no firmId');
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
@@ -43,14 +51,22 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
+    console.log('[POST /api/cases] Authorization header:', authHeader?.substring(0, 30));
+
     const token = authHeader?.replace('Bearer ', '');
+    console.log('[POST /api/cases] Extracted token (first 20 chars):', token?.substring(0, 20));
+    console.log('[POST /api/cases] Token length:', token?.length);
 
     if (!token) {
+      console.log('[POST /api/cases] No token provided');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await verifyToken(token);
+    console.log('[POST /api/cases] User after verification:', user?.email);
+
     if (!user || !user.firmId) {
+      console.log('[POST /api/cases] User verification failed or no firmId');
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 

@@ -14,12 +14,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, name, password, firmName, role = 'ADVOCATE' } = body;
+    const { email, name, password, firmName, firmId, role = 'ADVOCATE' } = body;
 
     // Validation
     if (!email || !password || !name) {
       return NextResponse.json(
         { error: 'Email, name, and password are required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate that either firmName or firmId is provided
+    if (!firmName && !firmId) {
+      return NextResponse.json(
+        { error: 'Either firmName (to create new) or firmId (to join existing) is required' },
+        { status: 400 }
+      );
+    }
+
+    // Prevent both from being provided
+    if (firmName && firmId) {
+      return NextResponse.json(
+        { error: 'Provide either firmName or firmId, not both' },
         { status: 400 }
       );
     }
@@ -83,9 +99,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Create firm if firm name is provided
-    let firm = null;
-    if (firmName && role === 'ADVOCATE') {
+    // Handle firm assignment
+    let assignedFirmId: string | null = null;
+
+    if (firmName) {
+      // Case 1: Create a new firm
       // Validate firm name
       if (firmName.length < 2 || firmName.length > 100) {
         // Clean up user if firm creation fails
@@ -96,17 +114,38 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      firm = await prisma.firm.create({
+      const newFirm = await prisma.firm.create({
         data: {
           name: firmName,
           ownerId: user.id,
         },
       });
 
-      // Update user with firm ID
+      assignedFirmId = newFirm.id;
+    } else if (firmId) {
+      // Case 2: Join an existing firm
+      // Verify the firm exists
+      const existingFirm = await prisma.firm.findUnique({
+        where: { id: firmId },
+      });
+
+      if (!existingFirm) {
+        // Clean up user if firm doesn't exist
+        await prisma.user.delete({ where: { id: user.id } });
+        return NextResponse.json(
+          { error: 'Specified firm does not exist' },
+          { status: 404 }
+        );
+      }
+
+      assignedFirmId = firmId;
+    }
+
+    // Update user with firm ID
+    if (assignedFirmId) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { firmId: firm.id },
+        data: { firmId: assignedFirmId },
       });
     }
 

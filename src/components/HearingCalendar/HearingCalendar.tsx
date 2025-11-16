@@ -29,6 +29,8 @@ export default function HearingCalendar() {
   const [selectedCaseId, setSelectedCaseId] = useState('');
   const [cases, setCases] = useState<any[]>([]);
   const [form] = Form.useForm();
+  const [hearingDetailsModalOpen, setHearingDetailsModalOpen] = useState(false);
+  const [selectedHearing, setSelectedHearing] = useState<Hearing | null>(null);
 
   // Fetch hearings
   useEffect(() => {
@@ -101,14 +103,41 @@ export default function HearingCalendar() {
 
   const dateCellRender = (date: dayjs.Dayjs) => {
     const listData = getListData(date);
+    const dayHearings = getHearingsForDate(date);
+
     return (
       <ul style={{ listStyle: 'none', padding: 0 }}>
-        {listData.map((item) => (
-          <li key={item.hearingId} style={{ fontSize: '12px', color: '#f57800' }}>
-            <CalendarOutlined style={{ marginRight: '4px' }} />
-            {item.content}
-          </li>
-        ))}
+        {listData.map((item) => {
+          const hearing = dayHearings.find((h) => h.id === item.hearingId);
+          return (
+            <li
+              key={item.hearingId}
+              onClick={() => {
+                setSelectedHearing(hearing || null);
+                setHearingDetailsModalOpen(true);
+              }}
+              style={{
+                fontSize: '12px',
+                color: '#f57800',
+                cursor: 'pointer',
+                padding: '4px',
+                borderRadius: '3px',
+                backgroundColor: 'rgba(245, 120, 0, 0.1)',
+                marginBottom: '2px',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(245, 120, 0, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(245, 120, 0, 0.1)';
+              }}
+            >
+              <CalendarOutlined style={{ marginRight: '4px' }} />
+              {item.content}
+            </li>
+          );
+        })}
       </ul>
     );
   };
@@ -136,12 +165,23 @@ export default function HearingCalendar() {
         message.success('Hearing scheduled successfully');
         setModalOpen(false);
         form.resetFields();
-        fetchHearings();
+        await fetchHearings();
       } else {
         message.error('Failed to schedule hearing');
       }
     } catch (error) {
       message.error('Error scheduling hearing');
+    }
+  };
+
+  // Handle opening modal with pre-filled date
+  const openScheduleHearingModal = (date?: dayjs.Dayjs) => {
+    setModalOpen(true);
+    if (date) {
+      // Pre-fill the date in the form
+      form.setFieldsValue({
+        hearingDate: date,
+      });
     }
   };
 
@@ -153,14 +193,18 @@ export default function HearingCalendar() {
         <Calendar
           fullscreen
           dateCellRender={dateCellRender}
-          onChange={(date) => setSelectedDate(date)}
+          onChange={(date) => {
+            setSelectedDate(date);
+            // Open schedule hearing modal with pre-filled date
+            openScheduleHearingModal(date);
+          }}
         />
       </Card>
 
       <Card
         title={`Hearings for ${selectedDate.format('YYYY-MM-DD')}`}
         extra={
-          <Button type="primary" onClick={() => setModalOpen(true)}>
+          <Button type="primary" onClick={() => openScheduleHearingModal(selectedDate)}>
             Schedule Hearing
           </Button>
         }
@@ -194,6 +238,67 @@ export default function HearingCalendar() {
           />
         )}
       </Card>
+
+      <Modal
+        title="Hearing Details"
+        open={hearingDetailsModalOpen}
+        onCancel={() => {
+          setHearingDetailsModalOpen(false);
+          setSelectedHearing(null);
+        }}
+        footer={[
+          <Button key="close" onClick={() => {
+            setHearingDetailsModalOpen(false);
+            setSelectedHearing(null);
+          }}>
+            Close
+          </Button>,
+        ]}
+      >
+        {selectedHearing && (
+          <div style={{ marginTop: '20px' }}>
+            <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #f0f0f0' }}>
+              <h3 style={{ marginBottom: '10px', color: '#1890ff' }}>
+                {selectedHearing.case.caseNumber}
+              </h3>
+              <p style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>
+                {selectedHearing.case.caseTitle}
+              </p>
+              <p style={{ color: '#666', marginBottom: '8px' }}>
+                <strong>Client:</strong> {selectedHearing.case.clientName}
+              </p>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ marginBottom: '12px' }}>
+                <strong>Hearing Date:</strong>{' '}
+                <span style={{ fontSize: '14px', color: '#1890ff', fontWeight: 'bold' }}>
+                  {dayjs(selectedHearing.hearingDate).format('MMMM D, YYYY')}
+                </span>
+              </p>
+
+              {selectedHearing.hearingTime && (
+                <p style={{ marginBottom: '12px' }}>
+                  <strong>Hearing Time:</strong> {selectedHearing.hearingTime}
+                </p>
+              )}
+
+              <p style={{ marginBottom: '12px' }}>
+                <strong>Hearing Type:</strong>{' '}
+                <Tag color={getHearingTypeColor(selectedHearing.hearingType)}>
+                  {selectedHearing.hearingType.replace(/_/g, ' ')}
+                </Tag>
+              </p>
+
+              {selectedHearing.courtRoom && (
+                <p style={{ marginBottom: '12px' }}>
+                  <strong>Court Room:</strong> {selectedHearing.courtRoom}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         title="Schedule Hearing"

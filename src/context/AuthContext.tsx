@@ -14,7 +14,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, name: string, password: string, firmName?: string) => Promise<void>;
+  register: (email: string, name: string, password: string, firmNameOrId?: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
   isTokenExpired: () => boolean;
@@ -102,17 +102,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (email: string, name: string, password: string, firmName?: string) => {
+  const register = async (email: string, name: string, password: string, firmNameOrId?: string) => {
     setIsLoading(true);
     try {
+      // Determine if it's a firm ID (UUID format) or firm name (string)
+      const isUUID = firmNameOrId && /^[a-z0-9]+$/.test(firmNameOrId) && firmNameOrId.length > 20;
+
+      const payload: any = { email, name, password };
+      if (firmNameOrId) {
+        if (isUUID) {
+          payload.firmId = firmNameOrId; // It's an existing firm ID
+        } else {
+          payload.firmName = firmNameOrId; // It's a new firm name
+        }
+      }
+
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name, password, firmName }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        throw new Error('Registration failed');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Registration failed');
       }
 
       // Auto-login after registration

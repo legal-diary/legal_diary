@@ -1,25 +1,65 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Form, Input, Button, Card, message, Spin, Row, Col, Checkbox } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Form, Input, Button, Card, message, Spin, Row, Col, Select, Divider } from 'antd';
 import { LockOutlined, UserOutlined, HomeOutlined, MailOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
+interface Firm {
+  id: string;
+  name: string;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const { register, isLoading } = useAuth();
   const [form] = Form.useForm();
-  const [createFirm, setCreateFirm] = useState(false);
+  const [firms, setFirms] = useState<Firm[]>([]);
+  const [loadingFirms, setLoadingFirms] = useState(true);
+  const [firmChoice, setFirmChoice] = useState<'existing' | 'new' | null>(null);
+
+  // Fetch existing firms
+  useEffect(() => {
+    const fetchFirms = async () => {
+      try {
+        const response = await fetch('/api/firms');
+        if (response.ok) {
+          const data = await response.json();
+          setFirms(data);
+        }
+      } catch (error) {
+        console.error('Error fetching firms:', error);
+      } finally {
+        setLoadingFirms(false);
+      }
+    };
+
+    fetchFirms();
+  }, []);
 
   const onFinish = async (values: any) => {
     try {
+      // Determine firm parameter based on choice
+      let firmParam: string | undefined;
+
+      if (firmChoice === 'existing') {
+        firmParam = values.existingFirmId;
+      } else if (firmChoice === 'new') {
+        firmParam = values.newFirmName;
+      }
+
+      if (!firmParam) {
+        message.error('Please select or create a firm');
+        return;
+      }
+
       await register(
         values.email,
         values.name,
         values.password,
-        createFirm ? values.firmName : undefined
+        firmParam
       );
       message.success('Registration successful!');
       router.push('/dashboard');
@@ -110,28 +150,73 @@ export default function RegisterPage() {
                 />
               </Form.Item>
 
-              <Form.Item>
-                <Checkbox
-                  checked={createFirm}
-                  onChange={(e) => setCreateFirm(e.target.checked)}
-                >
-                  Create a new law firm
-                </Checkbox>
-              </Form.Item>
+              <Divider>Firm Selection (Required)</Divider>
 
-              {createFirm && (
-                <Form.Item
-                  name="firmName"
-                  label="Firm Name"
-                  rules={[
-                    { required: true, message: 'Please enter your firm name' },
-                  ]}
-                >
-                  <Input
-                    prefix={<HomeOutlined />}
-                    placeholder="Your Firm Name"
-                  />
-                </Form.Item>
+              {loadingFirms ? (
+                <Spin size="small" style={{ display: 'block', marginBottom: '16px' }} />
+              ) : (
+                <>
+                  {firms.length > 0 && (
+                    <Form.Item
+                      name="existingFirmId"
+                      label="Join Existing Firm"
+                      rules={[
+                        {
+                          validator: (_, value) => {
+                            if (firmChoice === 'existing' && !value) {
+                              return Promise.reject(new Error('Please select a firm'));
+                            }
+                            return Promise.resolve();
+                          },
+                        },
+                      ]}
+                    >
+                      <Select
+                        placeholder="Select a firm to join"
+                        onChange={() => setFirmChoice('existing')}
+                        disabled={firmChoice === 'new'}
+                        optionLabelProp="label"
+                      >
+                        {firms.map((firm) => (
+                          <Select.Option key={firm.id} value={firm.id} label={firm.name}>
+                            {firm.name}
+                          </Select.Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  )}
+
+                  {(firms.length > 0 || firmChoice === 'existing') && (
+                    <div style={{ textAlign: 'center', margin: '16px 0' }}>
+                      <span style={{ color: '#666' }}>— OR —</span>
+                    </div>
+                  )}
+
+                  <Form.Item
+                    name="newFirmName"
+                    label="Create New Firm"
+                    rules={[
+                      {
+                        validator: (_, value) => {
+                          if (firmChoice === 'new' && !value) {
+                            return Promise.reject(new Error('Please enter a firm name'));
+                          }
+                          if (value && (value.length < 2 || value.length > 100)) {
+                            return Promise.reject(new Error('Firm name must be between 2 and 100 characters'));
+                          }
+                          return Promise.resolve();
+                        },
+                      },
+                    ]}
+                  >
+                    <Input
+                      prefix={<HomeOutlined />}
+                      placeholder="Your New Firm Name"
+                      onChange={() => setFirmChoice('new')}
+                      disabled={firmChoice === 'existing' && form.getFieldValue('existingFirmId')}
+                    />
+                  </Form.Item>
+                </>
               )}
 
               <Form.Item>
