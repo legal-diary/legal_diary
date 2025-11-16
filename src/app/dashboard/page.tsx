@@ -25,6 +25,7 @@ interface Case {
   createdAt: string;
 }
 
+
 export default function DashboardPage() {
   const { token, user } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
