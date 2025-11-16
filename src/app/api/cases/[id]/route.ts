@@ -1,0 +1,165 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+import { verifyToken } from '@/lib/middleware';
+
+// Allowed fields for case updates (whitelist approach)
+const ALLOWED_UPDATE_FIELDS = [
+  'caseTitle',
+  'description',
+  'clientName',
+  'clientEmail',
+  'clientPhone',
+  'status',
+  'priority',
+] as const;
+
+// GET a single case
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: caseId } = await params;
+
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await verifyToken(token);
+    if (!user || !user.firmId) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const caseRecord = await prisma.case.findFirst({
+      where: {
+        id: caseId,
+        firmId: user.firmId,
+      },
+      include: {
+        createdBy: true,
+        hearings: true,
+        fileDocuments: true,
+        aiSummary: true,
+      },
+    });
+
+    if (!caseRecord) {
+      return NextResponse.json({ error: 'Case not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(caseRecord);
+  } catch (error) {
+    console.error('Error fetching case:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// UPDATE a case
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: caseId } = await params;
+
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await verifyToken(token);
+    if (!user || !user.firmId) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    // Verify case ownership
+    const caseRecord = await prisma.case.findFirst({
+      where: {
+        id: caseId,
+        firmId: user.firmId,
+      },
+    });
+
+    if (!caseRecord) {
+      return NextResponse.json({ error: 'Case not found' }, { status: 404 });
+    }
+
+    const updates = await request.json();
+
+    // Validate and filter updates (whitelist approach)
+    const validatedUpdates: Record<string, any> = {};
+
+    for (const field of ALLOWED_UPDATE_FIELDS) {
+      if (field in updates) {
+        validatedUpdates[field] = updates[field];
+      }
+    }
+
+    // Additional validation for specific fields
+    if ('status' in validatedUpdates) {
+      const validStatuses = ['ACTIVE', 'PENDING_JUDGMENT', 'CONCLUDED', 'APPEAL', 'DISMISSED'];
+      if (!validStatuses.includes(validatedUpdates.status)) {
+        return NextResponse.json(
+          { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    if ('priority' in validatedUpdates) {
+      const validPriorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+      if (!validPriorities.includes(validatedUpdates.priority)) {
+        return NextResponse.json(
+          { error: `Invalid priority. Must be one of: ${validPriorities.join(', ')}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate email format if provided
+    if ('clientEmail' in validatedUpdates && validatedUpdates.clientEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(validatedUpdates.clientEmail)) {
+        return NextResponse.json(
+          { error: 'Invalid email format' },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (Object.keys(validatedUpdates).length === 0) {
+      return NextResponse.json(
+        { error: 'No valid fields provided for update' },
+        { status: 400 }
+      );
+    }
+
+    const updatedCase = await prisma.case.update({
+      where: { id: caseId },
+      data: validatedUpdates,
+      include: {
+        createdBy: true,
+        hearings: true,
+        fileDocuments: true,
+        aiSummary: true,
+      },
+    });
+
+    return NextResponse.json(updatedCase);
+  } catch (error) {
+    console.error('Error updating case:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

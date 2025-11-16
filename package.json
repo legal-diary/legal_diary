@@ -9,7 +9,17 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.1.0",
+    "@prisma/client": "^6.19.0",
+    "antd": "^5.28.1",
+    "axios": "^1.13.2",
+    "bcryptjs": "^3.0.3",
+    "dayjs": "^1.11.19",
+    "dotenv": "^17.2.3",
     "next": "16.0.3",
+    "next-auth": "^4.24.13",
+    "openai": "^6.9.0",
+    "prisma": "^6.19.0",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
