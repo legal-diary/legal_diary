@@ -117,13 +117,13 @@ export default function HearingCalendar() {
                 setHearingDetailsModalOpen(true);
               }}
               style={{
-                fontSize: '12px',
+                fontSize: 'clamp(0.75rem, 1.5vw, 1rem)',
                 color: '#f57800',
                 cursor: 'pointer',
-                padding: '4px',
-                borderRadius: '3px',
+                padding: '0.4vh 0.5vw',
+                borderRadius: '0.3vh',
                 backgroundColor: 'rgba(245, 120, 0, 0.1)',
-                marginBottom: '2px',
+                marginBottom: '0.3vh',
                 transition: 'background-color 0.2s',
               }}
               onMouseEnter={(e) => {
@@ -133,7 +133,7 @@ export default function HearingCalendar() {
                 e.currentTarget.style.backgroundColor = 'rgba(245, 120, 0, 0.1)';
               }}
             >
-              <CalendarOutlined style={{ marginRight: '4px' }} />
+              <CalendarOutlined style={{ marginRight: '0.5vw' }} />
               {item.content}
             </li>
           );
@@ -189,7 +189,7 @@ export default function HearingCalendar() {
 
   return (
     <div>
-      <Card title="Hearing Calendar" style={{ marginBottom: '20px' }}>
+      <Card title="Hearing Calendar" style={{ marginBottom: '2vh' }}>
         <Calendar
           fullscreen
           dateCellRender={dateCellRender}
@@ -203,6 +203,7 @@ export default function HearingCalendar() {
 
       <Card
         title={`Hearings for ${selectedDate.format('YYYY-MM-DD')}`}
+        style={{ fontSize: 'clamp(0.9rem, 2vw, 1.1rem)' }}
         extra={
           <Button type="primary" onClick={() => openScheduleHearingModal(selectedDate)}>
             Schedule Hearing
@@ -217,19 +218,19 @@ export default function HearingCalendar() {
             renderItem={(hearing) => (
               <List.Item>
                 <List.Item.Meta
-                  avatar={<FileTextOutlined style={{ fontSize: '20px', color: '#1890ff' }} />}
-                  title={`${hearing.case.caseNumber} - ${hearing.case.caseTitle}`}
+                  avatar={<FileTextOutlined style={{ fontSize: 'clamp(1rem, 3vw, 1.5rem)', color: '#1890ff' }} />}
+                  title={<span style={{ fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>{`${hearing.case.caseNumber} - ${hearing.case.caseTitle}`}</span>}
                   description={
-                    <div>
-                      <p>Client: {hearing.case.clientName}</p>
-                      <p>
+                    <div style={{ fontSize: 'clamp(0.75rem, 1.8vw, 0.95rem)' }}>
+                      <p style={{ marginBottom: '0.5vh' }}>Client: {hearing.case.clientName}</p>
+                      <p style={{ marginBottom: '0.5vh' }}>
                         Type:{' '}
                         <Tag color={getHearingTypeColor(hearing.hearingType)}>
                           {hearing.hearingType.replace(/_/g, ' ')}
                         </Tag>
                       </p>
-                      {hearing.hearingTime && <p>Time: {hearing.hearingTime}</p>}
-                      {hearing.courtRoom && <p>Court Room: {hearing.courtRoom}</p>}
+                      {hearing.hearingTime && <p style={{ marginBottom: '0.5vh' }}>Time: {hearing.hearingTime}</p>}
+                      {hearing.courtRoom && <p style={{ marginBottom: '0.5vh' }}>Court Room: {hearing.courtRoom}</p>}
                     </div>
                   }
                 />
@@ -256,34 +257,34 @@ export default function HearingCalendar() {
         ]}
       >
         {selectedHearing && (
-          <div style={{ marginTop: '20px' }}>
-            <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #f0f0f0' }}>
-              <h3 style={{ marginBottom: '10px', color: '#1890ff' }}>
+          <div style={{ marginTop: '2vh' }}>
+            <div style={{ marginBottom: '2vh', paddingBottom: '2vh', borderBottom: '1px solid #f0f0f0' }}>
+              <h3 style={{ marginBottom: '1vh', color: '#1890ff', fontSize: 'clamp(1rem, 3vw, 1.3rem)' }}>
                 {selectedHearing.case.caseNumber}
               </h3>
-              <p style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>
+              <p style={{ fontSize: 'clamp(0.9rem, 2vw, 1.1rem)', fontWeight: 'bold', marginBottom: '0.8vh' }}>
                 {selectedHearing.case.caseTitle}
               </p>
-              <p style={{ color: '#666', marginBottom: '8px' }}>
+              <p style={{ color: '#666', marginBottom: '0.8vh', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
                 <strong>Client:</strong> {selectedHearing.case.clientName}
               </p>
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <p style={{ marginBottom: '12px' }}>
+            <div style={{ marginBottom: '2vh' }}>
+              <p style={{ marginBottom: '1.2vh', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
                 <strong>Hearing Date:</strong>{' '}
-                <span style={{ fontSize: '14px', color: '#1890ff', fontWeight: 'bold' }}>
+                <span style={{ fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)', color: '#1890ff', fontWeight: 'bold' }}>
                   {dayjs(selectedHearing.hearingDate).format('MMMM D, YYYY')}
                 </span>
               </p>
 
               {selectedHearing.hearingTime && (
-                <p style={{ marginBottom: '12px' }}>
+                <p style={{ marginBottom: '1.2vh', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
                   <strong>Hearing Time:</strong> {selectedHearing.hearingTime}
                 </p>
               )}
 
-              <p style={{ marginBottom: '12px' }}>
+              <p style={{ marginBottom: '1.2vh', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
                 <strong>Hearing Type:</strong>{' '}
                 <Tag color={getHearingTypeColor(selectedHearing.hearingType)}>
                   {selectedHearing.hearingType.replace(/_/g, ' ')}
@@ -291,7 +292,7 @@ export default function HearingCalendar() {
               </p>
 
               {selectedHearing.courtRoom && (
-                <p style={{ marginBottom: '12px' }}>
+                <p style={{ marginBottom: '1.2vh', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
                   <strong>Court Room:</strong> {selectedHearing.courtRoom}
                 </p>
               )}

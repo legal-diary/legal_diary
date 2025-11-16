@@ -82,7 +82,7 @@ export default function CreateCasePage() {
 
   return (
     <DashboardLayout>
-      <Card title="Create New Case" style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <Card title="Create New Case" style={{ maxWidth: '90vw', margin: '0 auto' }}>
         <Spin spinning={loading}>
           <Form
             form={form}

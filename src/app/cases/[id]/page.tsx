@@ -260,17 +260,17 @@ export default function CaseDetailPage() {
           </Descriptions>
 
           {caseData.description && (
-            <Card title="Case Description" style={{ marginTop: '20px' }}>
-              <p>{caseData.description}</p>
+            <Card title="Case Description" style={{ marginTop: '2vh' }}>
+              <p style={{ fontSize: 'clamp(0.9rem, 2vw, 1rem)', lineHeight: '1.6vh' }}>{caseData.description}</p>
             </Card>
           )}
 
           {caseData.aiSummary && (
-            <Card title="AI Summary & Insights" style={{ marginTop: '20px' }}>
+            <Card title="AI Summary & Insights" style={{ marginTop: '2vh' }}>
               <Card.Meta
                 title="Summary"
                 description={caseData.aiSummary.summary}
-                style={{ marginBottom: '15px' }}
+                style={{ marginBottom: '1.5vh' }}
               />
               <Card.Meta
                 title="Key Points"
@@ -278,12 +278,12 @@ export default function CaseDetailPage() {
                   <ul>
                     {JSON.parse(caseData.aiSummary.keyPoints).map(
                       (point: string, index: number) => (
-                        <li key={index}>{point}</li>
+                        <li key={index} style={{ fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', marginBottom: '0.5vh' }}>{point}</li>
                       )
                     )}
                   </ul>
                 }
-                style={{ marginBottom: '15px' }}
+                style={{ marginBottom: '1.5vh' }}
               />
               <Card.Meta
                 title="Insights & Recommendations"
@@ -354,13 +354,13 @@ export default function CaseDetailPage() {
 
   return (
     <DashboardLayout>
-      <Row gutter={[16, 16]} style={{ marginBottom: '20px' }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: '2vh' }}>
         <Col xs={24}>
           <Card>
             <Row justify="space-between" align="middle">
               <Col>
-                <h2 style={{ margin: 0 }}>{caseData.caseTitle}</h2>
-                <p style={{ margin: '5px 0 0 0', color: '#666' }}>
+                <h2 style={{ margin: 0, fontSize: 'clamp(1.2rem, 4vw, 2rem)' }}>{caseData.caseTitle}</h2>
+                <p style={{ margin: '0.5vh 0 0 0', color: '#666', fontSize: 'clamp(0.8rem, 2vw, 1rem)' }}>
                   {caseData.caseNumber}
                 </p>
               </Col>

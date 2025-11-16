@@ -69,16 +69,16 @@ export default function RegisterPage() {
   };
 
   return (
-    <Row justify="center" align="middle" style={{ minHeight: '100vh', background: '#f0f2f5', padding: '20px' }}>
+    <Row justify="center" align="middle" style={{ minHeight: '100vh', background: 'var(--bg-secondary)', padding: '2vh' }}>
       <Col xs={22} sm={20} md={12} lg={8}>
         <Card
           title={
-            <div style={{ fontSize: '24px', fontWeight: 'bold', textAlign: 'center' }}>
+            <div style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: 'bold', textAlign: 'center', color: 'var(--primary-color)' }}>
               Create Account
             </div>
           }
-          bordered={false}
-          style={{ boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.1)' }}
+          bordered={true}
+          style={{ boxShadow: 'var(--shadow-md)', borderColor: 'var(--border-color)', borderRadius: '0.6rem' }}
         >
           <Spin spinning={isLoading}>
             <Form
@@ -153,7 +153,7 @@ export default function RegisterPage() {
               <Divider>Firm Selection (Required)</Divider>
 
               {loadingFirms ? (
-                <Spin size="small" style={{ display: 'block', marginBottom: '16px' }} />
+                <Spin size="small" style={{ display: 'block', marginBottom: '1.6vh' }} />
               ) : (
                 <>
                   {firms.length > 0 && (
@@ -187,8 +187,8 @@ export default function RegisterPage() {
                   )}
 
                   {(firms.length > 0 || firmChoice === 'existing') && (
-                    <div style={{ textAlign: 'center', margin: '16px 0' }}>
-                      <span style={{ color: '#666' }}>— OR —</span>
+                    <div style={{ textAlign: 'center', margin: '1.5vh 0' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 'clamp(0.8rem, 2vw, 1rem)' }}>— OR —</span>
                     </div>
                   )}
 
@@ -234,7 +234,7 @@ export default function RegisterPage() {
               <div style={{ textAlign: 'center' }}>
                 <p>
                   Already have an account?{' '}
-                  <Link href="/login" style={{ color: '#1890ff' }}>
+                  <Link href="/login" style={{ color: 'var(--primary-color)', fontWeight: '600' }}>
                     Login here
                   </Link>
                 </p>

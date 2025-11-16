@@ -23,16 +23,35 @@ export default function LoginPage() {
   };
 
   return (
-    <Row justify="center" align="middle" style={{ minHeight: '100vh', background: '#f0f2f5' }}>
-      <Col xs={22} sm={20} md={12} lg={8}>
+    <Row justify="center" align="middle" style={{
+      minHeight: '100vh',
+      background: 'var(--bg-secondary)',
+      padding: '2vh',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+
+      <Col xs={22} sm={20} md={12} lg={8} style={{ position: 'relative', zIndex: 1 }}>
         <Card
           title={
-            <div style={{ fontSize: '24px', fontWeight: 'bold', textAlign: 'center' }}>
+            <div style={{
+              fontSize: 'clamp(1.8rem, 6vw, 2.2rem)',
+              fontWeight: '800',
+              textAlign: 'center',
+              color: 'var(--primary-color)',
+              marginBottom: '0.5rem',
+            }}>
               Legal Diary
             </div>
           }
-          bordered={false}
-          style={{ boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.1)' }}
+          bordered={true}
+          style={{
+            borderColor: 'var(--border-color)',
+            boxShadow: 'var(--shadow-md)',
+            borderRadius: '0.6rem',
+            background: 'var(--bg-primary)',
+            animation: 'slideUp 0.6s ease',
+          }}
         >
           <Spin spinning={isLoading}>
             <Form
@@ -40,51 +59,79 @@ export default function LoginPage() {
               onFinish={onFinish}
               layout="vertical"
               size="large"
+              style={{ marginTop: '1rem' }}
             >
               <Form.Item
                 name="email"
-                label="Email"
+                label={<span style={{ fontWeight: '600', color: '#1a1a1a' }}>Email</span>}
                 rules={[
                   { required: true, message: 'Please enter your email' },
                   { type: 'email', message: 'Please enter a valid email' },
                 ]}
               >
                 <Input
-                  prefix={<UserOutlined />}
+                  prefix={<UserOutlined style={{ color: 'var(--primary-color)' }} />}
                   placeholder="your@email.com"
                   type="email"
+                  style={{ borderRadius: '0.6rem' }}
                 />
               </Form.Item>
 
               <Form.Item
                 name="password"
-                label="Password"
+                label={<span style={{ fontWeight: '600', color: '#1a1a1a' }}>Password</span>}
                 rules={[
                   { required: true, message: 'Please enter your password' },
                 ]}
               >
                 <Input.Password
-                  prefix={<LockOutlined />}
+                  prefix={<LockOutlined style={{ color: 'var(--primary-color)' }} />}
                   placeholder="Password"
+                  style={{ borderRadius: '0.6rem' }}
                 />
               </Form.Item>
 
-              <Form.Item>
+              <Form.Item style={{ marginTop: '2rem' }}>
                 <Button
                   type="primary"
                   htmlType="submit"
                   block
                   size="large"
                   loading={isLoading}
+                  style={{
+                    height: '3rem',
+                    fontSize: 'clamp(0.95rem, 2vw, 1.1rem)',
+                    fontWeight: '700',
+                    background: 'var(--primary-color)',
+                    border: '1px solid var(--primary-color)',
+                    borderRadius: '0.6rem',
+                    boxShadow: 'var(--shadow-sm)',
+                    transition: 'all 0.3s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                  }}
                 >
                   Login
                 </Button>
               </Form.Item>
 
-              <div style={{ textAlign: 'center' }}>
-                <p>
+              <div style={{
+                textAlign: 'center',
+                marginTop: '1.5rem',
+                paddingTop: '1.5rem',
+                borderTop: '1px solid var(--border-color)',
+              }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 'clamp(0.85rem, 2vw, 0.95rem)' }}>
                   Don't have an account?{' '}
-                  <Link href="/register" style={{ color: '#1890ff' }}>
+                  <Link href="/register" style={{
+                    color: 'var(--primary-color)',
+                    fontWeight: '600',
+                    textDecoration: 'none',
+                  }}>
                     Register here
                   </Link>
                 </p>
