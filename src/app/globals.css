@@ -8,4 +8,226 @@ html,
 body {
   width: 100%;
   height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Minimalistic Lawyer Theme Color Palette */
+:root {
+  /* Professional law firm colors - Navy, Dark Gray, White */
+  --primary-color: #1a3a52;      /* Deep Navy - Trust, Authority */
+  --primary-light: #2d5a7b;      /* Medium Navy */
+  --secondary-color: #5a5a5a;    /* Charcoal Gray - Professionalism */
+  --accent-color: #d4af37;       /* Gold - Prestige */
+  --text-primary: #1a1a1a;       /* Almost Black */
+  --text-secondary: #666666;     /* Medium Gray */
+  --bg-primary: #ffffff;         /* Clean White */
+  --bg-secondary: #f5f7fa;       /* Light Gray Blue */
+  --border-color: #e0e3e8;       /* Subtle Gray */
+
+  --shadow-sm: 0 0.05rem 0.15rem rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 0.1rem 0.4rem rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 0.2rem 0.6rem rgba(0, 0, 0, 0.15);
+}
+
+/* Smooth Animations */
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Minimalistic Card Styling */
+.ant-card {
+  animation: slideUp 0.4s ease;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 0.4rem !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: all 0.2s ease !important;
+  background: var(--bg-primary) !important;
+}
+
+.ant-card:hover {
+  box-shadow: var(--shadow-md) !important;
+  border-color: var(--primary-color) !important;
+}
+
+/* Minimalistic Form Input Styling */
+.ant-input,
+.ant-input-number,
+.ant-select-selector,
+.ant-picker {
+  border-radius: 0.3rem !important;
+  border: 1px solid var(--border-color) !important;
+  font-size: clamp(0.9rem, 2vw, 1rem) !important;
+  padding: 0.7rem 0.8rem !important;
+  transition: all 0.2s ease !important;
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-input:focus,
+.ant-input-number:focus,
+.ant-select-selector:focus,
+.ant-picker:focus,
+.ant-input-focused,
+.ant-input-number-focused,
+.ant-select-focused .ant-select-selector,
+.ant-picker-focused .ant-picker {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 0.1rem rgba(26, 58, 82, 0.05) !important;
+}
+
+.ant-input::placeholder {
+  color: var(--text-secondary) !important;
+  opacity: 0.7;
+}
+
+/* Minimalistic Button Styling */
+.ant-btn {
+  border-radius: 0.3rem !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+  height: auto !important;
+  padding: 0.6rem 1.4rem !important;
+  font-size: clamp(0.9rem, 2vw, 1rem) !important;
+}
+
+.ant-btn-primary {
+  background: var(--primary-color) !important;
+  border: 1px solid var(--primary-color) !important;
+  color: white !important;
+}
+
+.ant-btn-primary:hover {
+  background: var(--primary-light) !important;
+  border-color: var(--primary-light) !important;
+}
+
+.ant-btn-primary:active {
+  background: var(--primary-color) !important;
+}
+
+/* Minimalistic Table Styling */
+.ant-table {
+  border-radius: 0.4rem !important;
+  overflow: hidden !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.ant-table thead > tr > th {
+  background: var(--bg-secondary) !important;
+  color: var(--primary-color) !important;
+  font-weight: 600 !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  padding: 1rem !important;
+}
+
+.ant-table tbody > tr {
+  transition: all 0.2s ease !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.ant-table tbody > tr:hover > td {
+  background: rgba(245, 247, 250, 0.8) !important;
+}
+
+/* Minimalistic Modal Styling */
+.ant-modal-content {
+  border-radius: 0.4rem !important;
+  box-shadow: var(--shadow-lg) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.ant-modal-header {
+  border-bottom: 1px solid var(--border-color) !important;
+  border-radius: 0.4rem 0.4rem 0 0 !important;
+  background: var(--bg-secondary) !important;
+}
+
+.ant-modal-title {
+  font-weight: 600 !important;
+  color: var(--primary-color) !important;
+  font-size: clamp(1.1rem, 2vw, 1.3rem) !important;
+}
+
+/* Minimalistic Tag Styling */
+.ant-tag {
+  border: 1px solid var(--border-color) !important;
+  border-radius: 0.3rem !important;
+  padding: 0.4rem 0.8rem !important;
+  font-weight: 500 !important;
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Drawer styling */
+.ant-drawer-header {
+  border-bottom: 2px solid #667eea !important;
+  background: rgba(102, 126, 234, 0.05) !important;
+}
+
+/* Dropdown styling */
+.ant-dropdown-menu {
+  border-radius: 0.6rem !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.ant-dropdown-menu-item {
+  border-radius: 0.4rem !important;
+  margin: 0.3rem 0.4rem !important;
+  transition: all 0.3s ease !important;
+}
+
+.ant-dropdown-menu-item:hover {
+  background: rgba(102, 126, 234, 0.1) !important;
+  padding-left: 1.2rem !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 0.4rem;
+  height: 0.4rem;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #bfbfbf;
+  border-radius: 0.2rem;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #999;
 }

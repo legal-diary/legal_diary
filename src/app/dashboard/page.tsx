@@ -178,10 +178,10 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <DashboardLayout>
         <Spin spinning={loading}>
-        <div style={{ marginBottom: '30px' }}>
-          <h2 style={{ marginBottom: '20px' }}>Dashboard</h2>
+        <div style={{ marginBottom: '3vh' }}>
+          <h2 style={{ marginBottom: '2vh', fontSize: 'clamp(1.5rem, 5vw, 2.5rem)' }}>Dashboard</h2>
           <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={12} sm={12} md={6}>
               <Card>
                 <Statistic
                   title="Total Cases"
@@ -190,7 +190,7 @@ export default function DashboardPage() {
                 />
               </Card>
             </Col>
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={12} sm={12} md={6}>
               <Card>
                 <Statistic
                   title="Active Cases"
@@ -200,7 +200,7 @@ export default function DashboardPage() {
                 />
               </Card>
             </Col>
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={12} sm={12} md={6}>
               <Card>
                 <Statistic
                   title="Concluded Cases"
@@ -210,7 +210,7 @@ export default function DashboardPage() {
                 />
               </Card>
             </Col>
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={12} sm={12} md={6}>
               <Card>
                 <Statistic
                   title="Upcoming Hearings"

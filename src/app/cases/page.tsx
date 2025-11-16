@@ -200,7 +200,7 @@ export default function CasesPage() {
             </Link>
           }
         >
-          <Row gutter={[16, 16]} style={{ marginBottom: '20px' }}>
+          <Row gutter={[16, 16]} style={{ marginBottom: '2vh' }}>
             <Col xs={24} sm={12} md={8}>
               <Input
                 placeholder="Search case number, title, or client..."
