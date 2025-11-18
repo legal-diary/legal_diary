@@ -25,7 +25,7 @@ export default function LoginPage() {
   return (
     <Row justify="center" align="middle" style={{
       minHeight: '100vh',
-      background: 'var(--bg-secondary)',
+      background: '#ffffff',
       padding: '2vh',
       position: 'relative',
       overflow: 'hidden',
@@ -38,19 +38,20 @@ export default function LoginPage() {
               fontSize: 'clamp(1.8rem, 6vw, 2.2rem)',
               fontWeight: '800',
               textAlign: 'center',
-              color: 'var(--primary-color)',
+              color: '#000000',
               marginBottom: '0.5rem',
             }}>
               Legal Diary
             </div>
           }
-          bordered={true}
+          bordered={false}
           style={{
-            borderColor: 'var(--border-color)',
-            boxShadow: 'var(--shadow-md)',
-            borderRadius: '0.6rem',
-            background: 'var(--bg-primary)',
+            borderColor: 'transparent',
+            boxShadow: 'none',
+            borderRadius: '0.8rem',
+            background: '#ffffff',
             animation: 'slideUp 0.6s ease',
+            maxWidth: '100%',
           }}
         >
           <Spin spinning={isLoading}>

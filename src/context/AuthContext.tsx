@@ -8,6 +8,7 @@ interface User {
   name: string;
   role: string;
   firmId?: string;
+  firm_name?: string;
 }
 
 interface AuthContextType {

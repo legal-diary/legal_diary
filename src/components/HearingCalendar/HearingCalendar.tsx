@@ -189,16 +189,17 @@ export default function HearingCalendar() {
 
   return (
     <div>
-      <Card title="Hearing Calendar" style={{ marginBottom: '2vh' }}>
-        <Calendar
-          fullscreen
-          dateCellRender={dateCellRender}
-          onChange={(date) => {
-            setSelectedDate(date);
-            // Open schedule hearing modal with pre-filled date
-            openScheduleHearingModal(date);
-          }}
-        />
+      <Card title="Hearing Calendar" style={{ marginBottom: '2vh' }} className="calendar-card">
+        <div className="calendar-container">
+          <Calendar
+            dateCellRender={dateCellRender}
+            onChange={(date) => {
+              setSelectedDate(date);
+              // Open schedule hearing modal with pre-filled date
+              openScheduleHearingModal(date);
+            }}
+          />
+        </div>
       </Card>
 
       <Card

@@ -69,16 +69,16 @@ export default function RegisterPage() {
   };
 
   return (
-    <Row justify="center" align="middle" style={{ minHeight: '100vh', background: 'var(--bg-secondary)', padding: '2vh' }}>
+    <Row justify="center" align="middle" style={{ minHeight: '100vh', background: '#ffffff', padding: '2vh' }}>
       <Col xs={22} sm={20} md={12} lg={8}>
         <Card
           title={
-            <div style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: 'bold', textAlign: 'center', color: 'var(--primary-color)' }}>
+            <div style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: 'bold', textAlign: 'center', color: '#000000' }}>
               Create Account
             </div>
           }
-          bordered={true}
-          style={{ boxShadow: 'var(--shadow-md)', borderColor: 'var(--border-color)', borderRadius: '0.6rem' }}
+          bordered={false}
+          style={{ boxShadow: 'none', borderColor: 'transparent', borderRadius: '0.8rem', background: '#ffffff' }}
         >
           <Spin spinning={isLoading}>
             <Form

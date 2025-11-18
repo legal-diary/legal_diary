@@ -55,7 +55,13 @@ export async function POST(request: NextRequest) {
     // Find user
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { firmMember: true },
+      include: {
+        firmMember: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -104,11 +110,16 @@ export async function POST(request: NextRequest) {
     });
 
     // Return user info and token
-    const { password: _, ...userWithoutPassword } = user;
+    const { password: _, firmMember, ...userWithoutPassword } = user;
+    const userData = {
+      ...userWithoutPassword,
+      firm_name: firmMember?.name || null,
+    };
+
     return NextResponse.json(
       {
         message: 'Login successful',
-        user: userWithoutPassword,
+        user: userData,
         token,
         expiresAt: expiresAt.toISOString(),
       },
