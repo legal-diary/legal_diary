@@ -3,7 +3,14 @@
     "allow": [
       "Bash(npm run dev:*)",
       "Bash(powershell -Command:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(taskkill:*)",
+      "Bash(nul)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill.exe:*)",
+      "Bash(cmd /c taskkill /PID 16168 /F)",
+      "Bash(cmd /c taskkill /PID 16168 /F 2)"
     ],
     "deny": [],
     "ask": []

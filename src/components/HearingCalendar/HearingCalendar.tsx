@@ -189,16 +189,17 @@ export default function HearingCalendar() {
 
   return (
     <div>
-      <Card title="Hearing Calendar" style={{ marginBottom: '2vh' }}>
-        <Calendar
-          fullscreen
-          dateCellRender={dateCellRender}
-          onChange={(date) => {
-            setSelectedDate(date);
-            // Open schedule hearing modal with pre-filled date
-            openScheduleHearingModal(date);
-          }}
-        />
+      <Card title="Hearing Calendar" style={{ marginBottom: '2vh' }} className="calendar-card">
+        <div className="calendar-container">
+          <Calendar
+            dateCellRender={dateCellRender}
+            onChange={(date) => {
+              setSelectedDate(date);
+              // Open schedule hearing modal with pre-filled date
+              openScheduleHearingModal(date);
+            }}
+          />
+        </div>
       </Card>
 
       <Card
@@ -366,6 +367,77 @@ export default function HearingCalendar() {
           </Button>
         </Form>
       </Modal>
+
+      <style>{`
+        .calendar-card {
+          width: 100%;
+        }
+
+        .calendar-container {
+          width: 100%;
+          overflow-x: auto;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+          .calendar-card {
+            margin-bottom: 1.5vh !important;
+          }
+
+          .ant-picker-calendar {
+            font-size: 0.85rem;
+          }
+
+          .ant-picker-calendar-header {
+            padding: 0.8rem 0.4rem !important;
+          }
+
+          .ant-picker-calendar-date {
+            padding: 0.4rem !important;
+            min-height: auto !important;
+          }
+
+          .ant-picker-cell {
+            padding: 0.4rem !important;
+          }
+
+          /* Reduce calendar cell height on mobile */
+          .ant-picker-calendar-date-value {
+            font-size: 0.8rem;
+          }
+
+          .ant-picker-cell-in-view.ant-picker-cell {
+            height: auto;
+            min-height: 60px;
+          }
+
+          /* Make calendar events smaller on mobile */
+          .calendar-container ul li {
+            font-size: 0.7rem !important;
+            padding: 0.2rem 0.3rem !important;
+            margin-bottom: 0.2rem !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .ant-picker-calendar-date {
+            padding: 0.2rem !important;
+          }
+
+          .ant-picker-cell {
+            padding: 0.2rem !important;
+          }
+
+          .ant-picker-cell-in-view.ant-picker-cell {
+            min-height: 50px;
+          }
+
+          .calendar-container ul li {
+            font-size: 0.65rem !important;
+            padding: 0.1rem 0.2rem !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

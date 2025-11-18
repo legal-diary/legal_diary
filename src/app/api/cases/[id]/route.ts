@@ -12,6 +12,9 @@ const ALLOWED_UPDATE_FIELDS = [
   'clientPhone',
   'status',
   'priority',
+  'courtName',
+  'judgeAssigned',
+  'opponents',
 ] as const;
 
 // GET a single case
@@ -157,6 +160,53 @@ export async function PUT(
     return NextResponse.json(updatedCase);
   } catch (error) {
     console.error('Error updating case:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE a case
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: caseId } = await params;
+
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await verifyToken(token);
+    if (!user || !user.firmId) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    // Verify case ownership
+    const caseRecord = await prisma.case.findFirst({
+      where: {
+        id: caseId,
+        firmId: user.firmId,
+      },
+    });
+
+    if (!caseRecord) {
+      return NextResponse.json({ error: 'Case not found' }, { status: 404 });
+    }
+
+    // Delete the case (cascading deletes will be handled by Prisma)
+    await prisma.case.delete({
+      where: { id: caseId },
+    });
+
+    return NextResponse.json({ message: 'Case deleted successfully' }, { status: 200 });
+  } catch (error) {
+    console.error('Error deleting case:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
