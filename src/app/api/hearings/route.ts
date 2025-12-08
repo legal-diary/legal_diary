@@ -18,13 +18,54 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Get hearings for cases in user's firm
+    // Check if calendar mode is requested (optimized for calendar view)
+    const url = new URL(request.url);
+    const calendarMode = url.searchParams.get('calendar') === 'true';
+
+    if (calendarMode) {
+      // Optimized query for calendar - only necessary fields
+      const hearings = await prisma.hearing.findMany({
+        where: {
+          case: { firmId: user.firmId },
+        },
+        select: {
+          id: true,
+          caseId: true,
+          hearingDate: true,
+          hearingTime: true,
+          hearingType: true,
+          courtRoom: true,
+          case: {
+            select: {
+              caseNumber: true,
+              caseTitle: true,
+              clientName: true,
+            },
+          },
+        },
+        orderBy: { hearingDate: 'asc' },
+      });
+
+      const response = NextResponse.json(hearings);
+      response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+      return response;
+    }
+
+    // Full data for other views
     const hearings = await prisma.hearing.findMany({
       where: {
         case: { firmId: user.firmId },
       },
       include: {
-        case: true,
+        case: {
+          select: {
+            id: true,
+            caseNumber: true,
+            caseTitle: true,
+            clientName: true,
+            status: true,
+          },
+        },
         reminders: true,
       },
       orderBy: { hearingDate: 'asc' },

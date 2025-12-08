@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import {
   Card,
   Row,
@@ -12,9 +12,7 @@ import {
   Tabs,
   Empty,
   message,
-  Spin,
   Space,
-  Modal,
   Form,
   Input,
   DatePicker,
@@ -42,7 +40,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useParams, useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import Link from 'next/link';
+import { CaseDetailSkeleton, shimmerStyles, SectionLoader } from '@/components/Skeletons';
 
+// Lazy load Modal to reduce initial bundle
+const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
+
+// Types
 interface Case {
   id: string;
   caseNumber: string;
@@ -62,14 +65,40 @@ interface Case {
   aiSummary?: any;
 }
 
+// Static color maps
+const STATUS_COLORS: Record<string, string> = {
+  ACTIVE: 'blue',
+  PENDING_JUDGMENT: 'orange',
+  CONCLUDED: 'green',
+  APPEAL: 'red',
+  DISMISSED: 'default',
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  LOW: 'green',
+  MEDIUM: 'blue',
+  HIGH: 'orange',
+  URGENT: 'red',
+};
+
+const HEARING_TYPES = [
+  { value: 'ARGUMENTS', label: 'Arguments' },
+  { value: 'EVIDENCE_RECORDING', label: 'Evidence Recording' },
+  { value: 'FINAL_HEARING', label: 'Final Hearing' },
+  { value: 'INTERIM_HEARING', label: 'Interim Hearing' },
+  { value: 'JUDGMENT_DELIVERY', label: 'Judgment Delivery' },
+  { value: 'PRE_HEARING', label: 'Pre Hearing' },
+] as const;
+
 export default function CaseDetailPage() {
   const { token } = useAuth();
   const params = useParams();
   const caseId = params.id as string;
   const router = useRouter();
 
+  // State
   const [caseData, setCaseData] = useState<Case | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [hearingModalOpen, setHearingModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -84,41 +113,10 @@ export default function CaseDetailPage() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
 
-  const handleAIQuickAction = async (action: string) => {
-    setAiLoading(true);
-    try {
-      if (action === 'reanalyze') {
-        const response = await fetch(`/api/cases/${caseId}/ai/reanalyze`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
+  // Fetch case details
+  const fetchCaseDetail = useCallback(async () => {
+    if (!token || !caseId) return;
 
-        if (response.ok) {
-          message.success('Case re-analyzed successfully');
-          fetchCaseDetail();
-        } else {
-          const error = await response.json();
-          message.error(error.error || 'Failed to re-analyze case');
-        }
-      }
-    } catch (error) {
-      message.error('Failed to perform action');
-      console.error(error);
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (token && caseId) {
-      fetchCaseDetail();
-    }
-  }, [token, caseId]);
-
-  const fetchCaseDetail = async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/cases/${caseId}`, {
@@ -130,35 +128,199 @@ export default function CaseDetailPage() {
       } else if (response.status === 404) {
         message.error('Case not found');
       }
-    } catch (error) {
+    } catch {
       message.error('Failed to load case details');
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, caseId]);
 
-  const getStatusColor = (status: string) => {
-    const colors: { [key: string]: string } = {
-      ACTIVE: 'blue',
-      PENDING_JUDGMENT: 'orange',
-      CONCLUDED: 'green',
-      APPEAL: 'red',
-      DISMISSED: 'error',
-    };
-    return colors[status] || 'default';
-  };
+  useEffect(() => {
+    if (token && caseId) {
+      fetchCaseDetail();
+    }
+  }, [token, caseId, fetchCaseDetail]);
 
-  const getPriorityColor = (priority: string) => {
-    const colors: { [key: string]: string } = {
-      LOW: 'green',
-      MEDIUM: 'blue',
-      HIGH: 'orange',
-      URGENT: 'red',
-    };
-    return colors[priority] || 'default';
-  };
+  // Memoized handlers
+  const handleAIQuickAction = useCallback(async (action: string) => {
+    if (action !== 'reanalyze') return;
 
-  const hearingColumns = [
+    setAiLoading(true);
+    try {
+      const response = await fetch(`/api/cases/${caseId}/ai/reanalyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        message.success('Case re-analyzed successfully');
+        fetchCaseDetail();
+      } else {
+        const error = await response.json();
+        message.error(error.error || 'Failed to re-analyze case');
+      }
+    } catch {
+      message.error('Failed to perform action');
+    } finally {
+      setAiLoading(false);
+    }
+  }, [caseId, token, fetchCaseDetail]);
+
+  const handleViewDocument = useCallback((record: any) => {
+    setSelectedDocument(record);
+    setViewerOpen(true);
+  }, []);
+
+  const handleFileUpload = useCallback((info: any) => {
+    const fileList = info.fileList
+      .filter((file: any) => file.originFileObj)
+      .map((file: any) => file.originFileObj);
+    setUploadedFiles(fileList);
+  }, []);
+
+  const handleUploadSubmit = useCallback(async () => {
+    if (uploadedFiles.length === 0) {
+      message.warning('Please select at least one file to upload');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      uploadedFiles.forEach((file) => {
+        formData.append('files', file);
+      });
+
+      const response = await fetch(`/api/cases/${caseId}/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        message.success(`${result.files.length} file(s) uploaded successfully`);
+        setUploadModalOpen(false);
+        setUploadedFiles([]);
+        fetchCaseDetail();
+      } else {
+        const error = await response.json();
+        message.error(error.error || 'Failed to upload files');
+      }
+    } catch {
+      message.error('Failed to upload files');
+    } finally {
+      setUploading(false);
+    }
+  }, [uploadedFiles, caseId, token, fetchCaseDetail]);
+
+  const handleHearingSubmit = useCallback(async (values: any) => {
+    try {
+      const response = await fetch('/api/hearings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          caseId,
+          hearingDate: values.hearingDate.toISOString(),
+          hearingTime: values.hearingTime,
+          hearingType: values.hearingType,
+          courtRoom: values.courtRoom,
+        }),
+      });
+
+      if (response.ok) {
+        message.success('Hearing scheduled');
+        setHearingModalOpen(false);
+        form.resetFields();
+        fetchCaseDetail();
+      }
+    } catch {
+      message.error('Failed to schedule hearing');
+    }
+  }, [caseId, token, form, fetchCaseDetail]);
+
+  const handleEditOpen = useCallback(() => {
+    if (caseData) {
+      editForm.setFieldsValue({
+        caseTitle: caseData.caseTitle,
+        status: caseData.status,
+        priority: caseData.priority,
+        clientName: caseData.clientName,
+        clientEmail: caseData.clientEmail,
+        clientPhone: caseData.clientPhone,
+        courtName: caseData.courtName,
+        judgeAssigned: caseData.judgeAssigned,
+        opponents: caseData.opponents,
+        description: caseData.description,
+      });
+      setEditModalOpen(true);
+    }
+  }, [caseData, editForm]);
+
+  const handleEditSubmit = useCallback(async (values: any) => {
+    try {
+      const response = await fetch(`/api/cases/${caseId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...values,
+          documentsToDelete: documentsToDelete,
+        }),
+      });
+
+      if (response.ok) {
+        const updatedData = await response.json();
+        message.success('Case updated successfully');
+        setEditModalOpen(false);
+        setDocumentsToDelete([]);
+        setCaseData(updatedData);
+        setTimeout(() => fetchCaseDetail(), 500);
+      } else {
+        message.error('Failed to update case');
+      }
+    } catch {
+      message.error('Failed to update case');
+    }
+  }, [caseId, token, documentsToDelete, fetchCaseDetail]);
+
+  const handleDelete = useCallback(() => {
+    setDeleteConfirmOpen(true);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/cases/${caseId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        message.success('Case deleted successfully');
+        router.push('/cases');
+      } else {
+        message.error('Failed to delete case');
+        setDeleteConfirmOpen(false);
+      }
+    } catch {
+      message.error('Failed to delete case');
+      setDeleteConfirmOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  }, [caseId, token, router]);
+
+  // Memoized table columns
+  const hearingColumns = useMemo(() => [
     {
       title: 'Date',
       dataIndex: 'hearingDate',
@@ -182,14 +344,9 @@ export default function CaseDetailPage() {
       key: 'status',
       render: (status: string) => <Tag color="green">{status}</Tag>,
     },
-  ];
+  ], []);
 
-  const handleViewDocument = (record: any) => {
-    setSelectedDocument(record);
-    setViewerOpen(true);
-  };
-
-  const fileColumns = [
+  const fileColumns = useMemo(() => [
     {
       title: 'File Name',
       dataIndex: 'fileName',
@@ -227,184 +384,149 @@ export default function CaseDetailPage() {
         </Space>
       ),
     },
-  ];
+  ], [handleViewDocument]);
 
-  const handleFileUpload = (info: any) => {
-    const fileList = info.fileList
-      .filter((file: any) => file.originFileObj)
-      .map((file: any) => file.originFileObj);
-    setUploadedFiles(fileList);
-  };
+  // AI dropdown menu items
+  const aiMenuItems: MenuProps['items'] = useMemo(() => [
+    {
+      key: 'reanalyze',
+      label: 'Re-analyze Case',
+      icon: <ThunderboltOutlined />,
+      onClick: () => handleAIQuickAction('reanalyze'),
+    },
+    {
+      key: 'ai-tab',
+      label: 'Go to AI Analysis Tab',
+      onClick: () => {
+        const tabElement = document.querySelector('[data-node-key="ai-analysis"]') as HTMLElement;
+        if (tabElement) tabElement.click();
+      },
+    },
+  ], [handleAIQuickAction]);
 
-  const handleUploadSubmit = async () => {
-    if (uploadedFiles.length === 0) {
-      message.warning('Please select at least one file to upload');
-      return;
-    }
+  // Memoized tab items
+  const tabItems = useMemo(() => {
+    if (!caseData) return [];
 
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      uploadedFiles.forEach((file) => {
-        formData.append('files', file);
-      });
+    return [
+      {
+        key: 'overview',
+        label: 'Overview',
+        children: (
+          <Card>
+            <Descriptions column={2} bordered>
+              <Descriptions.Item label="Case Number">{caseData.caseNumber}</Descriptions.Item>
+              <Descriptions.Item label="Status">
+                <Tag color={STATUS_COLORS[caseData.status]}>{caseData.status.replace(/_/g, ' ')}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Priority">
+                <Tag color={PRIORITY_COLORS[caseData.priority]}>{caseData.priority}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Client Name">{caseData.clientName}</Descriptions.Item>
+              <Descriptions.Item label="Client Email">{caseData.clientEmail || 'N/A'}</Descriptions.Item>
+              <Descriptions.Item label="Client Phone">{caseData.clientPhone || 'N/A'}</Descriptions.Item>
+              <Descriptions.Item label="Court Name">{caseData.courtName || 'N/A'}</Descriptions.Item>
+              <Descriptions.Item label="Judge Assigned">{caseData.judgeAssigned || 'N/A'}</Descriptions.Item>
+              <Descriptions.Item label="Opponents" span={2}>{caseData.opponents || 'N/A'}</Descriptions.Item>
+              <Descriptions.Item label="Created Date" span={2}>
+                {dayjs(caseData.createdAt).format('YYYY-MM-DD HH:mm')}
+              </Descriptions.Item>
+            </Descriptions>
 
-      const response = await fetch(`/api/cases/${caseId}/upload`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
+            {caseData.description && (
+              <Card title="Case Description" style={{ marginTop: '2vh' }}>
+                <p style={{ fontSize: 'clamp(0.9rem, 2vw, 1rem)', lineHeight: '1.6' }}>{caseData.description}</p>
+              </Card>
+            )}
 
-      if (response.ok) {
-        const result = await response.json();
-        message.success(`${result.files.length} file(s) uploaded successfully`);
-        setUploadModalOpen(false);
-        setUploadedFiles([]);
-        fetchCaseDetail(); // Refresh to show new documents
-      } else {
-        const error = await response.json();
-        message.error(error.error || 'Failed to upload files');
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      message.error('Failed to upload files');
-    } finally {
-      setUploading(false);
-    }
-  };
+            {caseData.aiSummary && (
+              <Card title="AI Summary & Insights" style={{ marginTop: '2vh' }}>
+                <Card.Meta title="Summary" description={caseData.aiSummary.summary} style={{ marginBottom: '1.5vh' }} />
+                <Card.Meta
+                  title="Key Points"
+                  description={
+                    <ul>
+                      {JSON.parse(caseData.aiSummary.keyPoints).map((point: string, index: number) => (
+                        <li key={index} style={{ fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', marginBottom: '0.5vh' }}>
+                          {point}
+                        </li>
+                      ))}
+                    </ul>
+                  }
+                  style={{ marginBottom: '1.5vh' }}
+                />
+                <Card.Meta title="Insights & Recommendations" description={caseData.aiSummary.insights} />
+              </Card>
+            )}
+          </Card>
+        ),
+      },
+      {
+        key: 'hearings',
+        label: 'Hearings',
+        children: (
+          <Card
+            extra={
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setHearingModalOpen(true)}>
+                Schedule Hearing
+              </Button>
+            }
+          >
+            {caseData.hearings && caseData.hearings.length > 0 ? (
+              <Table columns={hearingColumns} dataSource={caseData.hearings} rowKey="id" pagination={false} />
+            ) : (
+              <Empty description="No hearings scheduled" />
+            )}
+          </Card>
+        ),
+      },
+      {
+        key: 'documents',
+        label: 'Documents',
+        children: (
+          <Card
+            extra={
+              <Button type="primary" icon={<UploadOutlined />} onClick={() => setUploadModalOpen(true)}>
+                Upload Document
+              </Button>
+            }
+          >
+            {caseData.fileDocuments && caseData.fileDocuments.length > 0 ? (
+              <Table columns={fileColumns} dataSource={caseData.fileDocuments} rowKey="id" pagination={false} />
+            ) : (
+              <Empty description="No documents uploaded" />
+            )}
+          </Card>
+        ),
+      },
+      {
+        key: 'ai-analysis',
+        label: 'AI Analysis',
+        children: (
+          <AIAnalysisTab
+            caseId={caseId}
+            caseTitle={caseData.caseTitle}
+            aiSummary={caseData.aiSummary}
+            fileDocuments={caseData.fileDocuments || []}
+            token={token || ''}
+            onAnalysisComplete={fetchCaseDetail}
+          />
+        ),
+      },
+    ];
+  }, [caseData, caseId, token, hearingColumns, fileColumns, fetchCaseDetail]);
 
-  const handleHearingSubmit = async (values: any) => {
-    try {
-      const response = await fetch('/api/hearings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          caseId,
-          hearingDate: values.hearingDate.toISOString(),
-          hearingTime: values.hearingTime,
-          hearingType: values.hearingType,
-          courtRoom: values.courtRoom,
-        }),
-      });
-
-      if (response.ok) {
-        message.success('Hearing scheduled');
-        setHearingModalOpen(false);
-        form.resetFields();
-        fetchCaseDetail();
-      }
-    } catch (error) {
-      message.error('Failed to schedule hearing');
-    }
-  };
-
-  const handleEditOpen = () => {
-    console.log('Edit button clicked');
-    if (caseData) {
-      console.log('Setting form fields with:', caseData);
-      editForm.setFieldsValue({
-        caseTitle: caseData.caseTitle,
-        status: caseData.status,
-        priority: caseData.priority,
-        clientName: caseData.clientName,
-        clientEmail: caseData.clientEmail,
-        clientPhone: caseData.clientPhone,
-        courtName: caseData.courtName,
-        judgeAssigned: caseData.judgeAssigned,
-        opponents: caseData.opponents,
-        description: caseData.description,
-      });
-      setEditModalOpen(true);
-      console.log('Edit modal opened');
-    }
-  };
-
-  const handleEditSubmit = async (values: any) => {
-    console.log('Edit form submitted with values:', values);
-    try {
-      console.log('Sending PUT request for case:', caseId);
-      const response = await fetch(`/api/cases/${caseId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...values,
-          documentsToDelete: documentsToDelete,
-        }),
-      });
-
-      console.log('PUT response status:', response.status);
-      if (response.ok) {
-        const updatedData = await response.json();
-        console.log('Updated case data:', updatedData);
-        message.success('Case updated successfully');
-        setEditModalOpen(false);
-        setDocumentsToDelete([]);
-        setCaseData(updatedData);
-        // Wait a moment then refresh to ensure UI updates
-        setTimeout(() => {
-          fetchCaseDetail();
-        }, 500);
-      } else {
-        const errorData = await response.json();
-        console.error('Error response:', errorData);
-        message.error('Failed to update case');
-      }
-    } catch (error) {
-      console.error('Edit error:', error);
-      message.error('Failed to update case');
-    }
-  };
-
-  const handleDelete = () => {
-    console.log('Delete button clicked');
-    setDeleteConfirmOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    console.log('Delete confirmed');
-    setDeleting(true);
-    try {
-      console.log('Sending DELETE request for case:', caseId);
-      const response = await fetch(`/api/cases/${caseId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      console.log('Delete response status:', response.status);
-      if (response.ok) {
-        message.success('Case deleted successfully');
-        router.push('/cases');
-      } else {
-        message.error('Failed to delete case');
-        setDeleteConfirmOpen(false);
-      }
-    } catch (error) {
-      console.error('Delete error:', error);
-      message.error('Failed to delete case');
-      setDeleteConfirmOpen(false);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
+  // Loading state
   if (loading) {
     return (
       <DashboardLayout>
-        <Spin />
+        <style>{shimmerStyles}</style>
+        <CaseDetailSkeleton />
       </DashboardLayout>
     );
   }
 
+  // Not found state
   if (!caseData) {
     return (
       <DashboardLayout>
@@ -413,158 +535,9 @@ export default function CaseDetailPage() {
     );
   }
 
-  const items = [
-    {
-      key: 'overview',
-      label: 'Overview',
-      children: (
-        <Card>
-          <Descriptions column={2} bordered>
-            <Descriptions.Item label="Case Number">
-              {caseData.caseNumber}
-            </Descriptions.Item>
-            <Descriptions.Item label="Status">
-              <Tag color={getStatusColor(caseData.status)}>
-                {caseData.status.replace(/_/g, ' ')}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Priority">
-              <Tag color={getPriorityColor(caseData.priority)}>
-                {caseData.priority}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Client Name">
-              {caseData.clientName}
-            </Descriptions.Item>
-            <Descriptions.Item label="Client Email">
-              {caseData.clientEmail || 'N/A'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Client Phone">
-              {caseData.clientPhone || 'N/A'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Court Name">
-              {caseData.courtName || 'N/A'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Judge Assigned">
-              {caseData.judgeAssigned || 'N/A'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Opponents" span={2}>
-              {caseData.opponents || 'N/A'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Created Date" span={2}>
-              {dayjs(caseData.createdAt).format('YYYY-MM-DD HH:mm')}
-            </Descriptions.Item>
-          </Descriptions>
-
-          {caseData.description && (
-            <Card title="Case Description" style={{ marginTop: '2vh' }}>
-              <p style={{ fontSize: 'clamp(0.9rem, 2vw, 1rem)', lineHeight: '1.6vh' }}>{caseData.description}</p>
-            </Card>
-          )}
-
-          {caseData.aiSummary && (
-            <Card title="AI Summary & Insights" style={{ marginTop: '2vh' }}>
-              <Card.Meta
-                title="Summary"
-                description={caseData.aiSummary.summary}
-                style={{ marginBottom: '1.5vh' }}
-              />
-              <Card.Meta
-                title="Key Points"
-                description={
-                  <ul>
-                    {JSON.parse(caseData.aiSummary.keyPoints).map(
-                      (point: string, index: number) => (
-                        <li key={index} style={{ fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', marginBottom: '0.5vh' }}>{point}</li>
-                      )
-                    )}
-                  </ul>
-                }
-                style={{ marginBottom: '1.5vh' }}
-              />
-              <Card.Meta
-                title="Insights & Recommendations"
-                description={caseData.aiSummary.insights}
-              />
-            </Card>
-          )}
-        </Card>
-      ),
-    },
-    {
-      key: 'hearings',
-      label: 'Hearings',
-      children: (
-        <Card
-          extra={
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setHearingModalOpen(true)}
-            >
-              Schedule Hearing
-            </Button>
-          }
-        >
-          {caseData.hearings && caseData.hearings.length > 0 ? (
-            <Table
-              columns={hearingColumns}
-              dataSource={caseData.hearings}
-              rowKey="id"
-              pagination={false}
-            />
-          ) : (
-            <Empty description="No hearings scheduled" />
-          )}
-        </Card>
-      ),
-    },
-    {
-      key: 'documents',
-      label: 'Documents',
-      children: (
-        <Card
-          extra={
-            <Button
-              type="primary"
-              icon={<UploadOutlined />}
-              onClick={() => setUploadModalOpen(true)}
-            >
-              Upload Document
-            </Button>
-          }
-        >
-          {caseData.fileDocuments && caseData.fileDocuments.length > 0 ? (
-            <Table
-              columns={fileColumns}
-              dataSource={caseData.fileDocuments}
-              rowKey="id"
-              pagination={false}
-            />
-          ) : (
-            <Empty description="No documents uploaded" />
-          )}
-        </Card>
-      ),
-    },
-    {
-      key: 'ai-analysis',
-      label: 'AI Analysis',
-      children: (
-        <AIAnalysisTab
-          caseId={caseId}
-          caseTitle={caseData.caseTitle}
-          aiSummary={caseData.aiSummary}
-          fileDocuments={caseData.fileDocuments || []}
-          token={token || ''}
-          onAnalysisComplete={fetchCaseDetail}
-        />
-      ),
-    },
-  ];
-
   return (
     <DashboardLayout>
+      {/* Header */}
       <Row gutter={[16, 16]} style={{ marginBottom: '2vh' }}>
         <Col xs={24}>
           <Card>
@@ -577,30 +550,7 @@ export default function CaseDetailPage() {
               </Col>
               <Col>
                 <Space>
-                  <Dropdown
-                    menu={{
-                      items: [
-                        {
-                          key: 'reanalyze',
-                          label: 'Re-analyze Case',
-                          icon: <ThunderboltOutlined />,
-                          onClick: () => handleAIQuickAction('reanalyze'),
-                        },
-                        {
-                          key: 'ai-tab',
-                          label: 'Go to AI Analysis Tab',
-                          onClick: () => {
-                            const tabElement = document.querySelector(
-                              '[data-node-key="ai-analysis"]'
-                            ) as HTMLElement;
-                            if (tabElement) {
-                              tabElement.click();
-                            }
-                          },
-                        },
-                      ] as MenuProps['items'],
-                    }}
-                  >
+                  <Dropdown menu={{ items: aiMenuItems }}>
                     <Button icon={<ThunderboltOutlined />} loading={aiLoading}>
                       AI <DownOutlined />
                     </Button>
@@ -608,12 +558,7 @@ export default function CaseDetailPage() {
                   <Button icon={<EditOutlined />} onClick={handleEditOpen}>
                     Edit
                   </Button>
-                  <Button
-                    icon={<DeleteOutlined />}
-                    onClick={handleDelete}
-                    danger
-                    loading={deleting}
-                  >
+                  <Button icon={<DeleteOutlined />} onClick={handleDelete} danger loading={deleting}>
                     Delete
                   </Button>
                   <Link href="/calendar">
@@ -626,265 +571,207 @@ export default function CaseDetailPage() {
         </Col>
       </Row>
 
-      <Tabs items={items} />
+      {/* Tabs */}
+      <Tabs items={tabItems} />
 
-      <Modal
-        title="Upload Document"
-        open={uploadModalOpen}
-        onCancel={() => {
-          setUploadModalOpen(false);
-          setUploadedFiles([]);
-        }}
-        footer={[
-          <Button
-            key="cancel"
-            onClick={() => {
+      {/* Modals - Lazy loaded */}
+      {uploadModalOpen && (
+        <Suspense fallback={null}>
+          <Modal
+            title="Upload Document"
+            open={uploadModalOpen}
+            onCancel={() => {
               setUploadModalOpen(false);
               setUploadedFiles([]);
             }}
+            footer={[
+              <Button key="cancel" onClick={() => { setUploadModalOpen(false); setUploadedFiles([]); }}>
+                Cancel
+              </Button>,
+              <Button key="upload" type="primary" loading={uploading} onClick={handleUploadSubmit} disabled={uploadedFiles.length === 0}>
+                {uploading ? 'Uploading...' : `Upload ${uploadedFiles.length > 0 ? `(${uploadedFiles.length})` : ''}`}
+              </Button>,
+            ]}
+            destroyOnClose
           >
-            Cancel
-          </Button>,
-          <Button
-            key="upload"
-            type="primary"
-            loading={uploading}
-            onClick={handleUploadSubmit}
-            disabled={uploadedFiles.length === 0}
-          >
-            {uploading ? 'Uploading...' : `Upload ${uploadedFiles.length > 0 ? `(${uploadedFiles.length})` : ''}`}
-          </Button>,
-        ]}
-      >
-        <Upload.Dragger
-          onChange={handleFileUpload}
-          multiple
-          maxCount={5}
-          beforeUpload={() => false}
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif"
-          fileList={uploadedFiles.map((file, index) => ({
-            uid: `${index}`,
-            name: file.name,
-            status: 'done' as const,
-          }))}
-          onRemove={(file) => {
-            setUploadedFiles(uploadedFiles.filter((_, i) => `${i}` !== file.uid));
-          }}
-        >
-          <p className="ant-upload-drag-icon">
-            <UploadOutlined style={{ fontSize: '3rem', color: '#1a3a52' }} />
-          </p>
-          <p className="ant-upload-text">Click or drag files to this area to upload</p>
-          <p className="ant-upload-hint">
-            Supported formats: PDF, Word, Excel, TXT, Images (max 5 files, 10MB each)
-          </p>
-        </Upload.Dragger>
-      </Modal>
+            <Upload.Dragger
+              onChange={handleFileUpload}
+              multiple
+              maxCount={5}
+              beforeUpload={() => false}
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif"
+              fileList={uploadedFiles.map((file, index) => ({
+                uid: `${index}`,
+                name: file.name,
+                status: 'done' as const,
+              }))}
+              onRemove={(file) => setUploadedFiles(uploadedFiles.filter((_, i) => `${i}` !== file.uid))}
+            >
+              <p className="ant-upload-drag-icon">
+                <UploadOutlined style={{ fontSize: '3rem', color: '#1a3a52' }} />
+              </p>
+              <p className="ant-upload-text">Click or drag files to this area to upload</p>
+              <p className="ant-upload-hint">Supported formats: PDF, Word, Excel, TXT, Images (max 5 files, 10MB each)</p>
+            </Upload.Dragger>
+          </Modal>
+        </Suspense>
+      )}
 
-      <Modal
-        title="Schedule Hearing"
-        open={hearingModalOpen}
-        onCancel={() => setHearingModalOpen(false)}
-        footer={null}
-      >
-        <Form form={form} onFinish={handleHearingSubmit} layout="vertical">
-          <Form.Item
-            name="hearingDate"
-            label="Hearing Date"
-            rules={[{ required: true }]}
-          >
-            <DatePicker />
-          </Form.Item>
-          <Form.Item name="hearingTime" label="Time">
-            <Input type="time" />
-          </Form.Item>
-          <Form.Item
-            name="hearingType"
-            label="Hearing Type"
-            rules={[{ required: true }]}
-          >
-            <Select>
-              <Select.Option value="ARGUMENTS">Arguments</Select.Option>
-              <Select.Option value="EVIDENCE_RECORDING">Evidence Recording</Select.Option>
-              <Select.Option value="FINAL_HEARING">Final Hearing</Select.Option>
-              <Select.Option value="INTERIM_HEARING">Interim Hearing</Select.Option>
-              <Select.Option value="JUDGMENT_DELIVERY">Judgment Delivery</Select.Option>
-              <Select.Option value="PRE_HEARING">Pre Hearing</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="courtRoom" label="Court Room">
-            <Input />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" block>
-            Schedule
-          </Button>
-        </Form>
-      </Modal>
-
-      <Modal
-        title="Edit Case"
-        open={editModalOpen}
-        onCancel={() => setEditModalOpen(false)}
-        footer={null}
-        width={800}
-      >
-        <Form
-          form={editForm}
-          onFinish={handleEditSubmit}
-          onFinishFailed={(errorInfo) => {
-            console.log('Form validation failed:', errorInfo);
-          }}
-          layout="vertical"
-        >
-          <Form.Item
-            name="caseTitle"
-            label="Case Title"
-            rules={[{ required: true, message: 'Please enter case title' }]}
-          >
-            <Input />
-          </Form.Item>
-
-          <Row gutter={[16, 0]}>
-            <Col xs={24} md={12}>
-              <Form.Item
-                name="status"
-                label="Status"
-                rules={[{ required: true }]}
-              >
+      {hearingModalOpen && (
+        <Suspense fallback={null}>
+          <Modal title="Schedule Hearing" open={hearingModalOpen} onCancel={() => setHearingModalOpen(false)} footer={null} destroyOnClose>
+            <Form form={form} onFinish={handleHearingSubmit} layout="vertical">
+              <Form.Item name="hearingDate" label="Hearing Date" rules={[{ required: true }]}>
+                <DatePicker style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="hearingTime" label="Time">
+                <Input type="time" />
+              </Form.Item>
+              <Form.Item name="hearingType" label="Hearing Type" rules={[{ required: true }]}>
                 <Select>
-                  <Select.Option value="ACTIVE">Active</Select.Option>
-                  <Select.Option value="PENDING_JUDGMENT">Pending Judgment</Select.Option>
-                  <Select.Option value="CONCLUDED">Concluded</Select.Option>
-                  <Select.Option value="APPEAL">Appeal</Select.Option>
-                  <Select.Option value="DISMISSED">Dismissed</Select.Option>
+                  {HEARING_TYPES.map((type) => (
+                    <Select.Option key={type.value} value={type.value}>{type.label}</Select.Option>
+                  ))}
                 </Select>
               </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item
-                name="priority"
-                label="Priority"
-                rules={[{ required: true }]}
-              >
-                <Select>
-                  <Select.Option value="LOW">Low</Select.Option>
-                  <Select.Option value="MEDIUM">Medium</Select.Option>
-                  <Select.Option value="HIGH">High</Select.Option>
-                  <Select.Option value="URGENT">Urgent</Select.Option>
-                </Select>
+              <Form.Item name="courtRoom" label="Court Room">
+                <Input />
               </Form.Item>
-            </Col>
-          </Row>
+              <Button type="primary" htmlType="submit" block>Schedule</Button>
+            </Form>
+          </Modal>
+        </Suspense>
+      )}
 
-          <Form.Item
-            name="clientName"
-            label="Client Name"
-            rules={[{ required: true, message: 'Please enter client name' }]}
+      {editModalOpen && (
+        <Suspense fallback={null}>
+          <Modal title="Edit Case" open={editModalOpen} onCancel={() => setEditModalOpen(false)} footer={null} width={800} destroyOnClose>
+            <Form form={editForm} onFinish={handleEditSubmit} layout="vertical">
+              <Form.Item name="caseTitle" label="Case Title" rules={[{ required: true, message: 'Please enter case title' }]}>
+                <Input />
+              </Form.Item>
+
+              <Row gutter={[16, 0]}>
+                <Col xs={24} md={12}>
+                  <Form.Item name="status" label="Status" rules={[{ required: true }]}>
+                    <Select>
+                      <Select.Option value="ACTIVE">Active</Select.Option>
+                      <Select.Option value="PENDING_JUDGMENT">Pending Judgment</Select.Option>
+                      <Select.Option value="CONCLUDED">Concluded</Select.Option>
+                      <Select.Option value="APPEAL">Appeal</Select.Option>
+                      <Select.Option value="DISMISSED">Dismissed</Select.Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item name="priority" label="Priority" rules={[{ required: true }]}>
+                    <Select>
+                      <Select.Option value="LOW">Low</Select.Option>
+                      <Select.Option value="MEDIUM">Medium</Select.Option>
+                      <Select.Option value="HIGH">High</Select.Option>
+                      <Select.Option value="URGENT">Urgent</Select.Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Form.Item name="clientName" label="Client Name" rules={[{ required: true, message: 'Please enter client name' }]}>
+                <Input />
+              </Form.Item>
+
+              <Row gutter={[16, 0]}>
+                <Col xs={24} md={12}>
+                  <Form.Item name="clientEmail" label="Client Email" rules={[{ type: 'email', message: 'Invalid email' }]}>
+                    <Input type="email" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item name="clientPhone" label="Client Phone">
+                    <Input />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={[16, 0]}>
+                <Col xs={24} md={12}>
+                  <Form.Item name="courtName" label="Court Name">
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item name="judgeAssigned" label="Judge Assigned">
+                    <Input />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Form.Item name="opponents" label="Opponents">
+                <Input placeholder="Comma-separated list" />
+              </Form.Item>
+
+              <Form.Item name="description" label="Case Description">
+                <Input.TextArea rows={4} />
+              </Form.Item>
+
+              {caseData.fileDocuments && caseData.fileDocuments.length > 0 && (
+                <Form.Item label="Manage Documents">
+                  <Card type="inner" size="small">
+                    <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#666' }}>
+                      Click the checkbox to delete documents:
+                    </p>
+                    {caseData.fileDocuments.map((doc: any) => (
+                      <div key={doc.id} style={{ marginBottom: '0.5rem' }}>
+                        <Checkbox
+                          checked={documentsToDelete.includes(doc.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setDocumentsToDelete([...documentsToDelete, doc.id]);
+                            } else {
+                              setDocumentsToDelete(documentsToDelete.filter((id) => id !== doc.id));
+                            }
+                          }}
+                        >
+                          {doc.fileName} ({(doc.fileSize / 1024).toFixed(2)} KB)
+                        </Checkbox>
+                      </div>
+                    ))}
+                  </Card>
+                </Form.Item>
+              )}
+
+              <Row gutter={[8, 0]} justify="end">
+                <Col>
+                  <Button onClick={() => { setEditModalOpen(false); setDocumentsToDelete([]); }}>Cancel</Button>
+                </Col>
+                <Col>
+                  <Button type="primary" htmlType="submit">Save Changes</Button>
+                </Col>
+              </Row>
+            </Form>
+          </Modal>
+        </Suspense>
+      )}
+
+      {deleteConfirmOpen && (
+        <Suspense fallback={null}>
+          <Modal
+            title="Delete Case"
+            open={deleteConfirmOpen}
+            onCancel={() => setDeleteConfirmOpen(false)}
+            onOk={confirmDelete}
+            okText="Delete"
+            okType="danger"
+            cancelText="Cancel"
+            confirmLoading={deleting}
           >
-            <Input />
-          </Form.Item>
-
-          <Row gutter={[16, 0]}>
-            <Col xs={24} md={12}>
-              <Form.Item
-                name="clientEmail"
-                label="Client Email"
-                rules={[{ type: 'email', message: 'Invalid email' }]}
-              >
-                <Input type="email" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item name="clientPhone" label="Client Phone">
-                <Input />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={[16, 0]}>
-            <Col xs={24} md={12}>
-              <Form.Item name="courtName" label="Court Name">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item name="judgeAssigned" label="Judge Assigned">
-                <Input />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item name="opponents" label="Opponents">
-            <Input placeholder="Comma-separated list" />
-          </Form.Item>
-
-          <Form.Item name="description" label="Case Description">
-            <Input.TextArea rows={4} />
-          </Form.Item>
-
-          {caseData.fileDocuments && caseData.fileDocuments.length > 0 && (
-            <Form.Item label="Manage Documents">
-              <Card type="inner" size="small">
-                <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#666' }}>
-                  Click the checkbox to delete documents:
-                </p>
-                {caseData.fileDocuments.map((doc: any) => (
-                  <div key={doc.id} style={{ marginBottom: '0.5rem' }}>
-                    <Checkbox
-                      checked={documentsToDelete.includes(doc.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setDocumentsToDelete([...documentsToDelete, doc.id]);
-                        } else {
-                          setDocumentsToDelete(
-                            documentsToDelete.filter((id) => id !== doc.id)
-                          );
-                        }
-                      }}
-                    >
-                      {doc.fileName} ({(doc.fileSize / 1024).toFixed(2)} KB)
-                    </Checkbox>
-                  </div>
-                ))}
-              </Card>
-            </Form.Item>
-          )}
-
-          <Row gutter={[8, 0]} justify="end">
-            <Col>
-              <Button onClick={() => {
-                setEditModalOpen(false);
-                setDocumentsToDelete([]);
-              }}>Cancel</Button>
-            </Col>
-            <Col>
-              <Button type="primary" htmlType="submit">
-                Save Changes
-              </Button>
-            </Col>
-          </Row>
-        </Form>
-      </Modal>
-
-      <Modal
-        title="Delete Case"
-        open={deleteConfirmOpen}
-        onCancel={() => setDeleteConfirmOpen(false)}
-        onOk={confirmDelete}
-        okText="Delete"
-        okType="danger"
-        cancelText="Cancel"
-        confirmLoading={deleting}
-      >
-        <p>Are you sure you want to delete this case? This action cannot be undone.</p>
-      </Modal>
+            <p>Are you sure you want to delete this case? This action cannot be undone.</p>
+          </Modal>
+        </Suspense>
+      )}
 
       <DocumentViewer
         visible={viewerOpen}
-        onClose={() => {
-          setViewerOpen(false);
-          setSelectedDocument(null);
-        }}
+        onClose={() => { setViewerOpen(false); setSelectedDocument(null); }}
         document={selectedDocument}
         token={token || ''}
       />
