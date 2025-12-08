@@ -69,7 +69,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <Row justify="center" align="middle" style={{ minHeight: '100vh', minHeight: '100dvh', background: '#ffffff', padding: 'clamp(12px, 4vw, 24px)' }}>
+    <Row justify="center" align="middle" style={{ minHeight: '100dvh', background: '#ffffff', padding: 'clamp(12px, 4vw, 24px)' }}>
       <Col xs={24} sm={22} md={14} lg={10} xl={8} style={{ maxWidth: '500px', width: '100%' }}>
         <Card
           title={
