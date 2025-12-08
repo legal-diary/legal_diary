@@ -32,10 +32,12 @@ import {
   DeleteOutlined,
   ThunderboltOutlined,
   DownOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import { Dropdown, MenuProps } from 'antd';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import AIAnalysisTab from '@/components/Cases/AIAnalysisTab';
+import DocumentViewer from '@/components/Documents/DocumentViewer';
 import { useAuth } from '@/context/AuthContext';
 import { useParams, useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
@@ -79,6 +81,8 @@ export default function CaseDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [documentsToDelete, setDocumentsToDelete] = useState<string[]>([]);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<any>(null);
 
   const handleAIQuickAction = async (action: string) => {
     setAiLoading(true);
@@ -180,6 +184,11 @@ export default function CaseDetailPage() {
     },
   ];
 
+  const handleViewDocument = (record: any) => {
+    setSelectedDocument(record);
+    setViewerOpen(true);
+  };
+
   const fileColumns = [
     {
       title: 'File Name',
@@ -201,11 +210,21 @@ export default function CaseDetailPage() {
       title: 'Actions',
       key: 'actions',
       render: (_: any, record: any) => (
-        <a href={record.fileUrl} target="_blank" rel="noopener noreferrer">
-          <Button icon={<DownloadOutlined />} size="small" type="link">
-            Download
+        <Space>
+          <Button
+            icon={<EyeOutlined />}
+            size="small"
+            type="link"
+            onClick={() => handleViewDocument(record)}
+          >
+            View
           </Button>
-        </a>
+          <a href={record.fileUrl} target="_blank" rel="noopener noreferrer">
+            <Button icon={<DownloadOutlined />} size="small" type="link">
+              Download
+            </Button>
+          </a>
+        </Space>
       ),
     },
   ];
@@ -647,7 +666,6 @@ export default function CaseDetailPage() {
             uid: `${index}`,
             name: file.name,
             status: 'done' as const,
-            originFileObj: file,
           }))}
           onRemove={(file) => {
             setUploadedFiles(uploadedFiles.filter((_, i) => `${i}` !== file.uid));
@@ -860,6 +878,16 @@ export default function CaseDetailPage() {
       >
         <p>Are you sure you want to delete this case? This action cannot be undone.</p>
       </Modal>
+
+      <DocumentViewer
+        visible={viewerOpen}
+        onClose={() => {
+          setViewerOpen(false);
+          setSelectedDocument(null);
+        }}
+        document={selectedDocument}
+        token={token || ''}
+      />
     </DashboardLayout>
   );
 }

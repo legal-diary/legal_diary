@@ -10,7 +10,8 @@
       "Bash(findstr:*)",
       "Bash(taskkill.exe:*)",
       "Bash(cmd /c taskkill /PID 16168 /F)",
-      "Bash(cmd /c taskkill /PID 16168 /F 2)"
+      "Bash(cmd /c taskkill /PID 16168 /F 2)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
