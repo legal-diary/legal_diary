@@ -16,7 +16,7 @@
     "bcryptjs": "^3.0.3",
     "dayjs": "^1.11.19",
     "dotenv": "^17.2.3",
-    "next": "16.0.3",
+    "next": "16.0.7",
     "next-auth": "^4.24.13",
     "openai": "^6.9.0",
     "prisma": "^6.19.0",
@@ -28,7 +28,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.0.3",
+    "eslint-config-next": "16.0.7",
     "typescript": "^5"
   }
 }
