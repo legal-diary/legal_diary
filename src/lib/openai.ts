@@ -1,20 +1,20 @@
 import OpenAI from 'openai';
 
-// Initialize OpenAI client
-const apiKey = process.env.OPENAI_API_KEY || '';
+let cachedOpenAI: OpenAI | null = null;
 
-if (!apiKey) {
-  console.error('[OpenAI Init] ERROR: OPENAI_API_KEY is not set in environment variables!');
-  console.error('[OpenAI Init] Check your .env file has OPENAI_API_KEY=sk-...');
-} else {
-  console.log('[OpenAI Init] API Key present: true');
-  console.log('[OpenAI Init] API Key length:', apiKey.length);
-  console.log('[OpenAI Init] API Key prefix:', apiKey.substring(0, 15) + '...');
+function getOpenAIClient(): OpenAI {
+  if (cachedOpenAI) return cachedOpenAI;
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'OPENAI_API_KEY is not set. Add it to your environment to enable AI features.'
+    );
+  }
+
+  cachedOpenAI = new OpenAI({ apiKey });
+  return cachedOpenAI;
 }
-
-const openai = new OpenAI({
-  apiKey: apiKey || undefined,
-});
 
 interface CaseAnalysisRequest {
   caseTitle: string;
@@ -74,6 +74,7 @@ Please format your response as JSON with the following structure:
 `;
 
   try {
+    const openai = getOpenAIClient();
     console.log('[analyzeCaseWithAI] Calling OpenAI API with model: gpt-4o');
     const message = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -132,6 +133,7 @@ Provide practical, actionable insights for the advocate to effectively handle th
 `;
 
   try {
+    const openai = getOpenAIClient();
     const message = await openai.chat.completions.create({
       model: 'gpt-4o',
       max_tokens: 512,
@@ -185,6 +187,7 @@ Please format your response as JSON with the following structure:
 `;
 
   try {
+    const openai = getOpenAIClient();
     const message = await openai.chat.completions.create({
       model: 'gpt-4o',
       max_tokens: 1500,
@@ -247,6 +250,7 @@ Provide a detailed, practical response to help the advocate with their analysis 
 `;
 
   try {
+    const openai = getOpenAIClient();
     const message = await openai.chat.completions.create({
       model: 'gpt-4o',
       max_tokens: 2000,
