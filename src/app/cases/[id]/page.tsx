@@ -538,38 +538,101 @@ export default function CaseDetailPage() {
   return (
     <DashboardLayout>
       {/* Header */}
-      <Row gutter={[16, 16]} style={{ marginBottom: '2vh' }}>
-        <Col xs={24}>
-          <Card>
-            <Row justify="space-between" align="middle">
-              <Col>
-                <h2 style={{ margin: 0, fontSize: 'clamp(1.2rem, 4vw, 2rem)' }}>{caseData.caseTitle}</h2>
-                <p style={{ margin: '0.5vh 0 0 0', color: '#666', fontSize: 'clamp(0.8rem, 2vw, 1rem)' }}>
-                  {caseData.caseNumber}
-                </p>
-              </Col>
-              <Col>
-                <Space>
-                  <Dropdown menu={{ items: aiMenuItems }}>
-                    <Button icon={<ThunderboltOutlined />} loading={aiLoading}>
-                      AI <DownOutlined />
-                    </Button>
-                  </Dropdown>
-                  <Button icon={<EditOutlined />} onClick={handleEditOpen}>
-                    Edit
+      <div className="case-detail-header">
+        <Card>
+          <div className="case-header-content">
+            <div className="case-header-info">
+              <h2 style={{ margin: 0, fontSize: 'clamp(1rem, 4vw, 1.8rem)' }}>{caseData.caseTitle}</h2>
+              <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: 'clamp(0.75rem, 2vw, 0.95rem)' }}>
+                {caseData.caseNumber}
+              </p>
+            </div>
+            <div className="case-header-actions">
+              <Space wrap size={[8, 8]} className="action-buttons">
+                <Dropdown menu={{ items: aiMenuItems }}>
+                  <Button icon={<ThunderboltOutlined />} loading={aiLoading} size="middle">
+                    <span className="btn-text">AI</span> <DownOutlined />
                   </Button>
-                  <Button icon={<DeleteOutlined />} onClick={handleDelete} danger loading={deleting}>
-                    Delete
+                </Dropdown>
+                <Button icon={<EditOutlined />} onClick={handleEditOpen} size="middle">
+                  <span className="btn-text">Edit</span>
+                </Button>
+                <Button icon={<DeleteOutlined />} onClick={handleDelete} danger loading={deleting} size="middle">
+                  <span className="btn-text">Delete</span>
+                </Button>
+                <Link href="/calendar">
+                  <Button icon={<CalendarOutlined />} size="middle">
+                    <span className="btn-text">Calendar</span>
                   </Button>
-                  <Link href="/calendar">
-                    <Button icon={<CalendarOutlined />}>Calendar</Button>
-                  </Link>
-                </Space>
-              </Col>
-            </Row>
-          </Card>
-        </Col>
-      </Row>
+                </Link>
+              </Space>
+            </div>
+          </div>
+        </Card>
+
+        <style jsx global>{`
+          .case-detail-header {
+            margin-bottom: 16px;
+          }
+
+          .case-header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+          }
+
+          .case-header-info {
+            flex: 1;
+            min-width: 200px;
+          }
+
+          .case-header-actions {
+            flex-shrink: 0;
+          }
+
+          @media (max-width: 768px) {
+            .case-header-content {
+              flex-direction: column;
+              align-items: flex-start;
+            }
+
+            .case-header-actions {
+              width: 100%;
+            }
+
+            .action-buttons {
+              width: 100%;
+              justify-content: flex-start !important;
+            }
+
+            .action-buttons .ant-btn {
+              padding: 4px 8px !important;
+              font-size: 0.8rem !important;
+            }
+
+            .btn-text {
+              display: none;
+            }
+          }
+
+          @media (max-width: 576px) {
+            .case-detail-header {
+              margin-bottom: 12px;
+            }
+
+            .action-buttons .ant-space-item {
+              flex: 1;
+            }
+
+            .action-buttons .ant-btn {
+              width: 100%;
+              justify-content: center;
+            }
+          }
+        `}</style>
+      </div>
 
       {/* Tabs */}
       <Tabs items={tabItems} />
@@ -645,7 +708,7 @@ export default function CaseDetailPage() {
 
       {editModalOpen && (
         <Suspense fallback={null}>
-          <Modal title="Edit Case" open={editModalOpen} onCancel={() => setEditModalOpen(false)} footer={null} width={800} destroyOnClose>
+          <Modal title="Edit Case" open={editModalOpen} onCancel={() => setEditModalOpen(false)} footer={null} width="min(800px, 95vw)" destroyOnClose centered>
             <Form form={editForm} onFinish={handleEditSubmit} layout="vertical">
               <Form.Item name="caseTitle" label="Case Title" rules={[{ required: true, message: 'Please enter case title' }]}>
                 <Input />

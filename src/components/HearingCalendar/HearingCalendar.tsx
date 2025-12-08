@@ -315,6 +315,8 @@ export default function HearingCalendar() {
               </Button>,
             ]}
             destroyOnClose
+            width="min(520px, 95vw)"
+            centered
           >
             <div style={{ marginTop: '16px' }}>
               <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #f0f0f0' }}>
@@ -370,6 +372,8 @@ export default function HearingCalendar() {
             onCancel={() => setModalOpen(false)}
             footer={null}
             destroyOnClose
+            width="min(520px, 95vw)"
+            centered
           >
             <Form form={form} onFinish={onFinish} layout="vertical">
               <Form.Item
@@ -432,6 +436,14 @@ export default function HearingCalendar() {
         .calendar-container {
           width: 100%;
           overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        /* Calendar responsive styles */
+        @media (max-width: 992px) {
+          .ant-picker-calendar-date-content {
+            height: 50px !important;
+          }
         }
 
         @media (max-width: 768px) {
@@ -444,27 +456,90 @@ export default function HearingCalendar() {
           }
 
           .ant-picker-calendar-header {
-            padding: 8px 4px !important;
+            padding: 8px !important;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
           }
 
           .ant-picker-calendar-date {
-            padding: 4px !important;
-            min-height: auto !important;
+            padding: 2px !important;
+          }
+
+          .ant-picker-calendar-date-content {
+            height: 40px !important;
+            overflow: hidden;
           }
 
           .ant-picker-cell {
-            padding: 4px !important;
-          }
-
-          .ant-picker-cell-in-view.ant-picker-cell {
-            height: auto;
-            min-height: 60px;
+            padding: 2px !important;
           }
 
           .calendar-container ul li {
-            font-size: 0.65rem !important;
+            font-size: 0.6rem !important;
             padding: 1px 2px !important;
             margin-bottom: 1px !important;
+          }
+
+          .ant-picker-calendar-date-value {
+            font-size: 0.8rem !important;
+          }
+        }
+
+        @media (max-width: 576px) {
+          .calendar-card .ant-card-body {
+            padding: 8px !important;
+          }
+
+          .ant-picker-calendar {
+            font-size: 0.75rem;
+          }
+
+          .ant-picker-calendar-header {
+            padding: 4px !important;
+          }
+
+          .ant-picker-calendar-header .ant-select {
+            min-width: 60px !important;
+            font-size: 0.75rem !important;
+          }
+
+          .ant-picker-calendar-header .ant-radio-group {
+            display: none !important;
+          }
+
+          .ant-picker-calendar-date-content {
+            height: 30px !important;
+          }
+
+          .ant-picker-calendar-date-value {
+            font-size: 0.7rem !important;
+            line-height: 1.2 !important;
+          }
+
+          .calendar-container ul li {
+            font-size: 0.55rem !important;
+            padding: 0 2px !important;
+          }
+
+          .ant-picker-content th {
+            font-size: 0.65rem !important;
+            padding: 4px 0 !important;
+          }
+        }
+
+        /* Hearing list responsive */
+        @media (max-width: 768px) {
+          .ant-list-item-meta-avatar {
+            margin-right: 8px !important;
+          }
+
+          .ant-list-item-meta-title {
+            font-size: 0.85rem !important;
+          }
+
+          .ant-list-item-meta-description {
+            font-size: 0.75rem !important;
           }
         }
       `}</style>

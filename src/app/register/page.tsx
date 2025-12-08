@@ -69,16 +69,20 @@ export default function RegisterPage() {
   };
 
   return (
-    <Row justify="center" align="middle" style={{ minHeight: '100vh', background: '#ffffff', padding: '2vh' }}>
-      <Col xs={22} sm={20} md={12} lg={8}>
+    <Row justify="center" align="middle" style={{ minHeight: '100vh', minHeight: '100dvh', background: '#ffffff', padding: 'clamp(12px, 4vw, 24px)' }}>
+      <Col xs={24} sm={22} md={14} lg={10} xl={8} style={{ maxWidth: '500px', width: '100%' }}>
         <Card
           title={
-            <div style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: 'bold', textAlign: 'center', color: '#000000' }}>
+            <div style={{ fontSize: 'clamp(1.3rem, 4vw, 1.8rem)', fontWeight: 'bold', textAlign: 'center', color: '#000000' }}>
               Create Account
             </div>
           }
           bordered={false}
-          style={{ boxShadow: 'none', borderColor: 'transparent', borderRadius: '0.8rem', background: '#ffffff' }}
+          style={{ boxShadow: 'none', borderColor: 'transparent', borderRadius: 'clamp(0.5rem, 2vw, 0.8rem)', background: '#ffffff' }}
+          styles={{
+            body: { padding: 'clamp(12px, 4vw, 24px)' },
+            header: { borderBottom: 'none', padding: 'clamp(12px, 4vw, 16px) clamp(12px, 4vw, 24px) 0' }
+          }}
         >
           <Spin spinning={isLoading}>
             <Form

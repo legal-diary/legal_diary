@@ -281,3 +281,832 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #999;
 }
+
+/* =====================================================
+   RESPONSIVE BREAKPOINTS SYSTEM
+   - Mobile: 0-576px (xs)
+   - Tablet: 577-768px (sm)
+   - Small Laptop: 769-992px (md)
+   - Laptop: 993-1200px (lg)
+   - Desktop/Monitor: 1201px+ (xl)
+   ===================================================== */
+
+/* =====================================================
+   RESPONSIVE TABLE STYLES
+   ===================================================== */
+
+/* Make tables scrollable on mobile */
+.ant-table-wrapper {
+  overflow-x: auto;
+}
+
+.ant-table {
+  min-width: 100%;
+}
+
+/* Mobile table adjustments */
+@media (max-width: 768px) {
+  .ant-table thead > tr > th,
+  .ant-table tbody > tr > td {
+    padding: 0.6rem 0.5rem !important;
+    font-size: 0.8rem !important;
+    white-space: nowrap;
+  }
+
+  .ant-table-cell {
+    padding: 0.6rem 0.5rem !important;
+  }
+
+  /* Hide less important columns on mobile */
+  .ant-table .hide-on-mobile {
+    display: none !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-table thead > tr > th,
+  .ant-table tbody > tr > td {
+    padding: 0.5rem 0.4rem !important;
+    font-size: 0.75rem !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE CARD STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-card {
+    border-radius: 0.4rem !important;
+  }
+
+  .ant-card-head {
+    padding: 0.8rem 1rem !important;
+    min-height: auto !important;
+  }
+
+  .ant-card-head-title {
+    font-size: clamp(0.9rem, 3vw, 1.1rem) !important;
+    padding: 0.5rem 0 !important;
+  }
+
+  .ant-card-body {
+    padding: 0.8rem 1rem !important;
+  }
+
+  .ant-card-extra {
+    padding: 0.5rem 0 !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-card-head {
+    padding: 0.6rem 0.8rem !important;
+    flex-wrap: wrap;
+  }
+
+  .ant-card-body {
+    padding: 0.6rem 0.8rem !important;
+  }
+
+  .ant-card-head-wrapper {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .ant-card-extra {
+    margin-left: 0 !important;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE BUTTON STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-btn {
+    padding: 0.5rem 1rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  .ant-btn-sm {
+    padding: 0.3rem 0.6rem !important;
+    font-size: 0.75rem !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-btn {
+    padding: 0.4rem 0.8rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* Stack buttons vertically in space groups on small screens */
+  .ant-space-horizontal.stack-on-mobile {
+    flex-direction: column !important;
+    width: 100%;
+  }
+
+  .ant-space-horizontal.stack-on-mobile > .ant-space-item {
+    width: 100%;
+  }
+
+  .ant-space-horizontal.stack-on-mobile .ant-btn {
+    width: 100%;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE FORM STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-form-item {
+    margin-bottom: 1rem !important;
+  }
+
+  .ant-form-item-label {
+    padding-bottom: 0.3rem !important;
+  }
+
+  .ant-form-item-label > label {
+    font-size: 0.85rem !important;
+  }
+
+  .ant-input,
+  .ant-input-number,
+  .ant-select-selector,
+  .ant-picker {
+    font-size: 0.9rem !important;
+    padding: 0.6rem 0.8rem !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-form-item {
+    margin-bottom: 0.8rem !important;
+  }
+
+  .ant-input,
+  .ant-input-number,
+  .ant-select-selector,
+  .ant-picker {
+    font-size: 0.85rem !important;
+    padding: 0.5rem 0.7rem !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE MODAL STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-modal {
+    max-width: calc(100vw - 2rem) !important;
+    margin: 1rem auto !important;
+  }
+
+  .ant-modal-content {
+    border-radius: 0.5rem !important;
+  }
+
+  .ant-modal-header {
+    padding: 1rem !important;
+  }
+
+  .ant-modal-title {
+    font-size: 1rem !important;
+  }
+
+  .ant-modal-body {
+    padding: 1rem !important;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .ant-modal-footer {
+    padding: 0.8rem 1rem !important;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-modal {
+    max-width: calc(100vw - 1rem) !important;
+    margin: 0.5rem auto !important;
+    top: 10px !important;
+  }
+
+  .ant-modal-body {
+    padding: 0.8rem !important;
+    max-height: 70vh;
+  }
+
+  .ant-modal-footer {
+    flex-direction: column;
+  }
+
+  .ant-modal-footer .ant-btn {
+    width: 100%;
+    margin: 0.25rem 0 !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE TABS STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-tabs-nav {
+    margin-bottom: 0.8rem !important;
+  }
+
+  .ant-tabs-tab {
+    padding: 0.6rem 0.8rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  .ant-tabs-content {
+    padding: 0 !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-tabs-nav-list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ant-tabs-tab {
+    padding: 0.5rem 0.6rem !important;
+    font-size: 0.8rem !important;
+    flex-shrink: 0;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE DESCRIPTIONS STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-descriptions-bordered .ant-descriptions-item-label,
+  .ant-descriptions-bordered .ant-descriptions-item-content {
+    padding: 0.6rem 0.8rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  .ant-descriptions-item-label {
+    width: 35% !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-descriptions {
+    overflow-x: auto;
+  }
+
+  .ant-descriptions-bordered .ant-descriptions-view {
+    border-radius: 0.4rem !important;
+  }
+
+  .ant-descriptions-bordered .ant-descriptions-item-label,
+  .ant-descriptions-bordered .ant-descriptions-item-content {
+    padding: 0.5rem 0.6rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* Stack descriptions on very small screens */
+  .ant-descriptions-row {
+    flex-direction: column;
+    display: flex;
+  }
+
+  .ant-descriptions-item {
+    padding-bottom: 0 !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE TAG STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-tag {
+    font-size: 0.75rem !important;
+    padding: 0.2rem 0.5rem !important;
+    border-radius: 0.25rem !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-tag {
+    font-size: 0.7rem !important;
+    padding: 0.15rem 0.4rem !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE LIST STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-list-item {
+    padding: 0.8rem 0 !important;
+  }
+
+  .ant-list-item-meta-title {
+    font-size: 0.9rem !important;
+  }
+
+  .ant-list-item-meta-description {
+    font-size: 0.8rem !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-list-item {
+    padding: 0.6rem 0 !important;
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+
+  .ant-list-item-meta {
+    width: 100%;
+  }
+
+  .ant-list-item-action {
+    margin-left: 0 !important;
+    margin-top: 0.5rem;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE CALENDAR STYLES
+   ===================================================== */
+
+@media (max-width: 992px) {
+  .ant-picker-calendar {
+    font-size: 0.9rem;
+  }
+
+  .ant-picker-calendar-header {
+    padding: 8px !important;
+  }
+
+  .ant-picker-calendar-date-content {
+    height: 50px !important;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 768px) {
+  .ant-picker-calendar {
+    font-size: 0.85rem;
+  }
+
+  .ant-picker-calendar-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center !important;
+  }
+
+  .ant-picker-calendar-date-content {
+    height: 40px !important;
+  }
+
+  .ant-picker-cell {
+    padding: 2px !important;
+  }
+
+  .ant-picker-calendar-date {
+    padding: 4px 2px !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-picker-calendar {
+    font-size: 0.75rem;
+  }
+
+  .ant-picker-calendar-date-content {
+    height: 35px !important;
+    font-size: 0.65rem;
+  }
+
+  .ant-picker-calendar-date-value {
+    font-size: 0.75rem !important;
+  }
+
+  .ant-picker-cell {
+    min-width: 0 !important;
+  }
+
+  .ant-picker-calendar-header .ant-select {
+    min-width: 70px !important;
+  }
+
+  .ant-picker-calendar-header .ant-radio-group {
+    display: none; /* Hide month/year toggle on very small screens */
+  }
+}
+
+/* =====================================================
+   RESPONSIVE DIVIDER STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-divider {
+    margin: 1rem 0 !important;
+  }
+
+  .ant-divider-with-text {
+    font-size: 0.85rem !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE EMPTY STATE STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-empty {
+    padding: 1.5rem 0 !important;
+  }
+
+  .ant-empty-image {
+    height: 60px !important;
+  }
+
+  .ant-empty-description {
+    font-size: 0.85rem !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE UPLOAD STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-upload-drag {
+    padding: 1rem !important;
+  }
+
+  .ant-upload-drag-icon {
+    font-size: 2rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  .ant-upload-text {
+    font-size: 0.9rem !important;
+  }
+
+  .ant-upload-hint {
+    font-size: 0.75rem !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE TOOLTIP & POPOVER STYLES
+   ===================================================== */
+
+@media (max-width: 576px) {
+  .ant-tooltip {
+    max-width: calc(100vw - 2rem) !important;
+  }
+
+  .ant-popover {
+    max-width: calc(100vw - 2rem) !important;
+  }
+
+  .ant-popconfirm .ant-popover-message {
+    font-size: 0.85rem !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE SELECT DROPDOWN STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-select-dropdown {
+    max-height: 40vh !important;
+  }
+
+  .ant-select-item {
+    padding: 0.5rem 0.8rem !important;
+    font-size: 0.9rem !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE BADGE STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-badge-status-text {
+    font-size: 0.8rem !important;
+  }
+
+  .ant-badge-status-dot {
+    width: 6px !important;
+    height: 6px !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE DRAWER STYLES
+   ===================================================== */
+
+@media (max-width: 576px) {
+  .ant-drawer-content-wrapper {
+    width: 85vw !important;
+    max-width: 320px;
+  }
+
+  .ant-drawer-header {
+    padding: 1rem !important;
+  }
+
+  .ant-drawer-body {
+    padding: 0.8rem !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE SPINNER STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-spin-lg .ant-spin-dot {
+    font-size: 28px !important;
+  }
+}
+
+/* =====================================================
+   UTILITY CLASSES FOR RESPONSIVENESS
+   ===================================================== */
+
+/* Hide on specific breakpoints */
+@media (max-width: 576px) {
+  .hide-xs,
+  .ant-table .hide-xs,
+  .ant-table-cell.hide-xs,
+  th.hide-xs,
+  td.hide-xs {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .hide-sm,
+  .ant-table .hide-sm,
+  .ant-table-cell.hide-sm,
+  th.hide-sm,
+  td.hide-sm {
+    display: none !important;
+  }
+
+  .hide-on-mobile,
+  .ant-table .hide-on-mobile,
+  .ant-table-cell.hide-on-mobile,
+  th.hide-on-mobile,
+  td.hide-on-mobile {
+    display: none !important;
+  }
+}
+
+@media (max-width: 992px) {
+  .hide-md,
+  .ant-table .hide-md,
+  .ant-table-cell.hide-md,
+  th.hide-md,
+  td.hide-md {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .show-only-mobile {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .show-only-mobile {
+    display: block !important;
+  }
+}
+
+/* Responsive spacing utilities */
+@media (max-width: 768px) {
+  .mobile-mb-1 {
+    margin-bottom: 0.5rem !important;
+  }
+
+  .mobile-mb-2 {
+    margin-bottom: 1rem !important;
+  }
+
+  .mobile-p-1 {
+    padding: 0.5rem !important;
+  }
+
+  .mobile-p-2 {
+    padding: 1rem !important;
+  }
+}
+
+/* Responsive text alignment */
+@media (max-width: 768px) {
+  .mobile-text-center {
+    text-align: center !important;
+  }
+}
+
+/* Responsive flex utilities */
+@media (max-width: 768px) {
+  .mobile-flex-column {
+    flex-direction: column !important;
+  }
+
+  .mobile-flex-wrap {
+    flex-wrap: wrap !important;
+  }
+
+  .mobile-gap-1 {
+    gap: 0.5rem !important;
+  }
+
+  .mobile-gap-2 {
+    gap: 1rem !important;
+  }
+}
+
+/* Full width on mobile */
+@media (max-width: 768px) {
+  .mobile-full-width {
+    width: 100% !important;
+  }
+}
+
+/* =====================================================
+   SMOOTH TRANSITIONS FOR RESPONSIVE CHANGES
+   ===================================================== */
+
+* {
+  transition: font-size 0.2s ease, padding 0.2s ease;
+}
+
+/* Disable transitions for performance on mobile */
+@media (max-width: 576px) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE TYPOGRAPHY
+   ===================================================== */
+
+h1 {
+  font-size: clamp(1.5rem, 5vw, 2.5rem) !important;
+}
+
+h2 {
+  font-size: clamp(1.3rem, 4vw, 2rem) !important;
+}
+
+h3 {
+  font-size: clamp(1.1rem, 3vw, 1.5rem) !important;
+}
+
+h4 {
+  font-size: clamp(1rem, 2.5vw, 1.25rem) !important;
+}
+
+p {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  line-height: 1.6;
+}
+
+/* =====================================================
+   RESPONSIVE HEADER ACTION BUTTONS
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .header-actions .ant-btn {
+    padding: 0.4rem 0.6rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  .header-actions .ant-btn .anticon {
+    margin-right: 0 !important;
+  }
+
+  .header-actions .ant-btn span:not(.anticon) {
+    display: none;
+  }
+}
+
+@media (max-width: 576px) {
+  .header-actions {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+/* =====================================================
+   RESPONSIVE ROW/COL GUTTER ADJUSTMENTS
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .ant-row {
+    margin-left: -4px !important;
+    margin-right: -4px !important;
+  }
+
+  .ant-row > .ant-col {
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+}
+
+/* =====================================================
+   PRINT STYLES
+   ===================================================== */
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .ant-layout-sider {
+    display: none !important;
+  }
+
+  .ant-layout-header {
+    display: none !important;
+  }
+}
+
+/* =====================================================
+   DASHBOARD TABLE ROW STYLES
+   ===================================================== */
+
+.table-row-light {
+  background-color: #fafafa;
+}
+
+.table-row-dark {
+  background-color: #ffffff;
+}
+
+.table-row-light:hover td,
+.table-row-dark:hover td {
+  background-color: #e6f7ff !important;
+}
+
+/* Responsive table styles */
+@media (max-width: 768px) {
+  .hide-on-mobile,
+  .responsive-table .hide-on-mobile {
+    display: none !important;
+  }
+
+  .responsive-table .ant-table-cell {
+    padding: 8px 6px !important;
+  }
+
+  .responsive-table .ant-table-thead > tr > th {
+    padding: 8px 6px !important;
+    font-size: 0.75rem !important;
+  }
+
+  .upcoming-table .hide-sm {
+    display: none !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .responsive-table .ant-table-cell {
+    padding: 6px 4px !important;
+  }
+
+  .responsive-table .ant-table-thead > tr > th {
+    padding: 6px 4px !important;
+    font-size: 0.7rem !important;
+  }
+
+  .upcoming-table .hide-xs {
+    display: none !important;
+  }
+}

@@ -25,21 +25,22 @@ export default function LoginPage() {
   return (
     <Row justify="center" align="middle" style={{
       minHeight: '100vh',
+      minHeight: '100dvh',
       background: '#ffffff',
-      padding: '2vh',
+      padding: 'clamp(12px, 4vw, 24px)',
       position: 'relative',
       overflow: 'hidden',
     }}>
 
-      <Col xs={22} sm={20} md={12} lg={8} style={{ position: 'relative', zIndex: 1 }}>
+      <Col xs={24} sm={22} md={14} lg={10} xl={8} style={{ position: 'relative', zIndex: 1, maxWidth: '450px', width: '100%' }}>
         <Card
           title={
             <div style={{
-              fontSize: 'clamp(1.8rem, 6vw, 2.2rem)',
+              fontSize: 'clamp(1.5rem, 5vw, 2rem)',
               fontWeight: '800',
               textAlign: 'center',
               color: '#000000',
-              marginBottom: '0.5rem',
+              marginBottom: '0.25rem',
             }}>
               Legal Diary
             </div>
@@ -48,10 +49,14 @@ export default function LoginPage() {
           style={{
             borderColor: 'transparent',
             boxShadow: 'none',
-            borderRadius: '0.8rem',
+            borderRadius: 'clamp(0.5rem, 2vw, 0.8rem)',
             background: '#ffffff',
             animation: 'slideUp 0.6s ease',
             maxWidth: '100%',
+          }}
+          styles={{
+            body: { padding: 'clamp(12px, 4vw, 24px)' },
+            header: { borderBottom: 'none', padding: 'clamp(12px, 4vw, 20px) clamp(12px, 4vw, 24px) 0' }
           }}
         >
           <Spin spinning={isLoading}>

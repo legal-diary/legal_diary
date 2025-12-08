@@ -154,57 +154,165 @@ const DashboardHeader = React.memo<{
   loading: boolean;
 }>(({ totalCount, loading }) => {
   const todayFormatted = useMemo(() => dayjs().format('dddd, DD MMMM YYYY'), []);
+  const todayFormattedMobile = useMemo(() => dayjs().format('ddd, DD MMM'), []);
 
   if (loading) return <HeaderSkeleton />;
 
   return (
-    <div
-      style={{
-        marginBottom: '24px',
-        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-        padding: '24px 32px',
-        borderRadius: '12px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <CalendarOutlined style={{ fontSize: '36px', color: '#4fd1c5' }} />
+    <div className="dashboard-header">
+      <div className="dashboard-header-content">
+        <div className="dashboard-header-left">
+          <CalendarOutlined className="dashboard-header-icon" />
           <div>
-            <Text style={{ color: '#a0aec0', fontSize: '14px', display: 'block' }}>
+            <Text className="dashboard-header-label">
               Legal Referencer
             </Text>
-            <Title level={2} style={{ margin: 0, color: '#fff', fontWeight: 600 }}>
+            <Title level={2} className="dashboard-header-date desktop-date">
               {todayFormatted}
+            </Title>
+            <Title level={3} className="dashboard-header-date mobile-date">
+              {todayFormattedMobile}
             </Title>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '24px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                background: 'rgba(79, 209, 197, 0.2)',
-                borderRadius: '50%',
-                width: '48px',
-                height: '48px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 8px',
-              }}
-            >
-              <FileTextOutlined style={{ fontSize: '24px', color: '#4fd1c5' }} />
+        <div className="dashboard-header-stats">
+          <div className="dashboard-stat-item">
+            <div className="dashboard-stat-icon">
+              <FileTextOutlined />
             </div>
-            <Text style={{ color: '#fff', fontSize: '24px', fontWeight: 600, display: 'block' }}>
+            <Text className="dashboard-stat-value">
               {totalCount}
             </Text>
-            <Text style={{ color: '#a0aec0', fontSize: '12px' }}>
+            <Text className="dashboard-stat-label">
               Today&apos;s Matters
             </Text>
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .dashboard-header {
+          margin-bottom: 24px;
+          background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+          padding: clamp(16px, 4vw, 32px);
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .dashboard-header-content {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 16px;
+        }
+
+        .dashboard-header-left {
+          display: flex;
+          align-items: center;
+          gap: clamp(8px, 2vw, 16px);
+        }
+
+        :global(.dashboard-header-icon) {
+          font-size: clamp(24px, 5vw, 36px) !important;
+          color: #4fd1c5;
+        }
+
+        :global(.dashboard-header-label) {
+          color: #a0aec0;
+          font-size: clamp(11px, 2vw, 14px);
+          display: block;
+        }
+
+        :global(.dashboard-header-date) {
+          margin: 0 !important;
+          color: #fff !important;
+          font-weight: 600 !important;
+        }
+
+        :global(.desktop-date) {
+          display: block;
+          font-size: clamp(1.2rem, 3vw, 1.8rem) !important;
+        }
+
+        :global(.mobile-date) {
+          display: none;
+          font-size: 1.1rem !important;
+        }
+
+        .dashboard-header-stats {
+          display: flex;
+          gap: 24px;
+        }
+
+        .dashboard-stat-item {
+          text-align: center;
+        }
+
+        .dashboard-stat-icon {
+          background: rgba(79, 209, 197, 0.2);
+          border-radius: 50%;
+          width: clamp(36px, 8vw, 48px);
+          height: clamp(36px, 8vw, 48px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 8px;
+        }
+
+        :global(.dashboard-stat-icon .anticon) {
+          font-size: clamp(18px, 4vw, 24px);
+          color: #4fd1c5;
+        }
+
+        :global(.dashboard-stat-value) {
+          color: #fff;
+          font-size: clamp(18px, 4vw, 24px) !important;
+          font-weight: 600;
+          display: block;
+        }
+
+        :global(.dashboard-stat-label) {
+          color: #a0aec0;
+          font-size: clamp(10px, 2vw, 12px);
+        }
+
+        @media (max-width: 768px) {
+          .dashboard-header {
+            padding: 16px;
+            border-radius: 8px;
+          }
+
+          .dashboard-header-content {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .dashboard-header-stats {
+            width: 100%;
+            justify-content: flex-start;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+          }
+
+          :global(.desktop-date) {
+            display: none !important;
+          }
+
+          :global(.mobile-date) {
+            display: block !important;
+          }
+        }
+
+        @media (max-width: 576px) {
+          .dashboard-header {
+            padding: 12px;
+            margin-bottom: 16px;
+          }
+        }
+      `}</style>
     </div>
   );
 });
@@ -220,47 +328,52 @@ const TodayScheduleTable = React.memo<{
   const columns = useMemo(
     () => [
       {
-        title: 'Previous Date',
+        title: 'Prev Date',
         dataIndex: 'previousDate',
         key: 'previousDate',
-        width: 120,
+        width: 90,
+        className: 'hide-on-mobile',
         render: (date: string | null) => (
-          <Text type={date ? 'secondary' : undefined}>{formatDate(date)}</Text>
+          <Text type={date ? 'secondary' : undefined} style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>
+            {formatDate(date)}
+          </Text>
         ),
       },
       {
-        title: 'Case Number',
+        title: 'Case No.',
         dataIndex: 'caseNumber',
         key: 'caseNumber',
-        width: 150,
+        width: 120,
+        fixed: 'left' as const,
         render: (text: string, record: TodayHearing) => (
-          <Link href={`/cases/${record.caseId}`} style={{ color: '#1890ff', fontWeight: 500 }}>
+          <Link href={`/cases/${record.caseId}`} style={{ color: '#1890ff', fontWeight: 500, fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>
             {text}
           </Link>
         ),
       },
       {
-        title: 'Party Name',
+        title: 'Party',
         dataIndex: 'partyName',
         key: 'partyName',
-        width: 180,
+        width: 140,
+        ellipsis: true,
         render: (text: string, record: TodayHearing) => (
           <Tooltip title={record.caseTitle}>
-            <Text strong>{text}</Text>
+            <Text strong style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>{text}</Text>
           </Tooltip>
         ),
       },
       {
-        title: 'Position / Stage',
+        title: 'Stage',
         dataIndex: 'stage',
         key: 'stage',
-        width: 150,
+        width: 120,
         render: (stage: string, record: TodayHearing) => (
           <div>
-            <Badge status={STAGE_COLORS[stage] as any} text={STAGE_LABELS[stage] || stage} />
+            <Badge status={STAGE_COLORS[stage] as any} text={<span style={{ fontSize: 'clamp(0.7rem, 1.8vw, 0.85rem)' }}>{STAGE_LABELS[stage] || stage}</span>} />
             {record.hearingType && (
-              <div>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
+              <div className="hide-on-mobile">
+                <Text type="secondary" style={{ fontSize: '0.7rem' }}>
                   {record.hearingType.replace(/_/g, ' ')}
                 </Text>
               </div>
@@ -269,13 +382,13 @@ const TodayScheduleTable = React.memo<{
         ),
       },
       {
-        title: 'Next Date',
+        title: 'Next',
         dataIndex: 'nextDate',
         key: 'nextDate',
-        width: 120,
+        width: 90,
         render: (date: string | null) => (
-          <Text type={date ? undefined : 'secondary'} style={{ color: date ? '#52c41a' : undefined }}>
-            {date ? formatDate(date) : 'To be fixed'}
+          <Text type={date ? undefined : 'secondary'} style={{ color: date ? '#52c41a' : undefined, fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>
+            {date ? formatDate(date) : 'TBF'}
           </Text>
         ),
       },
@@ -283,14 +396,16 @@ const TodayScheduleTable = React.memo<{
         title: 'Court',
         dataIndex: 'courtName',
         key: 'courtName',
-        width: 150,
+        width: 120,
+        className: 'hide-on-mobile',
+        ellipsis: true,
         render: (court: string | null, record: TodayHearing) => (
           <div>
-            <Text>{court || '-'}</Text>
+            <Text style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>{court || '-'}</Text>
             {record.courtRoom && (
               <div>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  Room: {record.courtRoom}
+                <Text type="secondary" style={{ fontSize: '0.7rem' }}>
+                  {record.courtRoom}
                 </Text>
               </div>
             )}
@@ -301,11 +416,12 @@ const TodayScheduleTable = React.memo<{
         title: 'Notes',
         dataIndex: 'notes',
         key: 'notes',
-        width: 200,
+        width: 150,
+        className: 'hide-on-mobile',
         ellipsis: true,
         render: (notes: string | null) => (
           <Tooltip title={notes}>
-            <Text type="secondary">{notes || '-'}</Text>
+            <Text type="secondary" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.85rem)' }}>{notes || '-'}</Text>
           </Tooltip>
         ),
       },
@@ -356,9 +472,10 @@ const TodayScheduleTable = React.memo<{
           columns={columns}
           pagination={false}
           rowKey="id"
-          size="middle"
-          scroll={{ x: 1000 }}
+          size="small"
+          scroll={{ x: 500 }}
           rowClassName={(_, index) => (index % 2 === 0 ? 'table-row-light' : 'table-row-dark')}
+          className="responsive-table"
         />
       )}
     </Card>
@@ -542,17 +659,18 @@ export default function DashboardPage() {
         title: 'Date',
         dataIndex: 'hearingDate',
         key: 'hearingDate',
-        width: 100,
+        width: 85,
+        fixed: 'left' as const,
         render: (date: string, record: UpcomingHearing) => {
           const isToday = dayjs(date).isSame(dayjs(), 'day');
           return (
             <div>
-              <Text strong={isToday} style={isToday ? { color: '#1890ff' } : undefined}>
-                {dayjs(date).format('DD/MM/YY')}
+              <Text strong={isToday} style={{ color: isToday ? '#1890ff' : undefined, fontSize: 'clamp(0.7rem, 2vw, 0.85rem)' }}>
+                {dayjs(date).format('DD/MM')}
               </Text>
               {record.hearingTime && (
-                <div>
-                  <Text type="secondary" style={{ fontSize: '11px' }}>
+                <div className="hide-xs">
+                  <Text type="secondary" style={{ fontSize: '0.65rem' }}>
                     {record.hearingTime}
                   </Text>
                 </div>
@@ -564,14 +682,15 @@ export default function DashboardPage() {
       {
         title: 'Case',
         key: 'case',
-        width: 180,
+        width: 130,
+        ellipsis: true,
         render: (_: any, record: UpcomingHearing) => (
           <div>
-            <Link href={`/cases/${record.caseId}`} style={{ color: '#1890ff', fontSize: '13px' }}>
+            <Link href={`/cases/${record.caseId}`} style={{ color: '#1890ff', fontSize: 'clamp(0.7rem, 2vw, 0.8rem)' }}>
               {record.case.caseNumber}
             </Link>
-            <div>
-              <Text type="secondary" style={{ fontSize: '11px' }}>
+            <div className="hide-xs">
+              <Text type="secondary" style={{ fontSize: '0.65rem' }}>
                 {record.case.clientName}
               </Text>
             </div>
@@ -582,9 +701,10 @@ export default function DashboardPage() {
         title: 'Type',
         dataIndex: 'hearingType',
         key: 'hearingType',
-        width: 120,
+        width: 100,
+        className: 'hide-sm',
         render: (type: string) => (
-          <Tag color="blue" style={{ fontSize: '11px' }}>
+          <Tag color="blue" style={{ fontSize: '0.65rem', padding: '1px 4px' }}>
             {type.replace(/_/g, ' ')}
           </Tag>
         ),
@@ -593,34 +713,32 @@ export default function DashboardPage() {
         title: 'Status',
         dataIndex: 'status',
         key: 'status',
-        width: 100,
+        width: 80,
+        className: 'hide-sm',
         render: (status: string) => (
-          <Tag color={STATUS_COLORS[status] || 'default'} style={{ fontSize: '11px' }}>
+          <Tag color={STATUS_COLORS[status] || 'default'} style={{ fontSize: '0.65rem', padding: '1px 4px' }}>
             {status}
           </Tag>
         ),
       },
       {
-        title: 'Actions',
+        title: '',
         key: 'actions',
-        width: 100,
+        width: 70,
+        fixed: 'right' as const,
         render: (_: any, record: UpcomingHearing) => (
-          <Space size="small">
-            <Tooltip title="Edit">
-              <Button type="text" size="small" icon={<EditOutlined />} onClick={() => handleEditHearing(record)} />
-            </Tooltip>
-            <Tooltip title="Delete">
-              <Popconfirm
-                title="Delete this hearing?"
-                description="This action cannot be undone."
-                onConfirm={() => handleDeleteHearing(record.id)}
-                okText="Delete"
-                cancelText="Cancel"
-                okButtonProps={{ danger: true }}
-              >
-                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-              </Popconfirm>
-            </Tooltip>
+          <Space size={2}>
+            <Button type="text" size="small" icon={<EditOutlined style={{ fontSize: '14px' }} />} onClick={() => handleEditHearing(record)} />
+            <Popconfirm
+              title="Delete?"
+              onConfirm={() => handleDeleteHearing(record.id)}
+              okText="Yes"
+              cancelText="No"
+              okButtonProps={{ danger: true, size: 'small' }}
+              cancelButtonProps={{ size: 'small' }}
+            >
+              <Button type="text" size="small" danger icon={<DeleteOutlined style={{ fontSize: '14px' }} />} />
+            </Popconfirm>
           </Space>
         ),
       },
@@ -689,7 +807,8 @@ export default function DashboardPage() {
                 pagination={false}
                 rowKey="id"
                 size="small"
-                scroll={{ x: 600 }}
+                scroll={{ x: 350 }}
+                className="responsive-table upcoming-table"
               />
             )}
           </Card>
@@ -702,14 +821,16 @@ export default function DashboardPage() {
               title={
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {editingHearing ? <EditOutlined /> : <PlusOutlined />}
-                  <span>{editingHearing ? 'Edit Hearing' : 'Add New Hearing'}</span>
+                  <span style={{ fontSize: 'clamp(0.9rem, 3vw, 1.1rem)' }}>{editingHearing ? 'Edit Hearing' : 'Add New Hearing'}</span>
                 </div>
               }
               open={isModalOpen}
               onCancel={handleModalClose}
               footer={null}
-              width={600}
+              width="min(600px, 95vw)"
               destroyOnClose
+              centered
+              className="responsive-modal"
             >
               <Form
                 form={form}
@@ -726,8 +847,8 @@ export default function DashboardPage() {
                   </Select>
                 </Form.Item>
 
-                <Row gutter={16}>
-                  <Col span={12}>
+                <Row gutter={[12, 0]}>
+                  <Col xs={24} sm={12}>
                     <Form.Item
                       name="hearingDate"
                       label="Hearing Date"
@@ -736,15 +857,15 @@ export default function DashboardPage() {
                       <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
                     </Form.Item>
                   </Col>
-                  <Col span={12}>
+                  <Col xs={24} sm={12}>
                     <Form.Item name="hearingTime" label="Hearing Time">
                       <TimePicker style={{ width: '100%' }} format="HH:mm" />
                     </Form.Item>
                   </Col>
                 </Row>
 
-                <Row gutter={16}>
-                  <Col span={12}>
+                <Row gutter={[12, 0]}>
+                  <Col xs={24} sm={12}>
                     <Form.Item
                       name="hearingType"
                       label="Hearing Type"
@@ -759,7 +880,7 @@ export default function DashboardPage() {
                       </Select>
                     </Form.Item>
                   </Col>
-                  <Col span={12}>
+                  <Col xs={24} sm={12}>
                     <Form.Item name="status" label="Status">
                       <Select>
                         {HEARING_STATUSES.map((status) => (
@@ -792,19 +913,6 @@ export default function DashboardPage() {
             </Modal>
           </Suspense>
         )}
-
-        <style jsx global>{`
-          .table-row-light {
-            background-color: #fafafa;
-          }
-          .table-row-dark {
-            background-color: #ffffff;
-          }
-          .table-row-light:hover td,
-          .table-row-dark:hover td {
-            background-color: #e6f7ff !important;
-          }
-        `}</style>
       </DashboardLayout>
     </ProtectedRoute>
   );

@@ -265,12 +265,13 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
         <Header
           style={{
             background: '#ffffff',
-            padding: '0 clamp(1.5vw, 3vw, 3vw)',
+            padding: '0 clamp(12px, 3vw, 32px)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             boxShadow: 'none',
-            height: '10vh',
+            height: 'clamp(52px, 10vh, 72px)',
+            minHeight: '52px',
             borderBottom: '1px solid var(--border-color)',
             flexShrink: 0,
           }}
@@ -377,12 +378,11 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
         {/* Main Content */}
         <Content
           style={{
-            padding: 'clamp(1.5vh, 3vw, 3vh)',
+            padding: 'clamp(8px, 3vw, 24px)',
             overflow: 'auto',
             background: '#ffffff',
             flex: 1,
             minHeight: 0,
-            height: 'calc(100vh - 10vh)',
           }}
         >
           {children}
@@ -413,6 +413,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       )}
 
       <style>{`
+        /* Responsive breakpoints */
         @media (max-width: 992px) {
           .desktop-firm-name {
             display: none !important;
@@ -427,7 +428,23 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         @media (max-width: 768px) {
           .ant-layout-header {
-            padding: 0 1.2vw !important;
+            padding: 0 12px !important;
+            height: 56px !important;
+          }
+
+          .ant-layout-content {
+            padding: 12px !important;
+          }
+        }
+
+        @media (max-width: 576px) {
+          .ant-layout-header {
+            padding: 0 8px !important;
+            height: 52px !important;
+          }
+
+          .ant-layout-content {
+            padding: 8px !important;
           }
         }
 

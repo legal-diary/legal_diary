@@ -82,7 +82,11 @@ export default function CreateCasePage() {
 
   return (
     <DashboardLayout>
-      <Card title="Create New Case" style={{ maxWidth: '90vw', margin: '0 auto' }}>
+      <Card
+        title={<span style={{ fontSize: 'clamp(1rem, 3vw, 1.3rem)' }}>Create New Case</span>}
+        style={{ maxWidth: 'min(900px, 95vw)', margin: '0 auto' }}
+        styles={{ body: { padding: 'clamp(12px, 4vw, 24px)' } }}
+      >
         <Spin spinning={loading}>
           <Form
             form={form}
