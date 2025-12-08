@@ -7,30 +7,58 @@ import { analyzeCaseWithAI } from '@/lib/openai';
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    console.log('[GET /api/cases] Authorization header:', authHeader?.substring(0, 30));
-
     const token = authHeader?.replace('Bearer ', '');
-    console.log('[GET /api/cases] Extracted token (first 20 chars):', token?.substring(0, 20));
-    console.log('[GET /api/cases] Token length:', token?.length);
 
     if (!token) {
-      console.log('[GET /api/cases] No token provided');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await verifyToken(token);
-    console.log('[GET /api/cases] User after verification:', user?.email);
 
     if (!user || !user.firmId) {
-      console.log('[GET /api/cases] User verification failed or no firmId');
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Check if minimal data is requested (for list views)
+    const url = new URL(request.url);
+    const minimal = url.searchParams.get('minimal') === 'true';
+
+    if (minimal) {
+      // Optimized query for list view - only essential fields
+      const cases = await prisma.case.findMany({
+        where: { firmId: user.firmId },
+        select: {
+          id: true,
+          caseNumber: true,
+          caseTitle: true,
+          clientName: true,
+          status: true,
+          priority: true,
+          courtName: true,
+          createdAt: true,
+          _count: {
+            select: { hearings: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const response = NextResponse.json(cases);
+      response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+      return response;
+    }
+
+    // Full data for detail views
     const cases = await prisma.case.findMany({
       where: { firmId: user.firmId },
       include: {
-        createdBy: true,
-        hearings: true,
+        createdBy: {
+          select: { id: true, name: true, email: true },
+        },
+        hearings: {
+          orderBy: { hearingDate: 'desc' },
+          take: 10,
+        },
         fileDocuments: true,
         aiSummary: true,
       },

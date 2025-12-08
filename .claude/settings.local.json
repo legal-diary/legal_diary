@@ -11,10 +11,19 @@
       "Bash(taskkill.exe:*)",
       "Bash(cmd /c taskkill /PID 16168 /F)",
       "Bash(cmd /c taskkill /PID 16168 /F 2)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(cmd /c \"cd /d C:\\coding\\Legal Diary\\legal-diary && run-puppeteer-test.bat\")",
+      "Bash(cmd /c \"cd /d \"\"C:\\coding\\Legal Diary\\legal-diary\"\" && set TEST_EMAIL=siddharthrj4444@gmail.com && set TEST_PASSWORD=23313432@Sid && node test-puppeteer.js\")",
+      "Bash(del /F /Q \"C:\\coding\\Legal Diary\\legal-diary\\test-puppeteer.js\")",
+      "Bash(cmd /c \"rmdir /S /Q \"\"C:\\coding\\Legal Diary\\legal-diary\\screenshots\"\"\")",
+      "Bash(node test-responsive.js:*)"
     ],
     "deny": [],
     "ask": []
   },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "puppeteer"
+  ],
   "outputStyle": "Explanatory"
 }

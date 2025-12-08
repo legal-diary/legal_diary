@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Layout, Menu, Button, Dropdown, Avatar, Drawer } from 'antd';
+import React, { useState, useMemo, useCallback, memo, lazy, Suspense } from 'react';
+import { Layout, Menu, Button, Avatar } from 'antd';
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -17,37 +17,185 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { usePathname } from 'next/navigation';
 
+// Lazy load heavy components
+const Dropdown = lazy(() => import('antd').then(mod => ({ default: mod.Dropdown })));
+const Drawer = lazy(() => import('antd').then(mod => ({ default: mod.Drawer })));
+
 const { Header, Content, Sider } = Layout;
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+// Memoized navigation items - defined outside component
+const createDesktopNavigationItems = () => [
+  {
+    key: 'dashboard',
+    icon: <DashboardOutlined style={{ fontSize: '1.2rem' }} />,
+    label: <Link href="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>Dashboard</Link>,
+  },
+  {
+    key: 'cases',
+    icon: <FileTextOutlined style={{ fontSize: '1.2rem' }} />,
+    label: 'Cases',
+    children: [
+      {
+        key: 'cases-list',
+        label: <Link href="/cases" style={{ textDecoration: 'none', color: 'inherit' }}>All Cases</Link>,
+      },
+      {
+        key: 'cases-create',
+        label: <Link href="/cases/create" style={{ textDecoration: 'none', color: 'inherit' }}>New Case</Link>,
+      },
+    ],
+  },
+  {
+    key: 'calendar',
+    icon: <CalendarOutlined style={{ fontSize: '1.2rem' }} />,
+    label: <Link href="/calendar" style={{ textDecoration: 'none', color: 'inherit' }}>Hearing Calendar</Link>,
+  },
+];
+
+// Memoized sidebar header
+const SidebarHeader = memo(() => (
+  <div style={{
+    padding: '2.5vh 2vw',
+    textAlign: 'center',
+    borderBottom: 'none',
+    background: 'transparent',
+  }}>
+    <div style={{
+      fontSize: 'clamp(1.3rem, 5vw, 1.8rem)',
+      fontWeight: '800',
+      color: '#fff',
+      letterSpacing: '0.3px',
+      textShadow: 'none',
+    }}>
+      Legal Diary
+    </div>
+  </div>
+));
+SidebarHeader.displayName = 'SidebarHeader';
+
+// Mobile menu component
+const MobileMenuContent = memo<{
+  pathname: string;
+  expandedMenu: string | null;
+  setExpandedMenu: (menu: string | null) => void;
+  handleMenuClick: (path: string) => void;
+  handleLogout: () => void;
+  getSelectedKey: () => string;
+}>(({ pathname, expandedMenu, setExpandedMenu, handleMenuClick, handleLogout, getSelectedKey }) => (
+  <>
+    <div className="mobile-menu-container">
+      <div
+        onClick={() => handleMenuClick('/dashboard')}
+        className={`mobile-menu-item ${getSelectedKey() === 'dashboard' ? 'active' : ''}`}
+      >
+        <DashboardOutlined style={{ fontSize: '1.2rem' }} />
+        <span>Dashboard</span>
+      </div>
+
+      <div className="mobile-menu-item-group">
+        <div
+          onClick={() => setExpandedMenu(expandedMenu === 'cases' ? null : 'cases')}
+          className={`mobile-menu-item ${getSelectedKey() === 'cases' ? 'active' : ''}`}
+        >
+          <FileTextOutlined style={{ fontSize: '1.2rem' }} />
+          <span>Cases</span>
+          <DownOutlined
+            style={{
+              marginLeft: 'auto',
+              transition: 'transform 0.3s ease',
+              transform: expandedMenu === 'cases' ? 'rotate(180deg)' : 'rotate(0deg)',
+              fontSize: '0.8rem',
+            }}
+          />
+        </div>
+
+        {expandedMenu === 'cases' && (
+          <div className="mobile-submenu">
+            <div
+              onClick={() => handleMenuClick('/cases')}
+              className={`mobile-submenu-item ${
+                pathname.includes('/cases') && !pathname.includes('/cases/create') ? 'active' : ''
+              }`}
+            >
+              All Cases
+            </div>
+            <div
+              onClick={() => handleMenuClick('/cases/create')}
+              className={`mobile-submenu-item ${pathname.includes('/cases/create') ? 'active' : ''}`}
+            >
+              New Case
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div
+        onClick={() => handleMenuClick('/calendar')}
+        className={`mobile-menu-item ${getSelectedKey() === 'calendar' ? 'active' : ''}`}
+      >
+        <CalendarOutlined style={{ fontSize: '1.2rem' }} />
+        <span>Hearing Calendar</span>
+      </div>
+    </div>
+
+    <div className="mobile-drawer-footer">
+      <Button
+        type="primary"
+        danger
+        block
+        icon={<LogoutOutlined />}
+        onClick={handleLogout}
+        style={{
+          height: '2.8rem',
+          fontSize: '1rem',
+          fontWeight: '600',
+          borderRadius: '0.5rem',
+          background: '#d32f2f',
+          border: 'none',
+        }}
+      >
+        Logout
+      </Button>
+    </div>
+  </>
+));
+MobileMenuContent.displayName = 'MobileMenuContent';
+
+// Main DashboardLayout component
+function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
 
-  const handleLogout = async () => {
+  // Memoized handlers
+  const handleLogout = useCallback(async () => {
     await logout();
     router.push('/login');
-  };
+  }, [logout, router]);
 
-  const getSelectedKey = () => {
+  const getSelectedKey = useCallback(() => {
     if (pathname.includes('/cases')) return 'cases';
     if (pathname.includes('/calendar')) return 'calendar';
     if (pathname.includes('/settings')) return 'settings';
     return 'dashboard';
-  };
+  }, [pathname]);
 
-  const userMenu = {
+  const handleMenuClick = useCallback((path: string) => {
+    setMobileDrawerOpen(false);
+    router.push(path);
+  }, [router]);
+
+  // Memoized user menu items
+  const userMenuItems = useMemo(() => ({
     items: [
       {
         key: 'settings',
         icon: <SettingOutlined />,
         label: <Link href="/settings">Settings</Link>,
       },
-      {
-        type: 'divider' as const,
-      },
+      { type: 'divider' as const },
       {
         key: 'logout',
         icon: <LogoutOutlined />,
@@ -55,74 +203,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         onClick: handleLogout,
       },
     ],
-  };
+  }), [handleLogout]);
 
-  const handleMenuClick = (path: string) => {
-    setMobileDrawerOpen(false);
-    router.push(path);
-  };
+  // Memoized navigation items
+  const desktopNavigationItems = useMemo(createDesktopNavigationItems, []);
 
-  const desktopNavigationItems = [
-    {
-      key: 'dashboard',
-      icon: <DashboardOutlined style={{ fontSize: '1.2rem' }} />,
-      label: <Link href="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>Dashboard</Link>,
-    },
-    {
-      key: 'cases',
-      icon: <FileTextOutlined style={{ fontSize: '1.2rem' }} />,
-      label: 'Cases',
-      children: [
-        {
-          key: 'cases-list',
-          label: <Link href="/cases" style={{ textDecoration: 'none', color: 'inherit' }}>All Cases</Link>,
-        },
-        {
-          key: 'cases-create',
-          label: <Link href="/cases/create" style={{ textDecoration: 'none', color: 'inherit' }}>New Case</Link>,
-        },
-      ],
-    },
-    {
-      key: 'calendar',
-      icon: <CalendarOutlined style={{ fontSize: '1.2rem' }} />,
-      label: <Link href="/calendar" style={{ textDecoration: 'none', color: 'inherit' }}>Hearing Calendar</Link>,
-    },
-  ];
+  // Memoized user avatar
+  const userInitial = useMemo(() => user?.name?.charAt(0).toUpperCase() || 'U', [user?.name]);
+  const userName = useMemo(() => user?.name?.split(' ')[0] || 'User', [user?.name]);
+  const firmName = useMemo(() => user?.firm_name?.toUpperCase() || 'Law Firm', [user?.firm_name]);
 
-  const mobileNavigationItems = [
-    {
-      key: 'dashboard',
-      icon: <DashboardOutlined style={{ fontSize: '1.2rem' }} />,
-      label: 'Dashboard',
-      onClick: () => handleMenuClick('/dashboard'),
+  // Memoized drawer styles
+  const drawerStyles = useMemo(() => ({
+    header: {
+      borderBottom: '1px solid #e8e8e8',
+      padding: '1.5rem',
+      background: '#ffffff',
     },
-    {
-      key: 'cases',
-      icon: <FileTextOutlined style={{ fontSize: '1.2rem' }} />,
-      label: 'Cases',
-      children: [
-        {
-          key: 'cases-list',
-          label: 'All Cases',
-          onClick: () => handleMenuClick('/cases'),
-          style: { width: '100%' },
-        },
-        {
-          key: 'cases-create',
-          label: 'New Case',
-          onClick: () => handleMenuClick('/cases/create'),
-          style: { width: '100%' },
-        },
-      ],
+    body: {
+      padding: '0',
+      background: '#ffffff',
+      display: 'flex' as const,
+      flexDirection: 'column' as const,
+      height: '100%',
     },
-    {
-      key: 'calendar',
-      icon: <CalendarOutlined style={{ fontSize: '1.2rem' }} />,
-      label: 'Hearing Calendar',
-      onClick: () => handleMenuClick('/calendar'),
-    },
-  ];
+  }), []);
 
   return (
     <Layout style={{ height: '100vh', background: '#ffffff', overflow: 'hidden' }}>
@@ -141,25 +246,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }}
         className="desktop-sidebar"
       >
-        {/* Sidebar Header */}
-        <div style={{
-          padding: '2.5vh 2vw',
-          textAlign: 'center',
-          borderBottom: 'none',
-          background: 'transparent',
-        }}>
-          <div style={{
-            fontSize: 'clamp(1.3rem, 5vw, 1.8rem)',
-            fontWeight: '800',
-            color: '#fff',
-            letterSpacing: '0.3px',
-            textShadow: 'none',
-          }}>
-            Legal Diary
-          </div>
-        </div>
-
-        {/* Navigation Menu */}
+        <SidebarHeader />
         <Menu
           mode="inline"
           selectedKeys={[getSelectedKey()]}
@@ -171,26 +258,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           }}
           theme="dark"
         />
-
-          
       </Sider>
 
       <Layout style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {/* Minimalist Header */}
+        {/* Header */}
         <Header
           style={{
             background: '#ffffff',
-            padding: '0 clamp(1.5vw, 3vw, 3vw)',
+            padding: '0 clamp(12px, 3vw, 32px)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             boxShadow: 'none',
-            height: '10vh',
+            height: 'clamp(52px, 10vh, 72px)',
+            minHeight: '52px',
             borderBottom: '1px solid var(--border-color)',
             flexShrink: 0,
           }}
         >
-          {/* Desktop Firm Name - Left Side */}
+          {/* Desktop Firm Name */}
           <div style={{
             fontSize: 'clamp(1rem, 2vw, 1.3rem)',
             fontWeight: '700',
@@ -201,16 +287,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             alignItems: 'center',
             gap: '1rem',
           }} className="desktop-firm-name">
-            {user?.firm_name?.toUpperCase() || 'Law Firm'}
+            {firmName}
           </div>
 
-          {/* Mobile Header - Hamburger Menu + Firm Name */}
+          {/* Mobile Header */}
           <div style={{
             display: 'none',
             alignItems: 'center',
             gap: '0.8rem',
           }} className="mobile-header">
-            {/* Hamburger Menu */}
             <button
               onClick={() => setMobileDrawerOpen(true)}
               style={{
@@ -229,77 +314,75 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <MenuOutlined />
             </button>
-            {/* Mobile Firm Name */}
             <div style={{
               fontSize: 'clamp(0.85rem, 2vw, 1rem)',
               fontWeight: '700',
               color: '#000000',
             }}>
-              {user?.firm_name?.toUpperCase() || 'Law Firm'}
+              {firmName}
             </div>
           </div>
 
-          {/* User Profile - Spacer to push right */}
           <div style={{ flex: 1 }} />
 
-          {/* User Profile */}
-          <Dropdown menu={userMenu} trigger={['click']} placement="bottomRight">
-            <div
-              style={{
-                cursor: 'pointer',
-                padding: '0.4vh 1vw',
-                borderRadius: '0.6rem',
-                transition: 'all 0.3s ease',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.6rem',
-                height: '6vh',
-                marginLeft: 'auto',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(26, 58, 82, 0.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <Avatar
-                size={32}
+          {/* User Profile Dropdown */}
+          <Suspense fallback={
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4vh 1vw' }}>
+              <Avatar size={32} style={{ background: 'var(--primary-color)', color: '#fff' }}>{userInitial}</Avatar>
+              <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>{userName}</span>
+            </div>
+          }>
+            <Dropdown menu={userMenuItems} trigger={['click']} placement="bottomRight">
+              <div
                 style={{
-                  background: 'var(--primary-color)',
-                  color: '#fff',
-                  fontSize: '0.8rem',
-                  fontWeight: 'bold',
-                  boxShadow: 'var(--shadow-sm)',
-                  flexShrink: 0,
+                  cursor: 'pointer',
+                  padding: '0.4vh 1vw',
+                  borderRadius: '0.6rem',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  height: '6vh',
+                  marginLeft: 'auto',
                 }}
               >
-                {user?.name?.charAt(0).toUpperCase()}
-              </Avatar>
-              <span style={{
-                fontSize: 'clamp(0.7rem, 1.5vw, 0.9rem)',
-                fontWeight: '600',
-                color: 'var(--text-primary)',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                maxWidth: 'clamp(100px, 12vw, 150px)',
-              }}>
-                {user?.name?.split(' ')[0]}
-              </span>
-            </div>
-          </Dropdown>
+                <Avatar
+                  size={32}
+                  style={{
+                    background: 'var(--primary-color)',
+                    color: '#fff',
+                    fontSize: '0.8rem',
+                    fontWeight: 'bold',
+                    boxShadow: 'var(--shadow-sm)',
+                    flexShrink: 0,
+                  }}
+                >
+                  {userInitial}
+                </Avatar>
+                <span style={{
+                  fontSize: 'clamp(0.7rem, 1.5vw, 0.9rem)',
+                  fontWeight: '600',
+                  color: 'var(--text-primary)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: 'clamp(100px, 12vw, 150px)',
+                }}>
+                  {userName}
+                </span>
+              </div>
+            </Dropdown>
+          </Suspense>
         </Header>
 
         {/* Main Content */}
         <Content
           style={{
-            padding: 'clamp(1.5vh, 3vw, 3vh)',
+            padding: 'clamp(8px, 3vw, 24px)',
             overflow: 'auto',
             background: '#ffffff',
             flex: 1,
             minHeight: 0,
-            height: 'calc(100vh - 10vh)',
           }}
         >
           {children}
@@ -307,136 +390,64 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </Layout>
 
       {/* Mobile Navigation Drawer */}
-      <Drawer
-        title="Legal Diary"
-        placement="left"
-        onClose={() => setMobileDrawerOpen(false)}
-        open={mobileDrawerOpen}
-        closeIcon={<CloseOutlined style={{ fontSize: '1.2rem', color: '#000000' }} />}
-        styles={{
-          header: {
-            borderBottom: '1px solid #e8e8e8',
-            padding: '1.5rem',
-            background: '#ffffff',
-          },
-          body: {
-            padding: '0',
-            background: '#ffffff',
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-          },
-        }}
-      >
-        {/* Mobile Menu - Custom Built */}
-        <div className="mobile-menu-container">
-          {/* Dashboard Item */}
-          <div
-            onClick={() => {
-              handleMenuClick('/dashboard');
-            }}
-            className={`mobile-menu-item ${getSelectedKey() === 'dashboard' ? 'active' : ''}`}
+      {mobileDrawerOpen && (
+        <Suspense fallback={null}>
+          <Drawer
+            title="Legal Diary"
+            placement="left"
+            onClose={() => setMobileDrawerOpen(false)}
+            open={mobileDrawerOpen}
+            closeIcon={<CloseOutlined style={{ fontSize: '1.2rem', color: '#000000' }} />}
+            styles={drawerStyles}
           >
-            <DashboardOutlined style={{ fontSize: '1.2rem' }} />
-            <span>Dashboard</span>
-          </div>
-
-          {/* Cases Item with Dropdown */}
-          <div className="mobile-menu-item-group">
-            <div
-              onClick={() => setExpandedMenu(expandedMenu === 'cases' ? null : 'cases')}
-              className={`mobile-menu-item ${getSelectedKey() === 'cases' ? 'active' : ''}`}
-            >
-              <FileTextOutlined style={{ fontSize: '1.2rem' }} />
-              <span>Cases</span>
-              <DownOutlined
-                style={{
-                  marginLeft: 'auto',
-                  transition: 'transform 0.3s ease',
-                  transform: expandedMenu === 'cases' ? 'rotate(180deg)' : 'rotate(0deg)',
-                  fontSize: '0.8rem',
-                }}
-              />
-            </div>
-
-            {/* Cases Submenu */}
-            {expandedMenu === 'cases' && (
-              <div className="mobile-submenu">
-                <div
-                  onClick={() => handleMenuClick('/cases')}
-                  className={`mobile-submenu-item ${
-                    pathname.includes('/cases') && !pathname.includes('/cases/create') ? 'active' : ''
-                  }`}
-                >
-                  All Cases
-                </div>
-                <div
-                  onClick={() => handleMenuClick('/cases/create')}
-                  className={`mobile-submenu-item ${pathname.includes('/cases/create') ? 'active' : ''}`}
-                >
-                  New Case
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Calendar Item */}
-          <div
-            onClick={() => {
-              handleMenuClick('/calendar');
-            }}
-            className={`mobile-menu-item ${getSelectedKey() === 'calendar' ? 'active' : ''}`}
-          >
-            <CalendarOutlined style={{ fontSize: '1.2rem' }} />
-            <span>Hearing Calendar</span>
-          </div>
-        </div>
-
-        {/* Mobile Drawer Footer */}
-        <div className="mobile-drawer-footer">
-          <Button
-            type="primary"
-            danger
-            block
-            icon={<LogoutOutlined />}
-            onClick={handleLogout}
-            style={{
-              height: '2.8rem',
-              fontSize: '1rem',
-              fontWeight: '600',
-              borderRadius: '0.5rem',
-              background: '#d32f2f',
-              border: 'none',
-            }}
-          >
-            Logout
-          </Button>
-        </div>
-      </Drawer>
+            <MobileMenuContent
+              pathname={pathname}
+              expandedMenu={expandedMenu}
+              setExpandedMenu={setExpandedMenu}
+              handleMenuClick={handleMenuClick}
+              handleLogout={handleLogout}
+              getSelectedKey={getSelectedKey}
+            />
+          </Drawer>
+        </Suspense>
+      )}
 
       <style>{`
+        /* Responsive breakpoints */
         @media (max-width: 992px) {
           .desktop-firm-name {
             display: none !important;
           }
-
           .mobile-header {
             display: flex !important;
           }
-
           .desktop-sidebar {
             display: none !important;
           }
         }
 
-        /* Mobile Header Optimization */
         @media (max-width: 768px) {
           .ant-layout-header {
-            padding: 0 1.2vw !important;
+            padding: 0 12px !important;
+            height: 56px !important;
+          }
+
+          .ant-layout-content {
+            padding: 12px !important;
           }
         }
 
-        /* Mobile Drawer Styling */
+        @media (max-width: 576px) {
+          .ant-layout-header {
+            padding: 0 8px !important;
+            height: 52px !important;
+          }
+
+          .ant-layout-content {
+            padding: 8px !important;
+          }
+        }
+
         .ant-drawer-content-wrapper {
           box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08) !important;
         }
@@ -451,8 +462,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           font-size: 1.3rem !important;
           font-weight: 800 !important;
           color: #000000 !important;
-          letter-spacing: 0px;
-          width: 100% !important;
         }
 
         .ant-drawer-close {
@@ -475,7 +484,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           overflow: hidden !important;
         }
 
-        /* Mobile Menu Container */
         .mobile-menu-container {
           flex: 1;
           overflow-y: auto;
@@ -484,7 +492,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           width: 100%;
         }
 
-        /* Mobile Menu Item */
         .mobile-menu-item {
           display: flex;
           align-items: center;
@@ -508,8 +515,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           border-left-color: #d0d0d0;
         }
 
-
-        /* Mobile Menu Item Group (for submenu parent) */
         .mobile-menu-item-group {
           width: 100%;
         }
@@ -518,14 +523,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           display: flex;
         }
 
-        /* Mobile Submenu */
         .mobile-submenu {
           background: #fafafa;
           width: 100%;
           overflow: hidden;
         }
 
-        /* Mobile Submenu Item */
         .mobile-submenu-item {
           padding: 0.9rem 1.5rem 0.9rem 3.5rem;
           color: #757575;
@@ -547,8 +550,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           border-left-color: #d0d0d0;
         }
 
-
-        /* Mobile Drawer Footer */
         .mobile-drawer-footer {
           padding: 1.5rem;
           border-top: 1px solid #e8e8e8;
@@ -560,7 +561,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           font-weight: 600;
         }
 
-        /* Desktop Sidebar Menu Styling */
         .desktop-sidebar .ant-menu-dark .ant-menu-item,
         .desktop-sidebar .ant-menu-dark .ant-menu-submenu-title {
           color: rgba(255, 255, 255, 0.85) !important;
@@ -576,3 +576,5 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </Layout>
   );
 }
+
+export default memo(DashboardLayout);

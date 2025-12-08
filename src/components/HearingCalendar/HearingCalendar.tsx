@@ -1,11 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Calendar, Card, Tag, List, Empty, Modal, Form, Input, DatePicker, Select, Button, message } from 'antd';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { Calendar, Card, Tag, List, Empty, Form, Input, DatePicker, Select, Button, message } from 'antd';
 import { CalendarOutlined, FileTextOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAuth } from '@/context/AuthContext';
+import { CalendarSkeleton, shimmerStyles, SectionLoader } from '@/components/Skeletons';
 
+// Lazy load Modal
+const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
+
+// Types
 interface Hearing {
   id: string;
   caseId: string;
@@ -20,353 +25,408 @@ interface Hearing {
   };
 }
 
+interface Case {
+  id: string;
+  caseNumber: string;
+  caseTitle: string;
+}
+
+// Static color map
+const HEARING_TYPE_COLORS: Record<string, string> = {
+  ARGUMENTS: 'blue',
+  EVIDENCE_RECORDING: 'orange',
+  FINAL_HEARING: 'red',
+  INTERIM_HEARING: 'green',
+  JUDGMENT_DELIVERY: 'purple',
+  PRE_HEARING: 'cyan',
+  OTHER: 'default',
+};
+
+const HEARING_TYPES = [
+  { value: 'ARGUMENTS', label: 'Arguments' },
+  { value: 'EVIDENCE_RECORDING', label: 'Evidence Recording' },
+  { value: 'FINAL_HEARING', label: 'Final Hearing' },
+  { value: 'INTERIM_HEARING', label: 'Interim Hearing' },
+  { value: 'JUDGMENT_DELIVERY', label: 'Judgment Delivery' },
+  { value: 'PRE_HEARING', label: 'Pre Hearing' },
+  { value: 'OTHER', label: 'Other' },
+] as const;
+
 export default function HearingCalendar() {
   const { token } = useAuth();
   const [hearings, setHearings] = useState<Hearing[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [cases, setCases] = useState<Case[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs>(dayjs());
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState('');
-  const [cases, setCases] = useState<any[]>([]);
   const [form] = Form.useForm();
   const [hearingDetailsModalOpen, setHearingDetailsModalOpen] = useState(false);
   const [selectedHearing, setSelectedHearing] = useState<Hearing | null>(null);
 
-  // Fetch hearings
-  useEffect(() => {
-    if (token) {
-      fetchHearings();
-      fetchCases();
-    }
-  }, [token]);
+  // Optimized single API call to fetch both hearings and cases
+  const fetchCalendarData = useCallback(async () => {
+    if (!token) return;
 
-  const fetchHearings = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/hearings', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setHearings(data);
+      // Parallel fetch for hearings and cases
+      const [hearingsRes, casesRes] = await Promise.all([
+        fetch('/api/hearings?calendar=true', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch('/api/cases?minimal=true', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      if (hearingsRes.ok) {
+        const hearingsData = await hearingsRes.json();
+        setHearings(hearingsData);
       }
-    } catch (error) {
-      message.error('Failed to load hearings');
+
+      if (casesRes.ok) {
+        const casesData = await casesRes.json();
+        setCases(casesData);
+      }
+    } catch {
+      message.error('Failed to load calendar data');
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  const fetchCases = async () => {
-    try {
-      const response = await fetch('/api/cases', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCases(data);
-      }
-    } catch (error) {
-      console.error('Failed to load cases');
+  useEffect(() => {
+    if (token) {
+      fetchCalendarData();
     }
-  };
+  }, [token, fetchCalendarData]);
 
-  // Get hearings for selected date
-  const getHearingsForDate = (date: dayjs.Dayjs) => {
-    return hearings.filter((h) =>
-      dayjs(h.hearingDate).isSame(date, 'day')
-    );
-  };
+  // Memoized hearings grouped by date for fast lookup
+  const hearingsByDate = useMemo(() => {
+    const map = new Map<string, Hearing[]>();
+    hearings.forEach((h) => {
+      const dateKey = dayjs(h.hearingDate).format('YYYY-MM-DD');
+      const existing = map.get(dateKey) || [];
+      existing.push(h);
+      map.set(dateKey, existing);
+    });
+    return map;
+  }, [hearings]);
 
-  // Get hearing status color
-  const getHearingTypeColor = (type: string) => {
-    const colors: { [key: string]: string } = {
-      ARGUMENTS: 'blue',
-      EVIDENCE_RECORDING: 'orange',
-      FINAL_HEARING: 'red',
-      INTERIM_HEARING: 'green',
-      JUDGMENT_DELIVERY: 'purple',
-      PRE_HEARING: 'cyan',
-    };
-    return colors[type] || 'default';
-  };
+  // Get hearings for a specific date
+  const getHearingsForDate = useCallback(
+    (date: dayjs.Dayjs): Hearing[] => {
+      const dateKey = date.format('YYYY-MM-DD');
+      return hearingsByDate.get(dateKey) || [];
+    },
+    [hearingsByDate]
+  );
 
-  // Cell render for calendar
-  const getListData = (date: dayjs.Dayjs) => {
-    const dayHearings = getHearingsForDate(date);
-    return dayHearings.map((h) => ({
-      type: 'warning',
-      content: `${h.case.caseNumber} - ${h.case.clientName}`,
-      hearingId: h.id,
-    }));
-  };
+  // Memoized selected date hearings
+  const selectedDateHearings = useMemo(
+    () => getHearingsForDate(selectedDate),
+    [selectedDate, getHearingsForDate]
+  );
 
-  const dateCellRender = (date: dayjs.Dayjs) => {
-    const listData = getListData(date);
-    const dayHearings = getHearingsForDate(date);
+  // Memoized date cell renderer
+  const dateCellRender = useCallback(
+    (date: dayjs.Dayjs) => {
+      const dayHearings = getHearingsForDate(date);
+      if (dayHearings.length === 0) return null;
 
-    return (
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {listData.map((item) => {
-          const hearing = dayHearings.find((h) => h.id === item.hearingId);
-          return (
+      return (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {dayHearings.slice(0, 3).map((hearing) => (
             <li
-              key={item.hearingId}
-              onClick={() => {
-                setSelectedHearing(hearing || null);
+              key={hearing.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedHearing(hearing);
                 setHearingDetailsModalOpen(true);
               }}
               style={{
-                fontSize: 'clamp(0.75rem, 1.5vw, 1rem)',
+                fontSize: 'clamp(0.7rem, 1.2vw, 0.85rem)',
                 color: '#f57800',
                 cursor: 'pointer',
-                padding: '0.4vh 0.5vw',
-                borderRadius: '0.3vh',
+                padding: '2px 4px',
+                borderRadius: '2px',
                 backgroundColor: 'rgba(245, 120, 0, 0.1)',
-                marginBottom: '0.3vh',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(245, 120, 0, 0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(245, 120, 0, 0.1)';
+                marginBottom: '2px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
-              <CalendarOutlined style={{ marginRight: '0.5vw' }} />
-              {item.content}
+              <CalendarOutlined style={{ marginRight: '4px', fontSize: '10px' }} />
+              {hearing.case.caseNumber}
             </li>
-          );
-        })}
-      </ul>
-    );
-  };
+          ))}
+          {dayHearings.length > 3 && (
+            <li style={{ fontSize: '0.7rem', color: '#999', paddingLeft: '4px' }}>
+              +{dayHearings.length - 3} more
+            </li>
+          )}
+        </ul>
+      );
+    },
+    [getHearingsForDate]
+  );
 
-  // Handle new hearing submission
-  const onFinish = async (values: any) => {
-    try {
-      const response = await fetch('/api/hearings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          caseId: selectedCaseId,
-          hearingDate: values.hearingDate.toISOString(),
-          hearingTime: values.hearingTime,
-          hearingType: values.hearingType,
-          courtRoom: values.courtRoom,
-          notes: values.notes,
-        }),
-      });
+  // Handle form submission
+  const onFinish = useCallback(
+    async (values: any) => {
+      try {
+        const response = await fetch('/api/hearings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            caseId: selectedCaseId,
+            hearingDate: values.hearingDate.toISOString(),
+            hearingTime: values.hearingTime,
+            hearingType: values.hearingType,
+            courtRoom: values.courtRoom,
+            notes: values.notes,
+          }),
+        });
 
-      if (response.ok) {
-        message.success('Hearing scheduled successfully');
-        setModalOpen(false);
-        form.resetFields();
-        await fetchHearings();
-      } else {
-        message.error('Failed to schedule hearing');
+        if (response.ok) {
+          message.success('Hearing scheduled successfully');
+          setModalOpen(false);
+          form.resetFields();
+          fetchCalendarData();
+        } else {
+          message.error('Failed to schedule hearing');
+        }
+      } catch {
+        message.error('Error scheduling hearing');
       }
-    } catch (error) {
-      message.error('Error scheduling hearing');
-    }
-  };
+    },
+    [token, selectedCaseId, form, fetchCalendarData]
+  );
 
-  // Handle opening modal with pre-filled date
-  const openScheduleHearingModal = (date?: dayjs.Dayjs) => {
-    setModalOpen(true);
-    if (date) {
-      // Pre-fill the date in the form
-      form.setFieldsValue({
-        hearingDate: date,
-      });
-    }
-  };
+  // Handle modal open with pre-filled date
+  const openScheduleModal = useCallback(
+    (date?: dayjs.Dayjs) => {
+      setModalOpen(true);
+      if (date) {
+        form.setFieldsValue({ hearingDate: date });
+      }
+    },
+    [form]
+  );
 
-  const selectedDateHearings = getHearingsForDate(selectedDate);
+  // Handle date selection
+  const handleDateChange = useCallback(
+    (date: dayjs.Dayjs) => {
+      setSelectedDate(date);
+      openScheduleModal(date);
+    },
+    [openScheduleModal]
+  );
+
+  // Memoized case options
+  const caseOptions = useMemo(
+    () =>
+      cases.map((c) => (
+        <Select.Option key={c.id} value={c.id}>
+          {c.caseNumber} - {c.caseTitle}
+        </Select.Option>
+      )),
+    [cases]
+  );
 
   return (
     <div>
-      <Card title="Hearing Calendar" style={{ marginBottom: '2vh' }} className="calendar-card">
-        <div className="calendar-container">
-          <Calendar
-            dateCellRender={dateCellRender}
-            onChange={(date) => {
-              setSelectedDate(date);
-              // Open schedule hearing modal with pre-filled date
-              openScheduleHearingModal(date);
-            }}
-          />
-        </div>
-      </Card>
-
-      <Card
-        title={`Hearings for ${selectedDate.format('YYYY-MM-DD')}`}
-        style={{ fontSize: 'clamp(0.9rem, 2vw, 1.1rem)' }}
-        extra={
-          <Button type="primary" onClick={() => openScheduleHearingModal(selectedDate)}>
-            Schedule Hearing
-          </Button>
-        }
-      >
-        {selectedDateHearings.length === 0 ? (
-          <Empty description="No hearings scheduled" />
-        ) : (
-          <List
-            dataSource={selectedDateHearings}
-            renderItem={(hearing) => (
-              <List.Item>
-                <List.Item.Meta
-                  avatar={<FileTextOutlined style={{ fontSize: 'clamp(1rem, 3vw, 1.5rem)', color: '#1890ff' }} />}
-                  title={<span style={{ fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>{`${hearing.case.caseNumber} - ${hearing.case.caseTitle}`}</span>}
-                  description={
-                    <div style={{ fontSize: 'clamp(0.75rem, 1.8vw, 0.95rem)' }}>
-                      <p style={{ marginBottom: '0.5vh' }}>Client: {hearing.case.clientName}</p>
-                      <p style={{ marginBottom: '0.5vh' }}>
-                        Type:{' '}
-                        <Tag color={getHearingTypeColor(hearing.hearingType)}>
-                          {hearing.hearingType.replace(/_/g, ' ')}
-                        </Tag>
-                      </p>
-                      {hearing.hearingTime && <p style={{ marginBottom: '0.5vh' }}>Time: {hearing.hearingTime}</p>}
-                      {hearing.courtRoom && <p style={{ marginBottom: '0.5vh' }}>Court Room: {hearing.courtRoom}</p>}
-                    </div>
-                  }
-                />
-              </List.Item>
-            )}
-          />
-        )}
-      </Card>
-
-      <Modal
-        title="Hearing Details"
-        open={hearingDetailsModalOpen}
-        onCancel={() => {
-          setHearingDetailsModalOpen(false);
-          setSelectedHearing(null);
-        }}
-        footer={[
-          <Button key="close" onClick={() => {
-            setHearingDetailsModalOpen(false);
-            setSelectedHearing(null);
-          }}>
-            Close
-          </Button>,
-        ]}
-      >
-        {selectedHearing && (
-          <div style={{ marginTop: '2vh' }}>
-            <div style={{ marginBottom: '2vh', paddingBottom: '2vh', borderBottom: '1px solid #f0f0f0' }}>
-              <h3 style={{ marginBottom: '1vh', color: '#1890ff', fontSize: 'clamp(1rem, 3vw, 1.3rem)' }}>
-                {selectedHearing.case.caseNumber}
-              </h3>
-              <p style={{ fontSize: 'clamp(0.9rem, 2vw, 1.1rem)', fontWeight: 'bold', marginBottom: '0.8vh' }}>
-                {selectedHearing.case.caseTitle}
-              </p>
-              <p style={{ color: '#666', marginBottom: '0.8vh', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
-                <strong>Client:</strong> {selectedHearing.case.clientName}
-              </p>
-            </div>
-
-            <div style={{ marginBottom: '2vh' }}>
-              <p style={{ marginBottom: '1.2vh', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
-                <strong>Hearing Date:</strong>{' '}
-                <span style={{ fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)', color: '#1890ff', fontWeight: 'bold' }}>
-                  {dayjs(selectedHearing.hearingDate).format('MMMM D, YYYY')}
-                </span>
-              </p>
-
-              {selectedHearing.hearingTime && (
-                <p style={{ marginBottom: '1.2vh', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
-                  <strong>Hearing Time:</strong> {selectedHearing.hearingTime}
-                </p>
-              )}
-
-              <p style={{ marginBottom: '1.2vh', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
-                <strong>Hearing Type:</strong>{' '}
-                <Tag color={getHearingTypeColor(selectedHearing.hearingType)}>
-                  {selectedHearing.hearingType.replace(/_/g, ' ')}
-                </Tag>
-              </p>
-
-              {selectedHearing.courtRoom && (
-                <p style={{ marginBottom: '1.2vh', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
-                  <strong>Court Room:</strong> {selectedHearing.courtRoom}
-                </p>
-              )}
-            </div>
+      <style>{shimmerStyles}</style>
+      <SectionLoader loading={loading} skeleton={<CalendarSkeleton />}>
+        <Card title="Hearing Calendar" style={{ marginBottom: '16px' }} className="calendar-card">
+          <div className="calendar-container">
+            <Calendar cellRender={dateCellRender} onChange={handleDateChange} />
           </div>
-        )}
-      </Modal>
+        </Card>
 
-      <Modal
-        title="Schedule Hearing"
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        footer={null}
-      >
-        <Form form={form} onFinish={onFinish} layout="vertical">
-          <Form.Item
-            name="caseId"
-            label="Select Case"
-            rules={[{ required: true, message: 'Please select a case' }]}
+        <Card
+          title={`Hearings for ${selectedDate.format('YYYY-MM-DD')}`}
+          style={{ fontSize: 'clamp(0.9rem, 2vw, 1.1rem)' }}
+          extra={
+            <Button type="primary" onClick={() => openScheduleModal(selectedDate)}>
+              Schedule Hearing
+            </Button>
+          }
+        >
+          {selectedDateHearings.length === 0 ? (
+            <Empty description="No hearings scheduled" />
+          ) : (
+            <List
+              dataSource={selectedDateHearings}
+              renderItem={(hearing) => (
+                <List.Item>
+                  <List.Item.Meta
+                    avatar={<FileTextOutlined style={{ fontSize: 'clamp(1rem, 3vw, 1.5rem)', color: '#1890ff' }} />}
+                    title={
+                      <span style={{ fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>
+                        {`${hearing.case.caseNumber} - ${hearing.case.caseTitle}`}
+                      </span>
+                    }
+                    description={
+                      <div style={{ fontSize: 'clamp(0.75rem, 1.8vw, 0.95rem)' }}>
+                        <p style={{ marginBottom: '4px' }}>Client: {hearing.case.clientName}</p>
+                        <p style={{ marginBottom: '4px' }}>
+                          Type:{' '}
+                          <Tag color={HEARING_TYPE_COLORS[hearing.hearingType] || 'default'}>
+                            {hearing.hearingType.replace(/_/g, ' ')}
+                          </Tag>
+                        </p>
+                        {hearing.hearingTime && <p style={{ marginBottom: '4px' }}>Time: {hearing.hearingTime}</p>}
+                        {hearing.courtRoom && <p style={{ marginBottom: '4px' }}>Court Room: {hearing.courtRoom}</p>}
+                      </div>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          )}
+        </Card>
+      </SectionLoader>
+
+      {/* Hearing Details Modal */}
+      {hearingDetailsModalOpen && selectedHearing && (
+        <Suspense fallback={null}>
+          <Modal
+            title="Hearing Details"
+            open={hearingDetailsModalOpen}
+            onCancel={() => {
+              setHearingDetailsModalOpen(false);
+              setSelectedHearing(null);
+            }}
+            footer={[
+              <Button
+                key="close"
+                onClick={() => {
+                  setHearingDetailsModalOpen(false);
+                  setSelectedHearing(null);
+                }}
+              >
+                Close
+              </Button>,
+            ]}
+            destroyOnClose
+            width="min(520px, 95vw)"
+            centered
           >
-            <Select
-              placeholder="Select a case"
-              onChange={(value) => setSelectedCaseId(value)}
-            >
-              {cases.map((c) => (
-                <Select.Option key={c.id} value={c.id}>
-                  {c.caseNumber} - {c.caseTitle}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #f0f0f0' }}>
+                <h3 style={{ marginBottom: '8px', color: '#1890ff', fontSize: 'clamp(1rem, 3vw, 1.3rem)' }}>
+                  {selectedHearing.case.caseNumber}
+                </h3>
+                <p style={{ fontSize: 'clamp(0.9rem, 2vw, 1.1rem)', fontWeight: 'bold', marginBottom: '8px' }}>
+                  {selectedHearing.case.caseTitle}
+                </p>
+                <p style={{ color: '#666', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
+                  <strong>Client:</strong> {selectedHearing.case.clientName}
+                </p>
+              </div>
 
-          <Form.Item
-            name="hearingDate"
-            label="Hearing Date"
-            rules={[{ required: true, message: 'Please select a date' }]}
+              <div style={{ marginBottom: '16px' }}>
+                <p style={{ marginBottom: '12px', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
+                  <strong>Hearing Date:</strong>{' '}
+                  <span style={{ color: '#1890ff', fontWeight: 'bold' }}>
+                    {dayjs(selectedHearing.hearingDate).format('MMMM D, YYYY')}
+                  </span>
+                </p>
+
+                {selectedHearing.hearingTime && (
+                  <p style={{ marginBottom: '12px', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
+                    <strong>Hearing Time:</strong> {selectedHearing.hearingTime}
+                  </p>
+                )}
+
+                <p style={{ marginBottom: '12px', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
+                  <strong>Hearing Type:</strong>{' '}
+                  <Tag color={HEARING_TYPE_COLORS[selectedHearing.hearingType] || 'default'}>
+                    {selectedHearing.hearingType.replace(/_/g, ' ')}
+                  </Tag>
+                </p>
+
+                {selectedHearing.courtRoom && (
+                  <p style={{ marginBottom: '12px', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
+                    <strong>Court Room:</strong> {selectedHearing.courtRoom}
+                  </p>
+                )}
+              </div>
+            </div>
+          </Modal>
+        </Suspense>
+      )}
+
+      {/* Schedule Hearing Modal */}
+      {modalOpen && (
+        <Suspense fallback={null}>
+          <Modal
+            title="Schedule Hearing"
+            open={modalOpen}
+            onCancel={() => setModalOpen(false)}
+            footer={null}
+            destroyOnClose
+            width="min(520px, 95vw)"
+            centered
           >
-            <DatePicker />
-          </Form.Item>
+            <Form form={form} onFinish={onFinish} layout="vertical">
+              <Form.Item
+                name="caseId"
+                label="Select Case"
+                rules={[{ required: true, message: 'Please select a case' }]}
+              >
+                <Select placeholder="Select a case" onChange={(value) => setSelectedCaseId(value)}>
+                  {caseOptions}
+                </Select>
+              </Form.Item>
 
-          <Form.Item name="hearingTime" label="Hearing Time">
-            <Input type="time" />
-          </Form.Item>
+              <Form.Item
+                name="hearingDate"
+                label="Hearing Date"
+                rules={[{ required: true, message: 'Please select a date' }]}
+              >
+                <DatePicker style={{ width: '100%' }} />
+              </Form.Item>
 
-          <Form.Item
-            name="hearingType"
-            label="Hearing Type"
-            rules={[{ required: true, message: 'Please select hearing type' }]}
-          >
-            <Select>
-              <Select.Option value="ARGUMENTS">Arguments</Select.Option>
-              <Select.Option value="EVIDENCE_RECORDING">Evidence Recording</Select.Option>
-              <Select.Option value="FINAL_HEARING">Final Hearing</Select.Option>
-              <Select.Option value="INTERIM_HEARING">Interim Hearing</Select.Option>
-              <Select.Option value="JUDGMENT_DELIVERY">Judgment Delivery</Select.Option>
-              <Select.Option value="PRE_HEARING">Pre Hearing</Select.Option>
-              <Select.Option value="OTHER">Other</Select.Option>
-            </Select>
-          </Form.Item>
+              <Form.Item name="hearingTime" label="Hearing Time">
+                <Input type="time" />
+              </Form.Item>
 
-          <Form.Item name="courtRoom" label="Court Room">
-            <Input placeholder="e.g., Court Room 5" />
-          </Form.Item>
+              <Form.Item
+                name="hearingType"
+                label="Hearing Type"
+                rules={[{ required: true, message: 'Please select hearing type' }]}
+              >
+                <Select>
+                  {HEARING_TYPES.map((type) => (
+                    <Select.Option key={type.value} value={type.value}>
+                      {type.label}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
 
-          <Form.Item name="notes" label="Notes">
-            <Input.TextArea rows={3} placeholder="Additional notes" />
-          </Form.Item>
+              <Form.Item name="courtRoom" label="Court Room">
+                <Input placeholder="e.g., Court Room 5" />
+              </Form.Item>
 
-          <Button type="primary" htmlType="submit" block>
-            Schedule Hearing
-          </Button>
-        </Form>
-      </Modal>
+              <Form.Item name="notes" label="Notes">
+                <Input.TextArea rows={3} placeholder="Additional notes" />
+              </Form.Item>
+
+              <Button type="primary" htmlType="submit" block>
+                Schedule Hearing
+              </Button>
+            </Form>
+          </Modal>
+        </Suspense>
+      )}
 
       <style>{`
         .calendar-card {
@@ -376,12 +436,19 @@ export default function HearingCalendar() {
         .calendar-container {
           width: 100%;
           overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
         }
 
-        /* Mobile responsiveness */
+        /* Calendar responsive styles */
+        @media (max-width: 992px) {
+          .ant-picker-calendar-date-content {
+            height: 50px !important;
+          }
+        }
+
         @media (max-width: 768px) {
           .calendar-card {
-            margin-bottom: 1.5vh !important;
+            margin-bottom: 12px !important;
           }
 
           .ant-picker-calendar {
@@ -389,52 +456,90 @@ export default function HearingCalendar() {
           }
 
           .ant-picker-calendar-header {
-            padding: 0.8rem 0.4rem !important;
+            padding: 8px !important;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
           }
 
           .ant-picker-calendar-date {
-            padding: 0.4rem !important;
-            min-height: auto !important;
+            padding: 2px !important;
+          }
+
+          .ant-picker-calendar-date-content {
+            height: 40px !important;
+            overflow: hidden;
           }
 
           .ant-picker-cell {
-            padding: 0.4rem !important;
+            padding: 2px !important;
           }
 
-          /* Reduce calendar cell height on mobile */
-          .ant-picker-calendar-date-value {
-            font-size: 0.8rem;
-          }
-
-          .ant-picker-cell-in-view.ant-picker-cell {
-            height: auto;
-            min-height: 60px;
-          }
-
-          /* Make calendar events smaller on mobile */
           .calendar-container ul li {
-            font-size: 0.7rem !important;
-            padding: 0.2rem 0.3rem !important;
-            margin-bottom: 0.2rem !important;
+            font-size: 0.6rem !important;
+            padding: 1px 2px !important;
+            margin-bottom: 1px !important;
+          }
+
+          .ant-picker-calendar-date-value {
+            font-size: 0.8rem !important;
           }
         }
 
-        @media (max-width: 480px) {
-          .ant-picker-calendar-date {
-            padding: 0.2rem !important;
+        @media (max-width: 576px) {
+          .calendar-card .ant-card-body {
+            padding: 8px !important;
           }
 
-          .ant-picker-cell {
-            padding: 0.2rem !important;
+          .ant-picker-calendar {
+            font-size: 0.75rem;
           }
 
-          .ant-picker-cell-in-view.ant-picker-cell {
-            min-height: 50px;
+          .ant-picker-calendar-header {
+            padding: 4px !important;
+          }
+
+          .ant-picker-calendar-header .ant-select {
+            min-width: 60px !important;
+            font-size: 0.75rem !important;
+          }
+
+          .ant-picker-calendar-header .ant-radio-group {
+            display: none !important;
+          }
+
+          .ant-picker-calendar-date-content {
+            height: 30px !important;
+          }
+
+          .ant-picker-calendar-date-value {
+            font-size: 0.7rem !important;
+            line-height: 1.2 !important;
           }
 
           .calendar-container ul li {
+            font-size: 0.55rem !important;
+            padding: 0 2px !important;
+          }
+
+          .ant-picker-content th {
             font-size: 0.65rem !important;
-            padding: 0.1rem 0.2rem !important;
+            padding: 4px 0 !important;
+          }
+        }
+
+        /* Hearing list responsive */
+        @media (max-width: 768px) {
+          .ant-list-item-meta-avatar {
+            margin-right: 8px !important;
+          }
+
+          .ant-list-item-meta-title {
+            font-size: 0.85rem !important;
+          }
+
+          .ant-list-item-meta-description {
+            font-size: 0.75rem !important;
           }
         }
       `}</style>
