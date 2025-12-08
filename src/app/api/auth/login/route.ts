@@ -127,10 +127,42 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error('Login error:', error);
-    // Return a more specific error message while protecting sensitive details
-    const message = error instanceof Error ? error.message : 'Internal server error';
+
+    // Log detailed error information for debugging
+    if (error instanceof Error) {
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+
+    // Check for Prisma-specific errors
+    let errorMessage = 'Authentication service unavailable. Please try again later.';
+    let errorDetails = {};
+
+    if (error instanceof Error) {
+      // Detect database connection errors
+      if (error.message.includes('Can\'t reach database server') ||
+          error.message.includes('Connection refused') ||
+          error.message.includes('ECONNREFUSED')) {
+        errorMessage = 'Database connection failed. Please check DATABASE_URL configuration.';
+        errorDetails = { hint: 'Verify DATABASE_URL in environment variables' };
+      } else if (error.message.includes('SSL') || error.message.includes('TLS')) {
+        errorMessage = 'Database SSL connection error.';
+        errorDetails = { hint: 'Check if database requires SSL connection' };
+      } else if (error.message.includes('authentication failed')) {
+        errorMessage = 'Database authentication failed.';
+        errorDetails = { hint: 'Verify database credentials in DATABASE_URL' };
+      }
+    }
+
     return NextResponse.json(
-      { error: 'Authentication service unavailable. Please try again later.' },
+      {
+        error: errorMessage,
+        ...(process.env.NODE_ENV === 'development' && {
+          debug: error instanceof Error ? error.message : String(error),
+          ...errorDetails
+        })
+      },
       { status: 500 }
     );
   }
