@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import fs from 'fs';
+import path from 'path';
 
 // Allowed fields for case updates (whitelist approach)
 const ALLOWED_UPDATE_FIELDS = [
@@ -98,6 +100,10 @@ export async function PUT(
 
     const updates = await request.json();
 
+    // Extract document IDs to delete (not part of case update)
+    const documentsToDelete = updates.documentsToDelete || [];
+    delete updates.documentsToDelete;
+
     // Validate and filter updates (whitelist approach)
     const validatedUpdates: Record<string, any> = {};
 
@@ -105,6 +111,34 @@ export async function PUT(
       if (field in updates) {
         validatedUpdates[field] = updates[field];
       }
+    }
+
+    // Delete specified documents
+    if (documentsToDelete.length > 0) {
+      const docsToDelete = await prisma.fileDocument.findMany({
+        where: {
+          id: { in: documentsToDelete },
+          caseId: caseId,
+        },
+      });
+
+      for (const doc of docsToDelete) {
+        try {
+          const filePath = path.join(process.cwd(), 'public', doc.fileUrl.replace(/^\//, ''));
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (err) {
+          console.error(`Failed to delete file ${doc.fileUrl}:`, err);
+        }
+      }
+
+      await prisma.fileDocument.deleteMany({
+        where: {
+          id: { in: documentsToDelete },
+          caseId: caseId,
+        },
+      });
     }
 
     // Additional validation for specific fields

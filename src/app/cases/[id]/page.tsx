@@ -20,6 +20,7 @@ import {
   DatePicker,
   Select,
   Upload,
+  Checkbox,
 } from 'antd';
 import {
   FileTextOutlined,
@@ -29,8 +30,12 @@ import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
+  ThunderboltOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
+import { Dropdown, MenuProps } from 'antd';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
+import AIAnalysisTab from '@/components/Cases/AIAnalysisTab';
 import { useAuth } from '@/context/AuthContext';
 import { useParams, useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
@@ -71,6 +76,37 @@ export default function CaseDetailPage() {
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [documentsToDelete, setDocumentsToDelete] = useState<string[]>([]);
+
+  const handleAIQuickAction = async (action: string) => {
+    setAiLoading(true);
+    try {
+      if (action === 'reanalyze') {
+        const response = await fetch(`/api/cases/${caseId}/ai/reanalyze`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          message.success('Case re-analyzed successfully');
+          fetchCaseDetail();
+        } else {
+          const error = await response.json();
+          message.error(error.error || 'Failed to re-analyze case');
+        }
+      }
+    } catch (error) {
+      message.error('Failed to perform action');
+      console.error(error);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (token && caseId) {
@@ -174,9 +210,50 @@ export default function CaseDetailPage() {
     },
   ];
 
-  const handleFileUpload = async (info: any) => {
-    const fileList = info.fileList.map((file: any) => file.originFileObj);
+  const handleFileUpload = (info: any) => {
+    const fileList = info.fileList
+      .filter((file: any) => file.originFileObj)
+      .map((file: any) => file.originFileObj);
     setUploadedFiles(fileList);
+  };
+
+  const handleUploadSubmit = async () => {
+    if (uploadedFiles.length === 0) {
+      message.warning('Please select at least one file to upload');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      uploadedFiles.forEach((file) => {
+        formData.append('files', file);
+      });
+
+      const response = await fetch(`/api/cases/${caseId}/upload`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        message.success(`${result.files.length} file(s) uploaded successfully`);
+        setUploadModalOpen(false);
+        setUploadedFiles([]);
+        fetchCaseDetail(); // Refresh to show new documents
+      } else {
+        const error = await response.json();
+        message.error(error.error || 'Failed to upload files');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      message.error('Failed to upload files');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleHearingSubmit = async (values: any) => {
@@ -238,7 +315,10 @@ export default function CaseDetailPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          ...values,
+          documentsToDelete: documentsToDelete,
+        }),
       });
 
       console.log('PUT response status:', response.status);
@@ -247,6 +327,7 @@ export default function CaseDetailPage() {
         console.log('Updated case data:', updatedData);
         message.success('Case updated successfully');
         setEditModalOpen(false);
+        setDocumentsToDelete([]);
         setCaseData(updatedData);
         // Wait a moment then refresh to ensure UI updates
         setTimeout(() => {
@@ -447,6 +528,20 @@ export default function CaseDetailPage() {
         </Card>
       ),
     },
+    {
+      key: 'ai-analysis',
+      label: 'AI Analysis',
+      children: (
+        <AIAnalysisTab
+          caseId={caseId}
+          caseTitle={caseData.caseTitle}
+          aiSummary={caseData.aiSummary}
+          fileDocuments={caseData.fileDocuments || []}
+          token={token || ''}
+          onAnalysisComplete={fetchCaseDetail}
+        />
+      ),
+    },
   ];
 
   return (
@@ -463,6 +558,34 @@ export default function CaseDetailPage() {
               </Col>
               <Col>
                 <Space>
+                  <Dropdown
+                    menu={{
+                      items: [
+                        {
+                          key: 'reanalyze',
+                          label: 'Re-analyze Case',
+                          icon: <ThunderboltOutlined />,
+                          onClick: () => handleAIQuickAction('reanalyze'),
+                        },
+                        {
+                          key: 'ai-tab',
+                          label: 'Go to AI Analysis Tab',
+                          onClick: () => {
+                            const tabElement = document.querySelector(
+                              '[data-node-key="ai-analysis"]'
+                            ) as HTMLElement;
+                            if (tabElement) {
+                              tabElement.click();
+                            }
+                          },
+                        },
+                      ] as MenuProps['items'],
+                    }}
+                  >
+                    <Button icon={<ThunderboltOutlined />} loading={aiLoading}>
+                      AI <DownOutlined />
+                    </Button>
+                  </Dropdown>
                   <Button icon={<EditOutlined />} onClick={handleEditOpen}>
                     Edit
                   </Button>
@@ -489,19 +612,55 @@ export default function CaseDetailPage() {
       <Modal
         title="Upload Document"
         open={uploadModalOpen}
-        onCancel={() => setUploadModalOpen(false)}
-        footer={null}
+        onCancel={() => {
+          setUploadModalOpen(false);
+          setUploadedFiles([]);
+        }}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setUploadModalOpen(false);
+              setUploadedFiles([]);
+            }}
+          >
+            Cancel
+          </Button>,
+          <Button
+            key="upload"
+            type="primary"
+            loading={uploading}
+            onClick={handleUploadSubmit}
+            disabled={uploadedFiles.length === 0}
+          >
+            {uploading ? 'Uploading...' : `Upload ${uploadedFiles.length > 0 ? `(${uploadedFiles.length})` : ''}`}
+          </Button>,
+        ]}
       >
-        <Upload
+        <Upload.Dragger
           onChange={handleFileUpload}
           multiple
           maxCount={5}
           beforeUpload={() => false}
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif"
+          fileList={uploadedFiles.map((file, index) => ({
+            uid: `${index}`,
+            name: file.name,
+            status: 'done' as const,
+            originFileObj: file,
+          }))}
+          onRemove={(file) => {
+            setUploadedFiles(uploadedFiles.filter((_, i) => `${i}` !== file.uid));
+          }}
         >
-          <Button icon={<UploadOutlined />}>
-            Click to upload files
-          </Button>
-        </Upload>
+          <p className="ant-upload-drag-icon">
+            <UploadOutlined style={{ fontSize: '3rem', color: '#1a3a52' }} />
+          </p>
+          <p className="ant-upload-text">Click or drag files to this area to upload</p>
+          <p className="ant-upload-hint">
+            Supported formats: PDF, Word, Excel, TXT, Images (max 5 files, 10MB each)
+          </p>
+        </Upload.Dragger>
       </Modal>
 
       <Modal
@@ -645,9 +804,40 @@ export default function CaseDetailPage() {
             <Input.TextArea rows={4} />
           </Form.Item>
 
+          {caseData.fileDocuments && caseData.fileDocuments.length > 0 && (
+            <Form.Item label="Manage Documents">
+              <Card type="inner" size="small">
+                <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#666' }}>
+                  Click the checkbox to delete documents:
+                </p>
+                {caseData.fileDocuments.map((doc: any) => (
+                  <div key={doc.id} style={{ marginBottom: '0.5rem' }}>
+                    <Checkbox
+                      checked={documentsToDelete.includes(doc.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setDocumentsToDelete([...documentsToDelete, doc.id]);
+                        } else {
+                          setDocumentsToDelete(
+                            documentsToDelete.filter((id) => id !== doc.id)
+                          );
+                        }
+                      }}
+                    >
+                      {doc.fileName} ({(doc.fileSize / 1024).toFixed(2)} KB)
+                    </Checkbox>
+                  </div>
+                ))}
+              </Card>
+            </Form.Item>
+          )}
+
           <Row gutter={[8, 0]} justify="end">
             <Col>
-              <Button onClick={() => setEditModalOpen(false)}>Cancel</Button>
+              <Button onClick={() => {
+                setEditModalOpen(false);
+                setDocumentsToDelete([]);
+              }}>Cancel</Button>
             </Col>
             <Col>
               <Button type="primary" htmlType="submit">
