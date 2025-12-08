@@ -24,7 +24,6 @@ export default function LoginPage() {
 
   return (
     <Row justify="center" align="middle" style={{
-      minHeight: '100vh',
       minHeight: '100dvh',
       background: '#ffffff',
       padding: 'clamp(12px, 4vw, 24px)',
