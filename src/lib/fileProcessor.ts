@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import mammoth from 'mammoth';
 
 interface DocumentContent {
   fileName: string;
@@ -16,18 +17,79 @@ interface ExtractionResult {
 const MAX_CONTENT_LENGTH = 50000; // 50KB limit to avoid token overflow
 
 /**
- * Extract text from PDF file
- * Note: For production, use a library like pdfjs-dist or pdf-lib
- * For now, we'll return a placeholder since PDF extraction is complex
+ * Extract text from PDF file using pdf2json library
+ * pdf2json is pure JavaScript with no canvas/DOM dependencies
  */
 export async function extractTextFromPDF(filePath: string): Promise<ExtractionResult> {
+  console.log(`[extractTextFromPDF] Starting extraction for: ${filePath}`);
   try {
-    // For now, return metadata about the PDF
-    // In production, use pdf-parse or pdfjs-dist with proper server-side configuration
-    return {
-      success: true,
-      content: `[PDF Document: ${path.basename(filePath)}] - PDF content extraction requires additional configuration. Please convert to text or use the AI Analysis features with document metadata.`,
-    };
+    // Dynamic import to work better with Next.js bundling
+    console.log('[extractTextFromPDF] Loading pdf2json library...');
+    const { default: PDFParser } = await import('pdf2json');
+    console.log('[extractTextFromPDF] pdf2json loaded successfully');
+
+    return new Promise((resolve) => {
+      const pdfParser = new PDFParser();
+
+      pdfParser.on('pdfParser_dataError', (errData: Error | { parserError: Error }) => {
+        const errorMessage = errData instanceof Error
+          ? errData.message
+          : errData.parserError.message;
+        resolve({
+          success: false,
+          error: `Failed to parse PDF: ${errorMessage}`,
+        });
+      });
+
+      pdfParser.on('pdfParser_dataReady', (pdfData: { Pages: Array<{ Texts: Array<{ R: Array<{ T: string }> }> }> }) => {
+        try {
+          // Extract text from all pages
+          let text = '';
+          for (const page of pdfData.Pages || []) {
+            for (const textItem of page.Texts || []) {
+              for (const textRun of textItem.R || []) {
+                // Decode URI-encoded text
+                text += decodeURIComponent(textRun.T) + ' ';
+              }
+            }
+            text += '\n\n'; // Page separator
+          }
+
+          text = text.trim();
+
+          if (!text || text.length === 0) {
+            console.log(`[extractTextFromPDF] No text found in PDF: ${path.basename(filePath)}`);
+            resolve({
+              success: true,
+              content: `[PDF Document: ${path.basename(filePath)}] - No readable text content found in PDF (may be scanned/image-based).`,
+            });
+            return;
+          }
+
+          // Clean up extracted text
+          const cleanedText = text
+            .replace(/\r\n/g, '\n')
+            .replace(/[ \t]+/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+
+          console.log(`[extractTextFromPDF] Successfully extracted ${cleanedText.length} characters from PDF`);
+          console.log(`[extractTextFromPDF] First 500 chars: ${cleanedText.substring(0, 500)}...`);
+
+          resolve({
+            success: true,
+            content: cleanedText.substring(0, MAX_CONTENT_LENGTH),
+          });
+        } catch (parseError) {
+          resolve({
+            success: false,
+            error: `Failed to process PDF text: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
+          });
+        }
+      });
+
+      pdfParser.loadPDF(filePath);
+    });
   } catch (error) {
     return {
       success: false,
@@ -37,22 +99,38 @@ export async function extractTextFromPDF(filePath: string): Promise<ExtractionRe
 }
 
 /**
- * Extract text from DOCX file
+ * Extract text from DOCX file using mammoth library
  */
 export async function extractTextFromDocx(filePath: string): Promise<ExtractionResult> {
+  console.log(`[extractTextFromDocx] Starting extraction for: ${filePath}`);
   try {
     const fileBuffer = fs.readFileSync(filePath);
-    // For now, use a simple approach - full docx parsing requires more complex setup
-    // This is a basic implementation that reads the underlying text
-    const data = fs.readFileSync(filePath, 'utf-8');
+    console.log(`[extractTextFromDocx] Read file buffer, size: ${fileBuffer.length} bytes`);
 
-    // Try to parse DOCX - it's a ZIP file containing XML
-    // For production, use a library like 'docx' or 'mammoth'
+    const result = await mammoth.extractRawText({ buffer: fileBuffer });
+
+    if (!result.value || result.value.trim().length === 0) {
+      console.log(`[extractTextFromDocx] No text found in DOCX: ${path.basename(filePath)}`);
+      return {
+        success: true,
+        content: `[Word Document: ${path.basename(filePath)}] - No readable text content found in document.`,
+      };
+    }
+
+    // Log any warnings from mammoth (useful for debugging)
+    if (result.messages && result.messages.length > 0) {
+      console.log(`[extractTextFromDocx] Warnings for ${path.basename(filePath)}:`, result.messages);
+    }
+
+    console.log(`[extractTextFromDocx] Successfully extracted ${result.value.length} characters from DOCX`);
+    console.log(`[extractTextFromDocx] First 500 chars: ${result.value.substring(0, 500)}...`);
+
     return {
       success: true,
-      content: data.substring(0, MAX_CONTENT_LENGTH),
+      content: result.value.substring(0, MAX_CONTENT_LENGTH),
     };
   } catch (error) {
+    console.error(`[extractTextFromDocx] Error extracting DOCX:`, error);
     return {
       success: false,
       error: `Failed to extract DOCX: ${error instanceof Error ? error.message : 'Unknown error'}`,

@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { Calendar, Card, Tag, List, Empty, Form, Input, DatePicker, Select, Button, message } from 'antd';
-import { CalendarOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Calendar, Card, Tag, List, Empty, Form, Input, DatePicker, Select, Button, message, Tooltip } from 'antd';
+import { CalendarOutlined, FileTextOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAuth } from '@/context/AuthContext';
 import { CalendarSkeleton, shimmerStyles, SectionLoader } from '@/components/Skeletons';
+import { getDayStatus } from '@/data/bangaloreCourtHolidays2026';
 
 // Lazy load Modal
 const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
@@ -51,6 +52,36 @@ const HEARING_TYPES = [
   { value: 'PRE_HEARING', label: 'Pre Hearing' },
   { value: 'OTHER', label: 'Other' },
 ] as const;
+
+// Calendar Legend Component
+const CalendarLegend = () => (
+  <div className="calendar-legend">
+  
+    <div className="legend-items">
+      <div className="legend-item">
+        <span className="legend-dot working"></span>
+        <span>Working Day</span>
+      </div>
+      <div className="legend-item">
+        <span className="legend-dot holiday"></span>
+        <span>Holiday/Sunday/2nd Sat</span>
+      </div>
+      <div className="legend-item">
+        <span className="legend-dot vacation"></span>
+        <span>Court Vacation</span>
+      </div>
+      <div className="legend-item">
+        <span className="legend-dot restricted"></span>
+        <span>Restricted Holiday</span>
+      </div>
+      <div className="legend-item">
+        <span className="legend-dot sitting"></span>
+        <span>Sitting Day</span>
+      </div>
+    </div>
+  </div>
+);
+
 
 export default function HearingCalendar() {
   const { token } = useAuth();
@@ -129,45 +160,70 @@ export default function HearingCalendar() {
     [selectedDate, getHearingsForDate]
   );
 
-  // Memoized date cell renderer
+  // Get day status for selected date
+  const selectedDayStatus = useMemo(() => {
+    const dateStr = selectedDate.format('YYYY-MM-DD');
+    return getDayStatus(dateStr);
+  }, [selectedDate]);
+
+  // Memoized date cell renderer with court holiday information
   const dateCellRender = useCallback(
     (date: dayjs.Dayjs) => {
+      const dateStr = date.format('YYYY-MM-DD');
       const dayHearings = getHearingsForDate(date);
-      if (dayHearings.length === 0) return null;
+      const dayStatus = getDayStatus(dateStr);
+
+      // Determine cell background class
+      let cellClass = 'court-day ';
+      if (dayStatus.isVacation) {
+        cellClass += 'vacation-day';
+      } else if (dayStatus.isSittingDay) {
+        cellClass += 'sitting-day';
+      } else if (dayStatus.isHoliday) {
+        cellClass += 'holiday-day';
+      } else if (dayStatus.isRestrictedHoliday) {
+        cellClass += 'restricted-day';
+      } else {
+        cellClass += 'working-day';
+      }
+
+      const tooltipContent = dayStatus.holidayName || dayStatus.vacationName ||
+        (dayStatus.isWorkingDay ? 'Working Day' : 'Non-Working Day');
 
       return (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {dayHearings.slice(0, 3).map((hearing) => (
-            <li
-              key={hearing.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedHearing(hearing);
-                setHearingDetailsModalOpen(true);
-              }}
-              style={{
-                fontSize: 'clamp(0.7rem, 1.2vw, 0.85rem)',
-                color: '#f57800',
-                cursor: 'pointer',
-                padding: '2px 4px',
-                borderRadius: '2px',
-                backgroundColor: 'rgba(245, 120, 0, 0.1)',
-                marginBottom: '2px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <CalendarOutlined style={{ marginRight: '4px', fontSize: '10px' }} />
-              {hearing.case.caseNumber}
-            </li>
-          ))}
-          {dayHearings.length > 3 && (
-            <li style={{ fontSize: '0.7rem', color: '#999', paddingLeft: '4px' }}>
-              +{dayHearings.length - 3} more
-            </li>
-          )}
-        </ul>
+        <Tooltip title={tooltipContent} placement="top">
+          <div className={cellClass}>
+            {/* Holiday/Status indicator */}
+            {(dayStatus.isHoliday || dayStatus.isVacation || dayStatus.isRestrictedHoliday || dayStatus.isSittingDay) && (
+              <div className="day-status-indicator">
+                {dayStatus.isSittingDay && <span className="sitting-badge">S</span>}
+              </div>
+            )}
+
+            {/* Hearings list */}
+            {dayHearings.length > 0 && (
+              <ul className="hearing-list">
+                {dayHearings.slice(0, 2).map((hearing) => (
+                  <li
+                    key={hearing.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedHearing(hearing);
+                      setHearingDetailsModalOpen(true);
+                    }}
+                    className="hearing-item"
+                  >
+                    <CalendarOutlined className="hearing-icon" />
+                    {hearing.case.caseNumber}
+                  </li>
+                ))}
+                {dayHearings.length > 2 && (
+                  <li className="hearing-more">+{dayHearings.length - 2} more</li>
+                )}
+              </ul>
+            )}
+          </div>
+        </Tooltip>
       );
     },
     [getHearingsForDate]
@@ -223,9 +279,8 @@ export default function HearingCalendar() {
   const handleDateChange = useCallback(
     (date: dayjs.Dayjs) => {
       setSelectedDate(date);
-      openScheduleModal(date);
     },
-    [openScheduleModal]
+    []
   );
 
   // Memoized case options
@@ -240,18 +295,49 @@ export default function HearingCalendar() {
   );
 
   return (
-    <div>
+    <div className="hearing-calendar-container">
       <style>{shimmerStyles}</style>
+      <style>{calendarStyles}</style>
+
       <SectionLoader loading={loading} skeleton={<CalendarSkeleton />}>
-        <Card title="Hearing Calendar" style={{ marginBottom: '16px' }} className="calendar-card">
+       
+
+        {/* Main Calendar */}
+        <Card
+          title={
+            <span>
+              <CalendarOutlined style={{ marginRight: 8 }} />
+              Karnataka High Court Calendar 2026
+            </span>
+          }
+          style={{ marginBottom: '16px' }}
+          className="calendar-card"
+        >
+          <CalendarLegend />
           <div className="calendar-container">
-            <Calendar cellRender={dateCellRender} onChange={handleDateChange} />
+            <Calendar
+              cellRender={dateCellRender}
+              onChange={handleDateChange}
+            />
           </div>
         </Card>
 
+        {/* Selected Date Details */}
         <Card
-          title={`Hearings for ${selectedDate.format('YYYY-MM-DD')}`}
-          style={{ fontSize: 'clamp(0.9rem, 2vw, 1.1rem)' }}
+          title={
+            <div className="selected-date-header">
+              <span>{selectedDate.format('dddd, MMMM D, YYYY')}</span>
+              <Tag color={selectedDayStatus.isWorkingDay ? 'green' : 'red'}>
+                {selectedDayStatus.isWorkingDay ? 'Working Day' : 'Non-Working'}
+              </Tag>
+              {selectedDayStatus.holidayName && (
+                <Tag color="blue">{selectedDayStatus.holidayName}</Tag>
+              )}
+              {selectedDayStatus.vacationName && (
+                <Tag color="purple">{selectedDayStatus.vacationName}</Tag>
+              )}
+            </div>
+          }
           extra={
             <Button type="primary" onClick={() => openScheduleModal(selectedDate)}>
               Schedule Hearing
@@ -259,7 +345,7 @@ export default function HearingCalendar() {
           }
         >
           {selectedDateHearings.length === 0 ? (
-            <Empty description="No hearings scheduled" />
+            <Empty description="No hearings scheduled for this date" />
           ) : (
             <List
               dataSource={selectedDateHearings}
@@ -427,122 +513,291 @@ export default function HearingCalendar() {
           </Modal>
         </Suspense>
       )}
-
-      <style>{`
-        .calendar-card {
-          width: 100%;
-        }
-
-        .calendar-container {
-          width: 100%;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-
-        /* Calendar responsive styles */
-        @media (max-width: 992px) {
-          .ant-picker-calendar-date-content {
-            height: 50px !important;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .calendar-card {
-            margin-bottom: 12px !important;
-          }
-
-          .ant-picker-calendar {
-            font-size: 0.85rem;
-          }
-
-          .ant-picker-calendar-header {
-            padding: 8px !important;
-            flex-wrap: wrap;
-            gap: 8px;
-            justify-content: center;
-          }
-
-          .ant-picker-calendar-date {
-            padding: 2px !important;
-          }
-
-          .ant-picker-calendar-date-content {
-            height: 40px !important;
-            overflow: hidden;
-          }
-
-          .ant-picker-cell {
-            padding: 2px !important;
-          }
-
-          .calendar-container ul li {
-            font-size: 0.6rem !important;
-            padding: 1px 2px !important;
-            margin-bottom: 1px !important;
-          }
-
-          .ant-picker-calendar-date-value {
-            font-size: 0.8rem !important;
-          }
-        }
-
-        @media (max-width: 576px) {
-          .calendar-card .ant-card-body {
-            padding: 8px !important;
-          }
-
-          .ant-picker-calendar {
-            font-size: 0.75rem;
-          }
-
-          .ant-picker-calendar-header {
-            padding: 4px !important;
-          }
-
-          .ant-picker-calendar-header .ant-select {
-            min-width: 60px !important;
-            font-size: 0.75rem !important;
-          }
-
-          .ant-picker-calendar-header .ant-radio-group {
-            display: none !important;
-          }
-
-          .ant-picker-calendar-date-content {
-            height: 30px !important;
-          }
-
-          .ant-picker-calendar-date-value {
-            font-size: 0.7rem !important;
-            line-height: 1.2 !important;
-          }
-
-          .calendar-container ul li {
-            font-size: 0.55rem !important;
-            padding: 0 2px !important;
-          }
-
-          .ant-picker-content th {
-            font-size: 0.65rem !important;
-            padding: 4px 0 !important;
-          }
-        }
-
-        /* Hearing list responsive */
-        @media (max-width: 768px) {
-          .ant-list-item-meta-avatar {
-            margin-right: 8px !important;
-          }
-
-          .ant-list-item-meta-title {
-            font-size: 0.85rem !important;
-          }
-
-          .ant-list-item-meta-description {
-            font-size: 0.75rem !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
+
+// Calendar-specific styles
+const calendarStyles = `
+  .hearing-calendar-container {
+    width: 100%;
+  }
+
+  /* Calendar Info Card */
+  .calendar-info-card .ant-card-body {
+    padding: 16px;
+  }
+
+  /* Legend Styles */
+  .calendar-legend {
+    width: 100%;
+  }
+
+  .legend-title {
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1a3a52;
+    font-size: clamp(0.9rem, 2vw, 1rem);
+  }
+
+  .legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: clamp(0.75rem, 1.5vw, 0.85rem);
+  }
+
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  .legend-dot.working {
+    background-color: #52c41a;
+  }
+
+  .legend-dot.holiday {
+    background-color: #ff4d4f;
+  }
+
+  .legend-dot.vacation {
+    background-color: #1890ff;
+  }
+
+  .legend-dot.restricted {
+    background-color: #faad14;
+  }
+
+  .legend-dot.sitting {
+    background-color: #722ed1;
+    border: 2px solid #52c41a;
+  }
+
+  /* Calendar Cell Styles */
+  .court-day {
+    min-height: 100%;
+    border-radius: 4px;
+    padding: 2px;
+    margin: -2px;
+    position: relative;
+  }
+
+  .working-day {
+    background-color: rgba(82, 196, 26, 0.1);
+    border-left: 3px solid #52c41a;
+  }
+
+  .holiday-day {
+    background-color: rgba(255, 77, 79, 0.15);
+    border-left: 3px solid #ff4d4f;
+  }
+
+  .vacation-day {
+    background-color: rgba(24, 144, 255, 0.15);
+    border-left: 3px solid #1890ff;
+  }
+
+  .restricted-day {
+    background-color: rgba(250, 173, 20, 0.1);
+    border-left: 3px solid #faad14;
+  }
+
+  .sitting-day {
+    background-color: rgba(114, 46, 209, 0.1);
+    border-left: 3px solid #722ed1;
+  }
+
+  .day-status-indicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+  }
+
+  .sitting-badge {
+    background: #722ed1;
+    color: white;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: bold;
+  }
+
+  /* Hearing List in Cell */
+  .hearing-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .hearing-item {
+    font-size: clamp(0.65rem, 1.2vw, 0.8rem);
+    color: #f57800;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 2px;
+    background-color: rgba(245, 120, 0, 0.15);
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hearing-item:hover {
+    background-color: rgba(245, 120, 0, 0.25);
+  }
+
+  .hearing-icon {
+    margin-right: 4px;
+    font-size: 10px;
+  }
+
+  .hearing-more {
+    font-size: 0.65rem;
+    color: #999;
+    padding-left: 4px;
+  }
+
+  /* Selected Date Header */
+  .selected-date-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Calendar Card */
+  .calendar-card {
+    width: 100%;
+  }
+
+  .calendar-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ant Design Calendar Overrides */
+  .ant-picker-calendar-date-content {
+    height: 60px !important;
+  }
+
+  /* Responsive Styles */
+  @media (max-width: 992px) {
+    .ant-picker-calendar-date-content {
+      height: 50px !important;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .calendar-card {
+      margin-bottom: 12px !important;
+    }
+
+    .ant-picker-calendar {
+      font-size: 0.85rem;
+    }
+
+    .ant-picker-calendar-header {
+      padding: 8px !important;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .ant-picker-calendar-date {
+      padding: 2px !important;
+    }
+
+    .ant-picker-calendar-date-content {
+      height: 40px !important;
+      overflow: hidden;
+    }
+
+    .ant-picker-cell {
+      padding: 2px !important;
+    }
+
+    .hearing-item {
+      font-size: 0.6rem !important;
+      padding: 1px 2px !important;
+      margin-bottom: 1px !important;
+    }
+
+    .ant-picker-calendar-date-value {
+      font-size: 0.8rem !important;
+    }
+
+    .court-day {
+      border-left-width: 2px;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .calendar-card .ant-card-body {
+      padding: 8px !important;
+    }
+
+    .ant-picker-calendar {
+      font-size: 0.75rem;
+    }
+
+    .ant-picker-calendar-header {
+      padding: 4px !important;
+    }
+
+    .ant-picker-calendar-header .ant-select {
+      min-width: 60px !important;
+      font-size: 0.75rem !important;
+    }
+
+    .ant-picker-calendar-header .ant-radio-group {
+      display: none !important;
+    }
+
+    .ant-picker-calendar-date-content {
+      height: 30px !important;
+    }
+
+    .ant-picker-calendar-date-value {
+      font-size: 0.7rem !important;
+      line-height: 1.2 !important;
+    }
+
+    .hearing-item {
+      font-size: 0.55rem !important;
+      padding: 0 2px !important;
+    }
+
+    .ant-picker-content th {
+      font-size: 0.65rem !important;
+      padding: 4px 0 !important;
+    }
+
+    .legend-items {
+      flex-direction: column;
+      gap: 6px;
+    }
+  }
+
+  /* Hearing list responsive */
+  @media (max-width: 768px) {
+    .ant-list-item-meta-avatar {
+      margin-right: 8px !important;
+    }
+
+    .ant-list-item-meta-title {
+      font-size: 0.85rem !important;
+    }
+
+    .ant-list-item-meta-description {
+      font-size: 0.75rem !important;
+    }
+  }
+`;

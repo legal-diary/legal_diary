@@ -44,7 +44,7 @@ export default function LoginPage() {
               Legal Diary
             </div>
           }
-          bordered={false}
+          variant="borderless"
           style={{
             borderColor: 'transparent',
             boxShadow: 'none',

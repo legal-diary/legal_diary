@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, withRetry } from '@/lib/prisma';
 import { verifyPassword, generateSessionToken } from '@/lib/auth';
 import {
   isRateLimited,
@@ -52,17 +52,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: {
-        firmMember: {
-          select: {
-            name: true,
+    // Find user (with retry for Render free tier wake-up)
+    const user = await withRetry(() =>
+      prisma.user.findUnique({
+        where: { email },
+        include: {
+          Firm_User_firmIdToFirm: {
+            select: {
+              name: true,
+            },
           },
         },
-      },
-    });
+      })
+    );
 
     if (!user) {
       // Record failed attempt
@@ -101,19 +103,21 @@ export async function POST(request: NextRequest) {
     const token = generateSessionToken();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    await prisma.session.create({
-      data: {
-        userId: user.id,
-        token,
-        expiresAt,
-      },
-    });
+    await withRetry(() =>
+      prisma.session.create({
+        data: {
+          userId: user.id,
+          token,
+          expiresAt,
+        },
+      })
+    );
 
     // Return user info and token
-    const { password: _, firmMember, ...userWithoutPassword } = user;
+    const { password: _, Firm_User_firmIdToFirm, ...userWithoutPassword } = user;
     const userData = {
       ...userWithoutPassword,
-      firm_name: firmMember?.name || null,
+      firm_name: Firm_User_firmIdToFirm?.name || null,
     };
 
     return NextResponse.json(

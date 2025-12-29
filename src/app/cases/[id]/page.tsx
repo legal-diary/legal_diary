@@ -446,7 +446,12 @@ export default function CaseDetailPage() {
                   title="Key Points"
                   description={
                     <ul>
-                      {JSON.parse(caseData.aiSummary.keyPoints).map((point: string, index: number) => (
+                      {(Array.isArray(caseData.aiSummary.keyPoints)
+                        ? caseData.aiSummary.keyPoints
+                        : typeof caseData.aiSummary.keyPoints === 'string'
+                          ? JSON.parse(caseData.aiSummary.keyPoints)
+                          : []
+                      ).map((point: string, index: number) => (
                         <li key={index} style={{ fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', marginBottom: '0.5vh' }}>
                           {point}
                         </li>

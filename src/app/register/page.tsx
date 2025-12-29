@@ -77,7 +77,7 @@ export default function RegisterPage() {
               Create Account
             </div>
           }
-          bordered={false}
+          variant="borderless"
           style={{ boxShadow: 'none', borderColor: 'transparent', borderRadius: 'clamp(0.5rem, 2vw, 0.8rem)', background: '#ffffff' }}
           styles={{
             body: { padding: 'clamp(12px, 4vw, 24px)' },

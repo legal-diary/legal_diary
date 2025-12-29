@@ -16,7 +16,13 @@
       "Bash(cmd /c \"cd /d \"\"C:\\coding\\Legal Diary\\legal-diary\"\" && set TEST_EMAIL=siddharthrj4444@gmail.com && set TEST_PASSWORD=23313432@Sid && node test-puppeteer.js\")",
       "Bash(del /F /Q \"C:\\coding\\Legal Diary\\legal-diary\\test-puppeteer.js\")",
       "Bash(cmd /c \"rmdir /S /Q \"\"C:\\coding\\Legal Diary\\legal-diary\\screenshots\"\"\")",
-      "Bash(node test-responsive.js:*)"
+      "Bash(node test-responsive.js:*)",
+      "mcp__puppeteer__puppeteer_screenshot",
+      "mcp__puppeteer__puppeteer_fill",
+      "mcp__puppeteer__puppeteer_click",
+      "mcp__puppeteer__puppeteer_evaluate",
+      "mcp__puppeteer__puppeteer_navigate",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

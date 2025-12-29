@@ -157,41 +157,42 @@ Provide practical, actionable insights for the advocate to effectively handle th
 }
 
 /**
- * Analyze uploaded documents for a case
+ * Analyze uploaded documents - focuses solely on document content
  */
 export async function analyzeDocumentsWithAI(
-  caseTitle: string,
   documents: Array<{ fileName: string; content: string }>
 ): Promise<DocumentAnalysisResult> {
   const documentsSection = documents
-    .map((doc) => `\n[${doc.fileName}]\n${doc.content}`)
-    .join('\n---\n');
+    .map((doc) => `\n[Document: ${doc.fileName}]\n${doc.content}`)
+    .join('\n\n---\n\n');
 
-  const prompt = `
-You are a legal expert. Analyze the following documents from the case "${caseTitle}" and provide:
-1. A summary of the documents (key points)
-2. Key findings (4-5 major points from the documents)
-3. Potential risks or issues identified
-4. Recommendations for the advocate
+  const prompt = `You are a legal document analyst. Analyze ONLY the content of the following document(s).
+Do NOT make assumptions beyond what is explicitly stated in the documents.
 
-Documents:
+DOCUMENTS TO ANALYZE:
 ${documentsSection}
 
-Please format your response as JSON with the following structure:
-{
-  "summary": "...",
-  "keyFindings": ["...", "...", "..."],
-  "risks": ["...", "...", "..."],
-  "recommendations": ["...", "...", "..."]
-}
-`;
+Based SOLELY on the document content above, provide:
+1. Summary: A concise overview of what the document(s) contain
+2. Key Findings: 4-6 important facts, clauses, or information extracted directly from the document(s)
+3. Potential Issues/Risks: Any concerning clauses, ambiguities, missing information, or legal risks identified
+4. Recommendations: Actionable suggestions based on the document analysis
+
+IMPORTANT: Respond ONLY with a valid JSON object in this exact format:
+{"summary": "your summary here", "keyFindings": ["finding 1", "finding 2", "finding 3"], "risks": ["risk 1", "risk 2"], "recommendations": ["recommendation 1", "recommendation 2"]}`;
 
   try {
     const openai = getOpenAIClient();
+    console.log('[analyzeDocumentsWithAI] Calling OpenAI API for document analysis');
     const message = await openai.chat.completions.create({
       model: 'gpt-4o',
-      max_tokens: 1500,
+      max_tokens: 2000,
+      response_format: { type: 'json_object' },
       messages: [
+        {
+          role: 'system',
+          content: 'You are a legal document analyst. Always respond with valid JSON only.',
+        },
         {
           role: 'user',
           content: prompt,
@@ -200,26 +201,23 @@ Please format your response as JSON with the following structure:
     });
 
     const responseText = message.choices[0].message.content;
+    console.log('[analyzeDocumentsWithAI] OpenAI response received, length:', responseText?.length);
 
     if (!responseText) {
       throw new Error('Empty response from OpenAI');
     }
 
     // Parse JSON response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Invalid response format');
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(responseText);
+    console.log('[analyzeDocumentsWithAI] Successfully parsed response');
     return {
-      summary: parsed.summary,
+      summary: parsed.summary || 'No summary available',
       keyFindings: parsed.keyFindings || [],
       risks: parsed.risks || [],
       recommendations: parsed.recommendations || [],
     };
   } catch (error) {
-    console.error('OpenAI API error:', error);
+    console.error('[analyzeDocumentsWithAI] OpenAI API error:', error);
     throw error;
   }
 }
