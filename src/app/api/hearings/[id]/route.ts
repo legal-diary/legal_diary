@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import {
+  updateCalendarEvent,
+  deleteCalendarEvent,
+  isGoogleCalendarConnected,
+} from '@/lib/googleCalendar';
 
 // GET a specific hearing
 export async function GET(
@@ -24,11 +29,11 @@ export async function GET(
     const hearing = await prisma.hearing.findFirst({
       where: {
         id,
-        case: { firmId: user.firmId },
+        Case: { firmId: user.firmId },
       },
       include: {
-        case: true,
-        reminders: true,
+        Case: true,
+        Reminder: true,
       },
     });
 
@@ -69,7 +74,7 @@ export async function PUT(
     const existingHearing = await prisma.hearing.findFirst({
       where: {
         id,
-        case: { firmId: user.firmId },
+        Case: { firmId: user.firmId },
       },
     });
 
@@ -97,10 +102,37 @@ export async function PUT(
         ...(status && { status }),
       },
       include: {
-        case: true,
-        reminders: true,
+        Case: {
+          select: {
+            caseNumber: true,
+            caseTitle: true,
+            clientName: true,
+          },
+        },
+        Reminder: true,
       },
     });
+
+    // Auto-sync to Google Calendar if connected
+    try {
+      const googleConnected = await isGoogleCalendarConnected(user.id);
+      if (googleConnected) {
+        await updateCalendarEvent(user.id, {
+          hearingId: updatedHearing.id,
+          caseNumber: updatedHearing.Case.caseNumber,
+          caseTitle: updatedHearing.Case.caseTitle,
+          clientName: updatedHearing.Case.clientName,
+          hearingDate: updatedHearing.hearingDate,
+          hearingTime: updatedHearing.hearingTime,
+          hearingType: updatedHearing.hearingType,
+          courtRoom: updatedHearing.courtRoom,
+          notes: updatedHearing.notes,
+        });
+        console.log('[Hearings] Updated Google Calendar event:', updatedHearing.id);
+      }
+    } catch (googleError) {
+      console.error('[Hearings] Google Calendar update failed:', googleError);
+    }
 
     return NextResponse.json(updatedHearing);
   } catch (error) {
@@ -135,12 +167,23 @@ export async function DELETE(
     const existingHearing = await prisma.hearing.findFirst({
       where: {
         id,
-        case: { firmId: user.firmId },
+        Case: { firmId: user.firmId },
       },
     });
 
     if (!existingHearing) {
       return NextResponse.json({ error: 'Hearing not found' }, { status: 404 });
+    }
+
+    // Delete from Google Calendar first (if connected)
+    try {
+      const googleConnected = await isGoogleCalendarConnected(user.id);
+      if (googleConnected) {
+        await deleteCalendarEvent(user.id, id);
+        console.log('[Hearings] Deleted Google Calendar event:', id);
+      }
+    } catch (googleError) {
+      console.error('[Hearings] Google Calendar delete failed:', googleError);
     }
 
     await prisma.hearing.delete({

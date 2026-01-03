@@ -45,10 +45,10 @@ export async function GET(
         firmId: user.firmId,
       },
       include: {
-        createdBy: true,
-        hearings: true,
-        fileDocuments: true,
-        aiSummary: true,
+        User: true,
+        Hearing: true,
+        FileDocument: true,
+        AISummary: true,
       },
     });
 
@@ -184,10 +184,10 @@ export async function PUT(
       where: { id: caseId },
       data: validatedUpdates,
       include: {
-        createdBy: true,
-        hearings: true,
-        fileDocuments: true,
-        aiSummary: true,
+        User: true,
+        Hearing: true,
+        FileDocument: true,
+        AISummary: true,
       },
     });
 

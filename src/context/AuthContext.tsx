@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import FirmSelectionModal from '@/components/Auth/FirmSelectionModal';
 
 interface User {
   id: string;
@@ -19,6 +20,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   isLoading: boolean;
   isTokenExpired: () => boolean;
+  needsFirmSetup: boolean;
+  updateUser: (userData: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,12 +38,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [needsFirmSetup, setNeedsFirmSetup] = useState(false);
 
   // Load user from localStorage on mount
   useEffect(() => {
     const savedToken = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('user');
     const savedExpiresAt = localStorage.getItem('tokenExpiresAt');
+    const firmSetupNeeded = localStorage.getItem('needsFirmSetup');
 
     if (savedToken && savedUser) {
       // Check if token has already expired
@@ -49,10 +54,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
         localStorage.removeItem('tokenExpiresAt');
+        localStorage.removeItem('needsFirmSetup');
       } else {
         setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
         setExpiresAt(savedExpiresAt);
+
+        // Check if user needs firm setup (Google OAuth user without firm)
+        if (firmSetupNeeded === 'true' || !parsedUser.firmId) {
+          setNeedsFirmSetup(true);
+        }
       }
     }
     setIsLoading(false);
@@ -147,9 +159,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setToken(null);
       setExpiresAt(null);
+      setNeedsFirmSetup(false);
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       localStorage.removeItem('tokenExpiresAt');
+      localStorage.removeItem('needsFirmSetup');
+      localStorage.removeItem('googleCalendarConnected');
     } finally {
       setIsLoading(false);
     }
@@ -159,9 +174,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return isTokenExpiredLocal(expiresAt);
   };
 
+  // Update user data (e.g., after firm setup)
+  const updateUser = (userData: User) => {
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+    // Clear firm setup flag if user now has a firm
+    if (userData.firmId) {
+      setNeedsFirmSetup(false);
+      localStorage.removeItem('needsFirmSetup');
+    }
+  };
+
+  // Handle firm setup success
+  const handleFirmSetupSuccess = (userData: User) => {
+    updateUser(userData);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, isLoading, isTokenExpired }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, isLoading, isTokenExpired, needsFirmSetup, updateUser }}>
       {children}
+      {/* Show firm selection modal for Google OAuth users without firm */}
+      {token && needsFirmSetup && (
+        <FirmSelectionModal
+          open={needsFirmSetup}
+          token={token}
+          onSuccess={handleFirmSetupSuccess}
+        />
+      )}
     </AuthContext.Provider>
   );
 }

@@ -30,7 +30,7 @@ interface Case {
   courtName?: string;
   createdAt: string;
   _count?: {
-    hearings: number;
+    Hearing: number;
   };
 }
 
@@ -101,7 +101,7 @@ const CaseCard = React.memo<{ caseData: Case }>(({ caseData }) => (
         </div>
       )}
       <div style={{ marginBottom: '0.3rem' }}>
-        <strong>Hearings:</strong> {caseData._count?.hearings ?? 0}
+        <strong>Hearings:</strong> {caseData._count?.Hearing ?? 0}
       </div>
       <div className="hide-xs">
         <strong>Created:</strong> {dayjs(caseData.createdAt).format('DD/MM/YYYY')}

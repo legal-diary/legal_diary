@@ -35,8 +35,8 @@ export async function POST(
     const caseRecord = await prisma.case.findUnique({
       where: { id: caseId },
       include: {
-        fileDocuments: true,
-        aiSummary: true,
+        FileDocument: true,
+        AISummary: true,
       },
     });
 
@@ -51,7 +51,7 @@ export async function POST(
 
     // Extract document contents
     const documents = [];
-    for (const doc of caseRecord.fileDocuments) {
+    for (const doc of caseRecord.FileDocument) {
       const filePath = path.join(process.cwd(), 'public', doc.fileUrl.replace(/^\//, ''));
       const extraction = await safeExtractFileContent(filePath, doc.fileType);
 
@@ -83,9 +83,9 @@ export async function POST(
 
     // Update or create AI summary
     let aiSummary;
-    if (caseRecord.aiSummary) {
+    if (caseRecord.AISummary) {
       aiSummary = await prisma.aISummary.update({
-        where: { id: caseRecord.aiSummary.id },
+        where: { id: caseRecord.AISummary.id },
         data: {
           summary: analysis.summary,
           keyPoints: JSON.stringify(analysis.keyPoints),

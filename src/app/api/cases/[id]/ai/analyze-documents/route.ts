@@ -29,7 +29,7 @@ export async function POST(
     const caseRecord = await prisma.case.findUnique({
       where: { id: caseId },
       include: {
-        fileDocuments: true,
+        FileDocument: true,
       },
     });
 
@@ -43,9 +43,9 @@ export async function POST(
     }
 
     // Get specified documents or all if none specified
-    let docsToAnalyze = caseRecord.fileDocuments;
+    let docsToAnalyze = caseRecord.FileDocument;
     if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
-      docsToAnalyze = caseRecord.fileDocuments.filter((doc) => documentIds.includes(doc.id));
+      docsToAnalyze = caseRecord.FileDocument.filter((doc) => documentIds.includes(doc.id));
     }
 
     if (docsToAnalyze.length === 0) {

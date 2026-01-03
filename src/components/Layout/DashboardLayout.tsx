@@ -50,6 +50,11 @@ const createDesktopNavigationItems = () => [
     icon: <CalendarOutlined style={{ fontSize: '1.2rem' }} />,
     label: <Link href="/calendar" style={{ textDecoration: 'none', color: 'inherit' }}>Hearing Calendar</Link>,
   },
+  {
+    key: 'settings',
+    icon: <SettingOutlined style={{ fontSize: '1.2rem' }} />,
+    label: <Link href="/settings" style={{ textDecoration: 'none', color: 'inherit' }}>Settings</Link>,
+  },
 ];
 
 // Memoized sidebar header
@@ -135,6 +140,14 @@ const MobileMenuContent = memo<{
       >
         <CalendarOutlined style={{ fontSize: '1.2rem' }} />
         <span>Hearing Calendar</span>
+      </div>
+
+      <div
+        onClick={() => handleMenuClick('/settings')}
+        className={`mobile-menu-item ${getSelectedKey() === 'settings' ? 'active' : ''}`}
+      >
+        <SettingOutlined style={{ fontSize: '1.2rem' }} />
+        <span>Settings</span>
       </div>
     </div>
 

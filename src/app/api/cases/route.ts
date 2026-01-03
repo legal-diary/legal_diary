@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
           courtName: true,
           createdAt: true,
           _count: {
-            select: { hearings: true },
+            select: { Hearing: true },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -52,15 +52,15 @@ export async function GET(request: NextRequest) {
     const cases = await prisma.case.findMany({
       where: { firmId: user.firmId },
       include: {
-        createdBy: {
+        User: {
           select: { id: true, name: true, email: true },
         },
-        hearings: {
+        Hearing: {
           orderBy: { hearingDate: 'desc' },
           take: 10,
         },
-        fileDocuments: true,
-        aiSummary: true,
+        FileDocument: true,
+        AISummary: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -136,9 +136,9 @@ export async function POST(request: NextRequest) {
         firmId: user.firmId,
       },
       include: {
-        createdBy: true,
-        hearings: true,
-        fileDocuments: true,
+        User: true,
+        Hearing: true,
+        FileDocument: true,
       },
     });
 

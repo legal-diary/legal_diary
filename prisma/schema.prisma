@@ -14,7 +14,7 @@ model AISummary {
   keyPoints   String
   insights    String
   generatedAt DateTime @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime @updatedAt
   Case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
   @@index([caseId])
@@ -36,7 +36,7 @@ model Case {
   courtName     String?
   judgeAssigned String?
   createdAt     DateTime       @default(now())
-  updatedAt     DateTime
+  updatedAt     DateTime       @updatedAt
   AISummary     AISummary?
   User          User           @relation(fields: [createdById], references: [id])
   Firm          Firm           @relation(fields: [firmId], references: [id], onDelete: Cascade)
@@ -70,7 +70,7 @@ model Firm {
   email                   String?
   ownerId                 String   @unique
   createdAt               DateTime @default(now())
-  updatedAt               DateTime
+  updatedAt               DateTime @updatedAt
   Case                    Case[]
   User_Firm_ownerIdToUser User     @relation("Firm_ownerIdToUser", fields: [ownerId], references: [id])
   User_User_firmIdToFirm  User[]   @relation("User_firmIdToFirm")
@@ -79,21 +79,49 @@ model Firm {
 }
 
 model Hearing {
-  id          String        @id @default(cuid())
-  caseId      String
-  hearingDate DateTime
-  hearingTime String?
-  hearingType HearingType   @default(ARGUMENTS)
-  courtRoom   String?
-  notes       String?
-  status      HearingStatus @default(SCHEDULED)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime
-  Case        Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  Reminder    Reminder[]
+  id           String         @id @default(cuid())
+  caseId       String
+  hearingDate  DateTime
+  hearingTime  String?
+  hearingType  HearingType    @default(ARGUMENTS)
+  courtRoom    String?
+  notes        String?
+  status       HearingStatus  @default(SCHEDULED)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  Case         Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  Reminder     Reminder[]
+  CalendarSync CalendarSync[]
 
   @@index([caseId])
   @@index([hearingDate])
+}
+
+model GoogleCalendarToken {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  accessToken  String   @db.Text
+  refreshToken String   @db.Text
+  expiresAt    DateTime
+  calendarId   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CalendarSync {
+  id            String   @id @default(cuid())
+  hearingId     String
+  googleEventId String   @unique
+  lastSyncedAt  DateTime @default(now())
+  syncStatus    String   @default("SYNCED")
+  errorMessage  String?
+  Hearing       Hearing  @relation(fields: [hearingId], references: [id], onDelete: Cascade)
+
+  @@index([hearingId])
+  @@index([googleEventId])
 }
 
 model Reminder {
@@ -122,21 +150,24 @@ model Session {
 }
 
 model User {
-  id                      String    @id @default(cuid())
-  email                   String    @unique
+  id                      String               @id @default(cuid())
+  email                   String               @unique
   name                    String?
-  password                String
+  password                String?              // Nullable for Google OAuth users
+  googleId                String?              @unique // Google 'sub' identifier for OAuth
   firmId                  String?
-  role                    UserRole  @default(ADVOCATE)
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime
+  role                    UserRole             @default(ADVOCATE)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
   Case                    Case[]
-  Firm_Firm_ownerIdToUser Firm?     @relation("Firm_ownerIdToUser")
+  Firm_Firm_ownerIdToUser Firm?                @relation("Firm_ownerIdToUser")
   Session                 Session[]
-  Firm_User_firmIdToFirm  Firm?     @relation("User_firmIdToFirm", fields: [firmId], references: [id])
+  Firm_User_firmIdToFirm  Firm?                @relation("User_firmIdToFirm", fields: [firmId], references: [id])
+  GoogleCalendarToken     GoogleCalendarToken?
 
   @@index([email])
   @@index([firmId])
+  @@index([googleId])
 }
 
 enum CaseStatus {

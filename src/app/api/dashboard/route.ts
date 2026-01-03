@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
             gte: todayStart,
             lte: todayEnd,
           },
-          case: {
+          Case: {
             firmId: user.firmId,
           },
         },
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
           courtRoom: true,
           notes: true,
           status: true,
-          case: {
+          Case: {
             select: {
               id: true,
               caseNumber: true,
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
           hearingDate: {
             gte: todayStart,
           },
-          case: {
+          Case: {
             firmId: user.firmId,
           },
         },
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
           courtRoom: true,
           notes: true,
           status: true,
-          case: {
+          Case: {
             select: {
               caseNumber: true,
               caseTitle: true,
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
 
     // Get previous and next dates for today's hearings
     // Use a single query to get all related hearing dates
-    const caseIds = [...new Set(todaysHearings.map(h => h.case.id))];
+    const caseIds = [...new Set(todaysHearings.map(h => h.Case.id))];
 
     const relatedHearings = caseIds.length > 0
       ? await prisma.hearing.findMany({
@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
 
     // Process today's hearings with prev/next dates
     const processedTodayHearings = todaysHearings.map((hearing) => {
-      const caseHearings = hearingsByCase.get(hearing.case.id) || [];
+      const caseHearings = hearingsByCase.get(hearing.Case.id) || [];
       const currentIndex = caseHearings.findIndex((h) => h.id === hearing.id);
 
       const previousHearing = currentIndex > 0 ? caseHearings[currentIndex - 1] : null;
@@ -142,12 +142,12 @@ export async function GET(request: NextRequest) {
 
       return {
         id: hearing.id,
-        caseId: hearing.case.id,
-        caseNumber: hearing.case.caseNumber,
-        partyName: hearing.case.clientName,
-        caseTitle: hearing.case.caseTitle,
-        stage: hearing.case.status,
-        courtName: hearing.case.courtName,
+        caseId: hearing.Case.id,
+        caseNumber: hearing.Case.caseNumber,
+        partyName: hearing.Case.clientName,
+        caseTitle: hearing.Case.caseTitle,
+        stage: hearing.Case.status,
+        courtName: hearing.Case.courtName,
         hearingType: hearing.hearingType,
         courtRoom: hearing.courtRoom,
         notes: hearing.notes,

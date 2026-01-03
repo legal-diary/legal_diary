@@ -27,13 +27,13 @@ export async function GET(
     const document = await prisma.fileDocument.findFirst({
       where: { id: documentId },
       include: {
-        case: {
+        Case: {
           select: { firmId: true },
         },
       },
     });
 
-    if (!document || document.case.firmId !== user.firmId) {
+    if (!document || document.Case.firmId !== user.firmId) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
 

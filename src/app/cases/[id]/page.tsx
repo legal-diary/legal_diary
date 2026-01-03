@@ -60,9 +60,9 @@ interface Case {
   judgeAssigned?: string;
   opponents?: string;
   createdAt: string;
-  hearings: any[];
-  fileDocuments: any[];
-  aiSummary?: any;
+  Hearing: any[];
+  FileDocument: any[];
+  AISummary?: any;
 }
 
 // Static color maps
@@ -439,17 +439,17 @@ export default function CaseDetailPage() {
               </Card>
             )}
 
-            {caseData.aiSummary && (
+            {caseData.AISummary && (
               <Card title="AI Summary & Insights" style={{ marginTop: '2vh' }}>
-                <Card.Meta title="Summary" description={caseData.aiSummary.summary} style={{ marginBottom: '1.5vh' }} />
+                <Card.Meta title="Summary" description={caseData.AISummary.summary} style={{ marginBottom: '1.5vh' }} />
                 <Card.Meta
                   title="Key Points"
                   description={
                     <ul>
-                      {(Array.isArray(caseData.aiSummary.keyPoints)
-                        ? caseData.aiSummary.keyPoints
-                        : typeof caseData.aiSummary.keyPoints === 'string'
-                          ? JSON.parse(caseData.aiSummary.keyPoints)
+                      {(Array.isArray(caseData.AISummary.keyPoints)
+                        ? caseData.AISummary.keyPoints
+                        : typeof caseData.AISummary.keyPoints === 'string'
+                          ? JSON.parse(caseData.AISummary.keyPoints)
                           : []
                       ).map((point: string, index: number) => (
                         <li key={index} style={{ fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', marginBottom: '0.5vh' }}>
@@ -460,7 +460,7 @@ export default function CaseDetailPage() {
                   }
                   style={{ marginBottom: '1.5vh' }}
                 />
-                <Card.Meta title="Insights & Recommendations" description={caseData.aiSummary.insights} />
+                <Card.Meta title="Insights & Recommendations" description={caseData.AISummary.insights} />
               </Card>
             )}
           </Card>
@@ -477,8 +477,8 @@ export default function CaseDetailPage() {
               </Button>
             }
           >
-            {caseData.hearings && caseData.hearings.length > 0 ? (
-              <Table columns={hearingColumns} dataSource={caseData.hearings} rowKey="id" pagination={false} />
+            {caseData.Hearing && caseData.Hearing.length > 0 ? (
+              <Table columns={hearingColumns} dataSource={caseData.Hearing} rowKey="id" pagination={false} />
             ) : (
               <Empty description="No hearings scheduled" />
             )}
@@ -496,8 +496,8 @@ export default function CaseDetailPage() {
               </Button>
             }
           >
-            {caseData.fileDocuments && caseData.fileDocuments.length > 0 ? (
-              <Table columns={fileColumns} dataSource={caseData.fileDocuments} rowKey="id" pagination={false} />
+            {caseData.FileDocument && caseData.FileDocument.length > 0 ? (
+              <Table columns={fileColumns} dataSource={caseData.FileDocument} rowKey="id" pagination={false} />
             ) : (
               <Empty description="No documents uploaded" />
             )}
@@ -511,8 +511,8 @@ export default function CaseDetailPage() {
           <AIAnalysisTab
             caseId={caseId}
             caseTitle={caseData.caseTitle}
-            aiSummary={caseData.aiSummary}
-            fileDocuments={caseData.fileDocuments || []}
+            aiSummary={caseData.AISummary}
+            fileDocuments={caseData.FileDocument || []}
             token={token || ''}
             onAnalysisComplete={fetchCaseDetail}
           />
@@ -781,13 +781,13 @@ export default function CaseDetailPage() {
                 <Input.TextArea rows={4} />
               </Form.Item>
 
-              {caseData.fileDocuments && caseData.fileDocuments.length > 0 && (
+              {caseData.FileDocument && caseData.FileDocument.length > 0 && (
                 <Form.Item label="Manage Documents">
                   <Card type="inner" size="small">
                     <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#666' }}>
                       Click the checkbox to delete documents:
                     </p>
-                    {caseData.fileDocuments.map((doc: any) => (
+                    {caseData.FileDocument.map((doc: any) => (
                       <div key={doc.id} style={{ marginBottom: '0.5rem' }}>
                         <Checkbox
                           checked={documentsToDelete.includes(doc.id)}

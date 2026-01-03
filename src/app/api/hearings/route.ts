@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import { generateHearingInsights } from '@/lib/openai';
+import { createCalendarEvent, isGoogleCalendarConnected } from '@/lib/googleCalendar';
 
 // GET hearings for user's firm
 export async function GET(request: NextRequest) {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
       // Optimized query for calendar - only necessary fields
       const hearings = await prisma.hearing.findMany({
         where: {
-          case: { firmId: user.firmId },
+          Case: { firmId: user.firmId },
         },
         select: {
           id: true,
@@ -35,11 +36,19 @@ export async function GET(request: NextRequest) {
           hearingTime: true,
           hearingType: true,
           courtRoom: true,
-          case: {
+          Case: {
             select: {
               caseNumber: true,
               caseTitle: true,
               clientName: true,
+            },
+          },
+          CalendarSync: {
+            select: {
+              id: true,
+              googleEventId: true,
+              syncStatus: true,
+              lastSyncedAt: true,
             },
           },
         },
@@ -54,10 +63,10 @@ export async function GET(request: NextRequest) {
     // Full data for other views
     const hearings = await prisma.hearing.findMany({
       where: {
-        case: { firmId: user.firmId },
+        Case: { firmId: user.firmId },
       },
       include: {
-        case: {
+        Case: {
           select: {
             id: true,
             caseNumber: true,
@@ -66,7 +75,8 @@ export async function GET(request: NextRequest) {
             status: true,
           },
         },
-        reminders: true,
+        Reminder: true,
+        CalendarSync: true,
       },
       orderBy: { hearingDate: 'asc' },
     });
@@ -133,8 +143,8 @@ export async function POST(request: NextRequest) {
         notes,
       },
       include: {
-        case: true,
-        reminders: true,
+        Case: true,
+        Reminder: true,
       },
     });
 
@@ -149,6 +159,28 @@ export async function POST(request: NextRequest) {
         reminderTime: reminderDate,
       },
     });
+
+    // Auto-sync to Google Calendar if connected
+    try {
+      const googleConnected = await isGoogleCalendarConnected(user.id);
+      if (googleConnected) {
+        await createCalendarEvent(user.id, {
+          hearingId: hearing.id,
+          caseNumber: caseRecord.caseNumber,
+          caseTitle: caseRecord.caseTitle,
+          clientName: caseRecord.clientName,
+          hearingDate: new Date(hearingDate),
+          hearingTime,
+          hearingType: hearingType || 'ARGUMENTS',
+          courtRoom,
+          notes,
+        });
+        console.log('[Hearings] Auto-synced to Google Calendar:', hearing.id);
+      }
+    } catch (googleError) {
+      console.error('[Hearings] Google Calendar sync failed:', googleError);
+      // Don't fail the request if Google sync fails
+    }
 
     // Generate hearing insights asynchronously
     try {
