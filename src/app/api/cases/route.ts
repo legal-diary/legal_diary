@@ -43,9 +43,13 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
       });
 
-      const response = NextResponse.json(cases);
-      response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
-      return response;
+      return NextResponse.json(cases, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
     }
 
     // Full data for detail views
@@ -65,7 +69,13 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(cases);
+    return NextResponse.json(cases, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     console.error('Error fetching cases:', error);
     return NextResponse.json(

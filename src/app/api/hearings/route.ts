@@ -55,9 +55,13 @@ export async function GET(request: NextRequest) {
         orderBy: { hearingDate: 'asc' },
       });
 
-      const response = NextResponse.json(hearings);
-      response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
-      return response;
+      return NextResponse.json(hearings, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
     }
 
     // Full data for other views
@@ -81,7 +85,13 @@ export async function GET(request: NextRequest) {
       orderBy: { hearingDate: 'asc' },
     });
 
-    return NextResponse.json(hearings);
+    return NextResponse.json(hearings, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     console.error('Error fetching hearings:', error);
     return NextResponse.json(

@@ -130,6 +130,8 @@ export default function HearingCalendar() {
   const [editingHearing, setEditingHearing] = useState<Hearing | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [dateDetailsModalOpen, setDateDetailsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   // Helper to check if a hearing is synced to Google Calendar
   const isSyncedToGoogle = useCallback((hearing: Hearing): boolean => {
@@ -250,6 +252,8 @@ export default function HearingCalendar() {
     setEditingHearing(hearing);
     setIsEditMode(true);
     setSelectedCaseId(hearing.caseId);
+    setSubmitSuccess(false); // Reset success state when entering edit mode
+    setSubmitting(false); // Reset submitting state
     form.setFieldsValue({
       caseId: hearing.caseId,
       hearingDate: dayjs(hearing.hearingDate),
@@ -265,6 +269,7 @@ export default function HearingCalendar() {
   const handleUpdateHearing = useCallback(async (values: any) => {
     if (!editingHearing) return;
 
+    setSubmitting(true);
     try {
       const response = await fetch(`/api/hearings/${editingHearing.id}`, {
         method: 'PUT',
@@ -282,17 +287,24 @@ export default function HearingCalendar() {
       });
 
       if (response.ok) {
-        message.success('Hearing updated successfully');
-        setModalOpen(false);
-        setIsEditMode(false);
-        setEditingHearing(null);
-        form.resetFields();
         await fetchCalendarData();
+        setSubmitSuccess(true);
+        message.success('Hearing updated successfully');
+
+        setTimeout(() => {
+          setModalOpen(false);
+          setIsEditMode(false);
+          setEditingHearing(null);
+          form.resetFields();
+          setSubmitSuccess(false);
+        }, 1500);
       } else {
         message.error('Failed to update hearing');
       }
     } catch {
       message.error('Error updating hearing');
+    } finally {
+      setSubmitting(false);
     }
   }, [token, editingHearing, form, fetchCalendarData]);
 
@@ -308,10 +320,14 @@ export default function HearingCalendar() {
       });
 
       if (response.ok) {
-        message.success('Hearing deleted successfully');
-        setHearingDetailsModalOpen(false);
-        setSelectedHearing(null);
         await fetchCalendarData();
+        message.success('Hearing deleted successfully');
+
+        setTimeout(() => {
+          setHearingDetailsModalOpen(false);
+          setSelectedHearing(null);
+          setDateDetailsModalOpen(false);
+        }, 1000);
       } else {
         message.error('Failed to delete hearing');
       }
@@ -471,6 +487,7 @@ export default function HearingCalendar() {
   // Handle form submission
   const onFinish = useCallback(
     async (values: any) => {
+      setSubmitting(true);
       try {
         const response = await fetch('/api/hearings', {
           method: 'POST',
@@ -489,15 +506,22 @@ export default function HearingCalendar() {
         });
 
         if (response.ok) {
-          message.success('Hearing scheduled successfully');
-          setModalOpen(false);
-          form.resetFields();
           await fetchCalendarData();
+          setSubmitSuccess(true);
+          message.success('Hearing scheduled successfully');
+
+          setTimeout(() => {
+            setModalOpen(false);
+            form.resetFields();
+            setSubmitSuccess(false);
+          }, 1500);
         } else {
           message.error('Failed to schedule hearing');
         }
       } catch {
         message.error('Error scheduling hearing');
+      } finally {
+        setSubmitting(false);
       }
     },
     [token, selectedCaseId, form, fetchCalendarData]
@@ -509,6 +533,8 @@ export default function HearingCalendar() {
       // Reset edit mode for new hearing creation
       setIsEditMode(false);
       setEditingHearing(null);
+      setSubmitSuccess(false); // Reset success state
+      setSubmitting(false); // Reset submitting state
       form.resetFields();
       setModalOpen(true);
       if (date) {
@@ -1008,8 +1034,21 @@ export default function HearingCalendar() {
                 <Input.TextArea rows={3} placeholder="Additional notes" />
               </Form.Item>
 
-              <Button type="primary" htmlType="submit" block>
-                {isEditMode ? "Update Hearing" : "Schedule Hearing"}
+              <Button
+                type="primary"
+                htmlType="submit"
+                block
+                loading={submitting}
+                icon={submitSuccess ? <CheckCircleOutlined /> : undefined}
+                style={submitSuccess ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
+                disabled={submitSuccess}
+              >
+                {submitSuccess
+                  ? "Success!"
+                  : submitting
+                    ? (isEditMode ? "Updating..." : "Scheduling...")
+                    : (isEditMode ? "Update Hearing" : "Schedule Hearing")
+                }
               </Button>
             </Form>
           </Modal>
