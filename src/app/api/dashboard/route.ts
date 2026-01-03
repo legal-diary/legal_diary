@@ -19,6 +19,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : {
+          firmId: user.firmId,
+          assignments: {
+            some: {
+              userId: user.id,
+            },
+          },
+        };
+
     const todayStart = dayjs().startOf('day').toDate();
     const todayEnd = dayjs().endOf('day').toDate();
 
@@ -31,9 +43,7 @@ export async function GET(request: NextRequest) {
             gte: todayStart,
             lte: todayEnd,
           },
-          Case: {
-            firmId: user.firmId,
-          },
+          Case: caseFilter,
         },
         select: {
           id: true,
@@ -63,9 +73,7 @@ export async function GET(request: NextRequest) {
           hearingDate: {
             gte: todayStart,
           },
-          Case: {
-            firmId: user.firmId,
-          },
+          Case: caseFilter,
         },
         select: {
           id: true,
@@ -91,7 +99,7 @@ export async function GET(request: NextRequest) {
       // Minimal case data for dropdown (only active cases)
       prisma.case.findMany({
         where: {
-          firmId: user.firmId,
+          ...caseFilter,
           status: {
             in: ['ACTIVE', 'PENDING_JUDGMENT', 'APPEAL'],
           },

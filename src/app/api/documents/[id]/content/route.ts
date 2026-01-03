@@ -23,17 +23,28 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+
     // Find document and verify ownership through case
     const document = await prisma.fileDocument.findFirst({
-      where: { id: documentId },
-      include: {
+      where: {
+        id: documentId,
         Case: {
-          select: { firmId: true },
+          firmId: user.firmId,
+          ...(isAdmin
+            ? {}
+            : {
+                assignments: {
+                  some: {
+                    userId: user.id,
+                  },
+                },
+              }),
         },
       },
     });
 
-    if (!document || document.Case.firmId !== user.firmId) {
+    if (!document) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
 

@@ -30,6 +30,8 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+
     // Check if connected
     const connected = await isGoogleCalendarConnected(user.id);
     if (!connected) {
@@ -45,6 +47,15 @@ export async function POST(
         id: hearingId,
         Case: {
           firmId: user.firmId,
+          ...(isAdmin
+            ? {}
+            : {
+                assignments: {
+                  some: {
+                    userId: user.id,
+                  },
+                },
+              }),
         },
       },
       include: {

@@ -26,10 +26,23 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+
     const hearing = await prisma.hearing.findFirst({
       where: {
         id,
-        Case: { firmId: user.firmId },
+        Case: {
+          firmId: user.firmId,
+          ...(isAdmin
+            ? {}
+            : {
+                assignments: {
+                  some: {
+                    userId: user.id,
+                  },
+                },
+              }),
+        },
       },
       include: {
         Case: true,
@@ -70,11 +83,24 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+
     // Verify hearing ownership
     const existingHearing = await prisma.hearing.findFirst({
       where: {
         id,
-        Case: { firmId: user.firmId },
+        Case: {
+          firmId: user.firmId,
+          ...(isAdmin
+            ? {}
+            : {
+                assignments: {
+                  some: {
+                    userId: user.id,
+                  },
+                },
+              }),
+        },
       },
     });
 
@@ -163,11 +189,24 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+
     // Verify hearing ownership
     const existingHearing = await prisma.hearing.findFirst({
       where: {
         id,
-        Case: { firmId: user.firmId },
+        Case: {
+          firmId: user.firmId,
+          ...(isAdmin
+            ? {}
+            : {
+                assignments: {
+                  some: {
+                    userId: user.id,
+                  },
+                },
+              }),
+        },
       },
     });
 

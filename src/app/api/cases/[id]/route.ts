@@ -39,16 +39,39 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+
     const caseRecord = await prisma.case.findFirst({
       where: {
         id: caseId,
         firmId: user.firmId,
+        ...(isAdmin
+          ? {}
+          : {
+              assignments: {
+                some: {
+                  userId: user.id,
+                },
+              },
+            }),
       },
       include: {
         User: true,
         Hearing: true,
         FileDocument: true,
         AISummary: true,
+        assignments: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -86,11 +109,22 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+
     // Verify case ownership
     const caseRecord = await prisma.case.findFirst({
       where: {
         id: caseId,
         firmId: user.firmId,
+        ...(isAdmin
+          ? {}
+          : {
+              assignments: {
+                some: {
+                  userId: user.id,
+                },
+              },
+            }),
       },
     });
 
@@ -219,6 +253,10 @@ export async function DELETE(
     const user = await verifyToken(token);
     if (!user || !user.firmId) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Verify case ownership

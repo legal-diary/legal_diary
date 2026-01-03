@@ -53,9 +53,23 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+
     // Verify case ownership
     const caseRecord = await prisma.case.findFirst({
-      where: { id: caseId, firmId: user.firmId },
+      where: {
+        id: caseId,
+        firmId: user.firmId,
+        ...(isAdmin
+          ? {}
+          : {
+              assignments: {
+                some: {
+                  userId: user.id,
+                },
+              },
+            }),
+      },
     });
 
     if (!caseRecord) {

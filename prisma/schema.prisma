@@ -42,6 +42,7 @@ model Case {
   Firm          Firm           @relation(fields: [firmId], references: [id], onDelete: Cascade)
   FileDocument  FileDocument[]
   Hearing       Hearing[]
+  assignments   CaseAssignment[]
 
   @@index([caseNumber])
   @@index([createdById])
@@ -149,6 +150,19 @@ model Session {
   @@index([userId])
 }
 
+model CaseAssignment {
+  id         String   @id @default(cuid())
+  caseId     String
+  userId     String
+  assignedAt DateTime @default(now())
+  case       Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, userId])
+  @@index([caseId])
+  @@index([userId])
+}
+
 model User {
   id                      String               @id @default(cuid())
   email                   String               @unique
@@ -160,6 +174,7 @@ model User {
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
   Case                    Case[]
+  caseAssignments         CaseAssignment[]
   Firm_Firm_ownerIdToUser Firm?                @relation("Firm_ownerIdToUser")
   Session                 Session[]
   Firm_User_firmIdToFirm  Firm?                @relation("User_firmIdToFirm", fields: [firmId], references: [id])

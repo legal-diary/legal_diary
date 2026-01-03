@@ -30,7 +30,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Sync all hearings
-    const result = await syncAllHearings(user.id, user.firmId);
+    const result = await syncAllHearings(
+      user.id,
+      user.firmId,
+      user.role === 'ADMIN' ? undefined : user.id
+    );
 
     console.log('[Google Sync] Completed:', result);
 

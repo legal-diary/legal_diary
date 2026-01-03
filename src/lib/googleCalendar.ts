@@ -434,7 +434,8 @@ export async function deleteCalendarEvent(
  */
 export async function syncAllHearings(
   userId: string,
-  firmId: string
+  firmId: string,
+  assignedUserId?: string
 ): Promise<{ synced: number; failed: number; errors: string[] }> {
   const calendar = await getCalendarClient(userId);
   if (!calendar) {
@@ -444,7 +445,18 @@ export async function syncAllHearings(
   // Get all hearings for user's firm
   const hearings = await prisma.hearing.findMany({
     where: {
-      Case: { firmId },
+      Case: {
+        firmId,
+        ...(assignedUserId
+          ? {
+              assignments: {
+                some: {
+                  userId: assignedUserId,
+                },
+              },
+            }
+          : {}),
+      },
       status: { in: ['SCHEDULED', 'POSTPONED'] },
     },
     include: {

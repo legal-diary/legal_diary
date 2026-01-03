@@ -19,6 +19,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : {
+          firmId: user.firmId,
+          assignments: {
+            some: {
+              userId: user.id,
+            },
+          },
+        };
+
     // Check if minimal data is requested (for list views)
     const url = new URL(request.url);
     const minimal = url.searchParams.get('minimal') === 'true';
@@ -26,7 +39,7 @@ export async function GET(request: NextRequest) {
     if (minimal) {
       // Optimized query for list view - only essential fields
       const cases = await prisma.case.findMany({
-        where: { firmId: user.firmId },
+        where: caseFilter,
         select: {
           id: true,
           caseNumber: true,
@@ -54,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     // Full data for detail views
     const cases = await prisma.case.findMany({
-      where: { firmId: user.firmId },
+      where: caseFilter,
       include: {
         User: {
           select: { id: true, name: true, email: true },
@@ -149,6 +162,13 @@ export async function POST(request: NextRequest) {
         User: true,
         Hearing: true,
         FileDocument: true,
+      },
+    });
+
+    await prisma.caseAssignment.create({
+      data: {
+        caseId: newCase.id,
+        userId: user.id,
       },
     });
 

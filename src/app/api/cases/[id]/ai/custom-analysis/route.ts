@@ -23,6 +23,8 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+
     const { prompt, documentIds } = await request.json();
 
     if (!prompt || prompt.trim().length === 0) {
@@ -30,8 +32,20 @@ export async function POST(
     }
 
     // Get case
-    const caseRecord = await prisma.case.findUnique({
-      where: { id: caseId },
+    const caseRecord = await prisma.case.findFirst({
+      where: {
+        id: caseId,
+        firmId: user.firmId,
+        ...(isAdmin
+          ? {}
+          : {
+              assignments: {
+                some: {
+                  userId: user.id,
+                },
+              },
+            }),
+      },
       include: {
         FileDocument: true,
       },
@@ -39,11 +53,6 @@ export async function POST(
 
     if (!caseRecord) {
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
-    }
-
-    // Verify case belongs to user's firm
-    if (caseRecord.firmId !== user.firmId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Extract document contents if documentIds provided

@@ -19,6 +19,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : {
+          firmId: user.firmId,
+          assignments: {
+            some: {
+              userId: user.id,
+            },
+          },
+        };
+
     // Check if calendar mode is requested (optimized for calendar view)
     const url = new URL(request.url);
     const calendarMode = url.searchParams.get('calendar') === 'true';
@@ -27,7 +39,7 @@ export async function GET(request: NextRequest) {
       // Optimized query for calendar - only necessary fields
       const hearings = await prisma.hearing.findMany({
         where: {
-          Case: { firmId: user.firmId },
+          Case: caseFilter,
         },
         select: {
           id: true,
@@ -67,7 +79,7 @@ export async function GET(request: NextRequest) {
     // Full data for other views
     const hearings = await prisma.hearing.findMany({
       where: {
-        Case: { firmId: user.firmId },
+        Case: caseFilter,
       },
       include: {
         Case: {
@@ -135,7 +147,19 @@ export async function POST(request: NextRequest) {
 
     // Verify case ownership
     const caseRecord = await prisma.case.findFirst({
-      where: { id: caseId, firmId: user.firmId },
+      where: {
+        id: caseId,
+        firmId: user.firmId,
+        ...(user.role === 'ADMIN'
+          ? {}
+          : {
+              assignments: {
+                some: {
+                  userId: user.id,
+                },
+              },
+            }),
+      },
     });
 
     if (!caseRecord) {
