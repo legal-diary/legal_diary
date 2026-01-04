@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
     await prisma.session.deleteMany({
       where: { token },
     });
+    invalidateTokenCache(token);
 
     const response = NextResponse.json(
       { message: 'Logout successful' },

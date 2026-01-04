@@ -72,6 +72,8 @@ export async function POST(
       return NextResponse.json({ error: 'No documents found to analyze' }, { status: 400 });
     }
 
+    const startTime = Date.now();
+
     // Extract document contents
     const documents = [];
     let totalChars = 0;

@@ -39,7 +39,13 @@ export async function GET(request: NextRequest) {
         },
         Case: caseFilter,
       },
-      include: {
+      select: {
+        id: true,
+        hearingDate: true,
+        hearingTime: true,
+        hearingType: true,
+        courtRoom: true,
+        notes: true,
         Case: {
           select: {
             id: true,
@@ -48,30 +54,44 @@ export async function GET(request: NextRequest) {
             caseTitle: true,
             status: true,
             courtName: true,
-            Hearing: {
-              orderBy: { hearingDate: 'asc' },
-              select: {
-                id: true,
-                hearingDate: true,
-                status: true,
-              },
-            },
           },
         },
       },
       orderBy: { hearingDate: 'asc' },
     });
 
+    const caseIds = [...new Set(todaysHearings.map((hearing) => hearing.Case.id))];
+    const relatedHearings = caseIds.length > 0
+      ? await prisma.hearing.findMany({
+          where: {
+            caseId: { in: caseIds },
+          },
+          select: {
+            id: true,
+            caseId: true,
+            hearingDate: true,
+          },
+          orderBy: { hearingDate: 'asc' },
+        })
+      : [];
+
+    const hearingsByCase = new Map<string, { id: string; hearingDate: Date }[]>();
+    relatedHearings.forEach((hearing) => {
+      const existing = hearingsByCase.get(hearing.caseId) || [];
+      existing.push({ id: hearing.id, hearingDate: hearing.hearingDate });
+      hearingsByCase.set(hearing.caseId, existing);
+    });
+
     // Process hearings to add previous and next dates
     const processedHearings = todaysHearings.map((hearing) => {
-      const allHearings = hearing.Case.Hearing;
-      const currentIndex = allHearings.findIndex((h) => h.id === hearing.id);
+      const caseHearings = hearingsByCase.get(hearing.Case.id) || [];
+      const currentIndex = caseHearings.findIndex((h) => h.id === hearing.id);
 
       // Find previous hearing (before today's hearing)
-      const previousHearing = currentIndex > 0 ? allHearings[currentIndex - 1] : null;
+      const previousHearing = currentIndex > 0 ? caseHearings[currentIndex - 1] : null;
 
       // Find next hearing (after today's hearing)
-      const nextHearing = currentIndex < allHearings.length - 1 ? allHearings[currentIndex + 1] : null;
+      const nextHearing = currentIndex < caseHearings.length - 1 ? caseHearings[currentIndex + 1] : null;
 
       return {
         id: hearing.id,

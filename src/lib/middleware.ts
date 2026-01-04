@@ -1,5 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+
+const TOKEN_CACHE_TTL_MS = 30_000;
+const MAX_TOKEN_CACHE_SIZE = 500;
+type SessionWithUser = Prisma.SessionGetPayload<{
+  include: { User: { include: { Firm_User_firmIdToFirm: true } } };
+}>;
+
+const tokenCache = new Map<
+  string,
+  { user: SessionWithUser['User']; expiresAt: Date; cachedAt: number }
+>();
+
+const getCachedEntry = (token: string) => {
+  const cached = tokenCache.get(token);
+  if (!cached) return null;
+
+  const now = Date.now();
+  const isCacheExpired = now - cached.cachedAt > TOKEN_CACHE_TTL_MS;
+  const isSessionExpired = cached.expiresAt < new Date();
+
+  if (isCacheExpired || isSessionExpired) {
+    tokenCache.delete(token);
+    return null;
+  }
+
+  return cached;
+};
+
+const setCachedUser = (token: string, user: SessionWithUser['User'], expiresAt: Date) => {
+  if (tokenCache.size >= MAX_TOKEN_CACHE_SIZE) {
+    const oldestKey = tokenCache.keys().next().value as string | undefined;
+    if (oldestKey) tokenCache.delete(oldestKey);
+  }
+
+  tokenCache.set(token, {
+    user,
+    expiresAt,
+    cachedAt: Date.now(),
+  });
+};
+
+export const invalidateTokenCache = (token: string) => {
+  tokenCache.delete(token);
+};
 
 export async function verifyToken(token: string) {
   try {
@@ -18,6 +63,7 @@ export async function verifyToken(token: string) {
       await prisma.session.delete({
         where: { id: session.id },
       });
+      tokenCache.delete(token);
       return null;
     }
 
@@ -28,7 +74,9 @@ export async function verifyToken(token: string) {
   }
 }
 
-export async function withAuth(handler: Function) {
+type AuthedRequest = NextRequest & { user: SessionWithUser['User'] };
+
+export async function withAuth(handler: (request: AuthedRequest) => Promise<NextResponse>) {
   return async (request: NextRequest) => {
     const authHeader = request.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
@@ -49,7 +97,8 @@ export async function withAuth(handler: Function) {
     }
 
     // Add user to request
-    (request as any).user = user;
-    return handler(request);
+    const authedRequest = request as AuthedRequest;
+    authedRequest.user = user;
+    return handler(authedRequest);
   };
 }
