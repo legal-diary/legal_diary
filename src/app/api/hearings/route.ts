@@ -30,40 +30,65 @@ export async function GET(request: NextRequest) {
     // Check if calendar mode is requested (optimized for calendar view)
     const url = new URL(request.url);
     const calendarMode = url.searchParams.get('calendar') === 'true';
+    const startDate = url.searchParams.get('startDate');
+    const endDate = url.searchParams.get('endDate');
+    const page = Math.max(parseInt(url.searchParams.get('page') || '1', 10), 1);
+    const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50', 10), 1), 200);
+    const skip = (page - 1) * limit;
 
     if (calendarMode) {
-      // Optimized query for calendar - only necessary fields
-      const hearings = await prisma.hearing.findMany({
-        where: {
-          Case: caseFilter,
-        },
-        select: {
-          id: true,
-          caseId: true,
-          hearingDate: true,
-          hearingTime: true,
-          hearingType: true,
-          courtRoom: true,
-          Case: {
-            select: {
-              caseNumber: true,
-              caseTitle: true,
-              clientName: true,
+      const dateFilter = startDate && endDate
+        ? {
+            hearingDate: {
+              gte: new Date(startDate),
+              lte: new Date(endDate),
             },
-          },
-          CalendarSync: {
-            select: {
-              id: true,
-              googleEventId: true,
-              syncStatus: true,
-              lastSyncedAt: true,
-            },
-          },
-        },
-        orderBy: { hearingDate: 'asc' },
-      });
+          }
+        : {};
 
-      return NextResponse.json(hearings, {
+      // Optimized query for calendar - only necessary fields
+      const [hearings, total] = await Promise.all([
+        prisma.hearing.findMany({
+          where: {
+            Case: caseFilter,
+            ...dateFilter,
+          },
+          select: {
+            id: true,
+            caseId: true,
+            hearingDate: true,
+            hearingTime: true,
+            hearingType: true,
+            courtRoom: true,
+            Case: {
+              select: {
+                caseNumber: true,
+                caseTitle: true,
+                clientName: true,
+              },
+            },
+            CalendarSync: {
+              select: {
+                id: true,
+                googleEventId: true,
+                syncStatus: true,
+                lastSyncedAt: true,
+              },
+            },
+          },
+          orderBy: { hearingDate: 'asc' },
+          skip,
+          take: limit,
+        }),
+        prisma.hearing.count({
+          where: {
+            Case: caseFilter,
+            ...dateFilter,
+          },
+        }),
+      ]);
+
+      return NextResponse.json({ data: hearings, page, limit, total }, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
@@ -73,27 +98,36 @@ export async function GET(request: NextRequest) {
     }
 
     // Full data for other views
-    const hearings = await prisma.hearing.findMany({
-      where: {
-        Case: caseFilter,
-      },
-      include: {
-        Case: {
-          select: {
-            id: true,
-            caseNumber: true,
-            caseTitle: true,
-            clientName: true,
-            status: true,
-          },
+    const [hearings, total] = await Promise.all([
+      prisma.hearing.findMany({
+        where: {
+          Case: caseFilter,
         },
-        Reminder: true,
-        CalendarSync: true,
-      },
-      orderBy: { hearingDate: 'asc' },
-    });
+        include: {
+          Case: {
+            select: {
+              id: true,
+              caseNumber: true,
+              caseTitle: true,
+              clientName: true,
+              status: true,
+            },
+          },
+          Reminder: true,
+          CalendarSync: true,
+        },
+        orderBy: { hearingDate: 'asc' },
+        skip,
+        take: limit,
+      }),
+      prisma.hearing.count({
+        where: {
+          Case: caseFilter,
+        },
+      }),
+    ]);
 
-    return NextResponse.json(hearings, {
+    return NextResponse.json({ data: hearings, page, limit, total }, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',

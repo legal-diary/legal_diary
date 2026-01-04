@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { invalidateTokenCache } from '@/lib/middleware';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +18,7 @@ export async function POST(request: NextRequest) {
     await prisma.session.deleteMany({
       where: { token },
     });
+    invalidateTokenCache(token);
 
     return NextResponse.json(
       { message: 'Logout successful' },
