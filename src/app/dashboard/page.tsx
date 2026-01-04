@@ -84,7 +84,7 @@ interface UpcomingHearing {
   courtRoom: string | null;
   notes: string | null;
   status: string;
-  case: {
+  Case: {
     caseNumber: string;
     caseTitle: string;
     clientName: string;
@@ -687,11 +687,11 @@ export default function DashboardPage() {
         render: (_: any, record: UpcomingHearing) => (
           <div>
             <Link href={`/cases/${record.caseId}`} style={{ color: '#1890ff', fontSize: 'clamp(0.7rem, 2vw, 0.8rem)' }}>
-              {record.case.caseNumber}
+              {record.Case?.caseNumber || 'N/A'}
             </Link>
             <div className="hide-xs">
               <Text type="secondary" style={{ fontSize: '0.65rem' }}>
-                {record.case.clientName}
+                {record.Case?.clientName || 'Unknown'}
               </Text>
             </div>
           </div>

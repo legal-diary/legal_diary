@@ -31,12 +31,19 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Get case
-    const caseRecord = await prisma.case.findUnique({
-      where: { id: caseId },
+    // Role-based case access verification
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = {
+      id: caseId,
+      firmId: user.firmId,
+      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
+    };
+
+    const caseRecord = await prisma.case.findFirst({
+      where: caseFilter,
       include: {
-        fileDocuments: true,
-        aiSummary: true,
+        FileDocument: true,
+        AISummary: true,
       },
     });
 
@@ -44,14 +51,9 @@ export async function POST(
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    // Verify case belongs to user's firm
-    if (caseRecord.firmId !== user.firmId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     // Extract document contents
     const documents = [];
-    for (const doc of caseRecord.fileDocuments) {
+    for (const doc of caseRecord.FileDocument) {
       const filePath = path.join(process.cwd(), 'public', doc.fileUrl.replace(/^\//, ''));
       const extraction = await safeExtractFileContent(filePath, doc.fileType);
 
@@ -83,9 +85,9 @@ export async function POST(
 
     // Update or create AI summary
     let aiSummary;
-    if (caseRecord.aiSummary) {
+    if (caseRecord.AISummary) {
       aiSummary = await prisma.aISummary.update({
-        where: { id: caseRecord.aiSummary.id },
+        where: { id: caseRecord.AISummary.id },
         data: {
           summary: analysis.summary,
           keyPoints: JSON.stringify(analysis.keyPoints),

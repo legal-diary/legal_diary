@@ -155,7 +155,7 @@ export default function AIAnalysisTab({
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       {/* Case Re-analysis Section */}
-      <Card title="Case Analysis" bordered>
+      <Card title="Case Analysis" variant="outlined">
         <Alert
           message="Re-analyze this case with updated details and documents"
           type="info"
@@ -188,7 +188,12 @@ export default function AIAnalysisTab({
               title="Key Points"
               description={
                 <ul>
-                  {aiSummary.keyPoints.map((point: string, index: number) => (
+                  {(Array.isArray(aiSummary.keyPoints)
+                    ? aiSummary.keyPoints
+                    : typeof aiSummary.keyPoints === 'string'
+                      ? JSON.parse(aiSummary.keyPoints)
+                      : []
+                  ).map((point: string, index: number) => (
                     <li key={index} style={{ marginBottom: '0.5rem' }}>
                       {point}
                     </li>
@@ -215,7 +220,7 @@ export default function AIAnalysisTab({
 
       {/* Document Analysis Section */}
       {fileDocuments.length > 0 && (
-        <Card title="Document Analysis" bordered>
+        <Card title="Document Analysis" variant="outlined">
           <Alert
             message="Select documents to analyze and get AI-powered insights"
             type="info"
@@ -317,7 +322,7 @@ export default function AIAnalysisTab({
       )}
 
       {/* Custom Analysis Section */}
-      <Card title="Custom Analysis" bordered>
+      <Card title="Custom Analysis" variant="outlined">
         <Alert
           message="Ask AI a specific question about this case"
           type="info"

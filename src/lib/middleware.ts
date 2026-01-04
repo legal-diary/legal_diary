@@ -8,12 +8,12 @@ export async function verifyToken(token: string) {
 
     const session = await prisma.session.findUnique({
       where: { token },
-      include: { user: { include: { firmMember: true } } },
+      include: { User: { include: { Firm_User_firmIdToFirm: true } } },
     });
 
     console.log('[verifyToken] Session found:', !!session);
 
-    if (!session) {
+    if (!session || !session.User) {
       console.log('[verifyToken] No session found in database for token');
       return null;
     }
@@ -33,8 +33,9 @@ export async function verifyToken(token: string) {
       return null;
     }
 
-    console.log('[verifyToken] Token verified successfully for user:', session.user.email);
-    return session.user;
+    console.log('[verifyToken] Token verified successfully for user:', session.User.email);
+    console.log('[verifyToken] User firmId:', session.User.firmId);
+    return session.User;
   } catch (error) {
     console.error('[verifyToken] Token verification error:', error);
     return null;

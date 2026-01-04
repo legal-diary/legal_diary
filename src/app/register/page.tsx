@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Form, Input, Button, Card, message, Spin, Row, Col, Select, Divider } from 'antd';
-import { LockOutlined, UserOutlined, HomeOutlined, MailOutlined } from '@ant-design/icons';
+import { LockOutlined, UserOutlined, HomeOutlined, MailOutlined, GoogleOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -19,6 +19,25 @@ export default function RegisterPage() {
   const [firms, setFirms] = useState<Firm[]>([]);
   const [loadingFirms, setLoadingFirms] = useState(true);
   const [firmChoice, setFirmChoice] = useState<'existing' | 'new' | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleGoogleSignUp = async () => {
+    setGoogleLoading(true);
+    try {
+      const response = await fetch('/api/auth/google');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to initiate Google sign-up');
+      }
+
+      // Redirect to Google OAuth consent screen
+      window.location.href = data.authUrl;
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Failed to sign up with Google');
+      setGoogleLoading(false);
+    }
+  };
 
   // Fetch existing firms
   useEffect(() => {
@@ -77,7 +96,7 @@ export default function RegisterPage() {
               Create Account
             </div>
           }
-          bordered={false}
+          variant="borderless"
           style={{ boxShadow: 'none', borderColor: 'transparent', borderRadius: 'clamp(0.5rem, 2vw, 0.8rem)', background: '#ffffff' }}
           styles={{
             body: { padding: 'clamp(12px, 4vw, 24px)' },
@@ -235,7 +254,44 @@ export default function RegisterPage() {
                 </Button>
               </Form.Item>
 
-              <div style={{ textAlign: 'center' }}>
+              <Divider style={{ margin: '1rem 0' }}>
+                <span style={{ color: '#999', fontSize: '0.85rem' }}>or</span>
+              </Divider>
+
+              <Button
+                block
+                size="large"
+                onClick={handleGoogleSignUp}
+                loading={googleLoading}
+                disabled={isLoading}
+                icon={<GoogleOutlined />}
+                style={{
+                  height: '3rem',
+                  fontSize: 'clamp(0.9rem, 2vw, 1rem)',
+                  fontWeight: '600',
+                  background: '#ffffff',
+                  border: '1px solid #dadce0',
+                  borderRadius: '0.6rem',
+                  color: '#3c4043',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f8f9fa';
+                  e.currentTarget.style.borderColor = '#c1c1c1';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#ffffff';
+                  e.currentTarget.style.borderColor = '#dadce0';
+                }}
+              >
+                Sign up with Google
+              </Button>
+
+              <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
                 <p>
                   Already have an account?{' '}
                   <Link href="/login" style={{ color: 'var(--primary-color)', fontWeight: '600' }}>

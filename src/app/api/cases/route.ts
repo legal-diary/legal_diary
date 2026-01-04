@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import { analyzeCaseWithAI } from '@/lib/openai';
 
-// GET all cases for a firm
+// GET all cases for a firm (role-based filtering)
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -19,6 +19,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Role-based case filtering:
+    // - ADMIN sees all cases in their firm
+    // - ADVOCATE sees only cases they're assigned to
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+
     // Check if minimal data is requested (for list views)
     const url = new URL(request.url);
     const minimal = url.searchParams.get('minimal') === 'true';
@@ -26,7 +34,7 @@ export async function GET(request: NextRequest) {
     if (minimal) {
       // Optimized query for list view - only essential fields
       const cases = await prisma.case.findMany({
-        where: { firmId: user.firmId },
+        where: caseFilter,
         select: {
           id: true,
           caseNumber: true,
@@ -37,35 +45,52 @@ export async function GET(request: NextRequest) {
           courtName: true,
           createdAt: true,
           _count: {
-            select: { hearings: true },
+            select: { Hearing: true },
           },
         },
         orderBy: { createdAt: 'desc' },
       });
 
-      const response = NextResponse.json(cases);
-      response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
-      return response;
+      return NextResponse.json(cases, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
     }
 
     // Full data for detail views
     const cases = await prisma.case.findMany({
-      where: { firmId: user.firmId },
+      where: caseFilter,
       include: {
-        createdBy: {
+        User: {
           select: { id: true, name: true, email: true },
         },
-        hearings: {
+        Hearing: {
           orderBy: { hearingDate: 'desc' },
           take: 10,
         },
-        fileDocuments: true,
-        aiSummary: true,
+        FileDocument: true,
+        AISummary: true,
+        assignments: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(cases);
+    return NextResponse.json(cases, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     console.error('Error fetching cases:', error);
     return NextResponse.json(
@@ -119,7 +144,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create case
+    // Create case with auto-assignment to creator
     const newCase = await prisma.case.create({
       data: {
         caseNumber,
@@ -134,11 +159,24 @@ export async function POST(request: NextRequest) {
         priority: priority || 'MEDIUM',
         createdById: user.id,
         firmId: user.firmId,
+        // Auto-assign the creator to the case
+        assignments: {
+          create: {
+            userId: user.id,
+          },
+        },
       },
       include: {
-        createdBy: true,
-        hearings: true,
-        fileDocuments: true,
+        User: true,
+        Hearing: true,
+        FileDocument: true,
+        assignments: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+        },
       },
     });
 

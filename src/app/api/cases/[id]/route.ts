@@ -19,7 +19,7 @@ const ALLOWED_UPDATE_FIELDS = [
   'opponents',
 ] as const;
 
-// GET a single case
+// GET a single case (role-based access)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,16 +39,30 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Role-based access:
+    // - ADMIN can access any case in their firm
+    // - ADVOCATE can only access cases they're assigned to
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = {
+      id: caseId,
+      firmId: user.firmId,
+      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
+    };
+
     const caseRecord = await prisma.case.findFirst({
-      where: {
-        id: caseId,
-        firmId: user.firmId,
-      },
+      where: caseFilter,
       include: {
-        createdBy: true,
-        hearings: true,
-        fileDocuments: true,
-        aiSummary: true,
+        User: true,
+        Hearing: true,
+        FileDocument: true,
+        AISummary: true,
+        assignments: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+        },
       },
     });
 
@@ -66,7 +80,7 @@ export async function GET(
   }
 }
 
-// UPDATE a case
+// UPDATE a case (role-based access)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -86,12 +100,18 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Verify case ownership
+    // Role-based access:
+    // - ADMIN can update any case in their firm
+    // - ADVOCATE can only update cases they're assigned to
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = {
+      id: caseId,
+      firmId: user.firmId,
+      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
+    };
+
     const caseRecord = await prisma.case.findFirst({
-      where: {
-        id: caseId,
-        firmId: user.firmId,
-      },
+      where: caseFilter,
     });
 
     if (!caseRecord) {
@@ -184,10 +204,10 @@ export async function PUT(
       where: { id: caseId },
       data: validatedUpdates,
       include: {
-        createdBy: true,
-        hearings: true,
-        fileDocuments: true,
-        aiSummary: true,
+        User: true,
+        Hearing: true,
+        FileDocument: true,
+        AISummary: true,
       },
     });
 
@@ -201,7 +221,7 @@ export async function PUT(
   }
 }
 
-// DELETE a case
+// DELETE a case (ADMIN only)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -221,7 +241,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Verify case ownership
+    // Only ADMIN can delete cases
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Only administrators can delete cases' },
+        { status: 403 }
+      );
+    }
+
+    // Verify case belongs to firm
     const caseRecord = await prisma.case.findFirst({
       where: {
         id: caseId,

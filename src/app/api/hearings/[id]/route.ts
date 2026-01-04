@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import {
+  updateCalendarEvent,
+  deleteCalendarEvent,
+  isGoogleCalendarConnected,
+} from '@/lib/googleCalendar';
 
-// GET a specific hearing
+// GET a specific hearing (role-based access)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -21,14 +26,20 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Role-based filtering through case assignments
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+
     const hearing = await prisma.hearing.findFirst({
       where: {
         id,
-        case: { firmId: user.firmId },
+        Case: caseFilter,
       },
       include: {
-        case: true,
-        reminders: true,
+        Case: true,
+        Reminder: true,
       },
     });
 
@@ -46,7 +57,7 @@ export async function GET(
   }
 }
 
-// PUT - Update a hearing
+// PUT - Update a hearing (role-based access)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -65,11 +76,16 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Verify hearing ownership
+    // Role-based access verification
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+
     const existingHearing = await prisma.hearing.findFirst({
       where: {
         id,
-        case: { firmId: user.firmId },
+        Case: caseFilter,
       },
     });
 
@@ -97,10 +113,37 @@ export async function PUT(
         ...(status && { status }),
       },
       include: {
-        case: true,
-        reminders: true,
+        Case: {
+          select: {
+            caseNumber: true,
+            caseTitle: true,
+            clientName: true,
+          },
+        },
+        Reminder: true,
       },
     });
+
+    // Auto-sync to Google Calendar if connected
+    try {
+      const googleConnected = await isGoogleCalendarConnected(user.id);
+      if (googleConnected) {
+        await updateCalendarEvent(user.id, {
+          hearingId: updatedHearing.id,
+          caseNumber: updatedHearing.Case.caseNumber,
+          caseTitle: updatedHearing.Case.caseTitle,
+          clientName: updatedHearing.Case.clientName,
+          hearingDate: updatedHearing.hearingDate,
+          hearingTime: updatedHearing.hearingTime,
+          hearingType: updatedHearing.hearingType,
+          courtRoom: updatedHearing.courtRoom,
+          notes: updatedHearing.notes,
+        });
+        console.log('[Hearings] Updated Google Calendar event:', updatedHearing.id);
+      }
+    } catch (googleError) {
+      console.error('[Hearings] Google Calendar update failed:', googleError);
+    }
 
     return NextResponse.json(updatedHearing);
   } catch (error) {
@@ -112,7 +155,7 @@ export async function PUT(
   }
 }
 
-// DELETE - Delete a hearing
+// DELETE - Delete a hearing (role-based access)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -131,16 +174,32 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Verify hearing ownership
+    // Role-based access verification
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+
     const existingHearing = await prisma.hearing.findFirst({
       where: {
         id,
-        case: { firmId: user.firmId },
+        Case: caseFilter,
       },
     });
 
     if (!existingHearing) {
       return NextResponse.json({ error: 'Hearing not found' }, { status: 404 });
+    }
+
+    // Delete from Google Calendar first (if connected)
+    try {
+      const googleConnected = await isGoogleCalendarConnected(user.id);
+      if (googleConnected) {
+        await deleteCalendarEvent(user.id, id);
+        console.log('[Hearings] Deleted Google Calendar event:', id);
+      }
+    } catch (googleError) {
+      console.error('[Hearings] Google Calendar delete failed:', googleError);
     }
 
     await prisma.hearing.delete({

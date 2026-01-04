@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import { generateHearingInsights } from '@/lib/openai';
+import { createCalendarEvent, isGoogleCalendarConnected } from '@/lib/googleCalendar';
 
-// GET hearings for user's firm
+// GET hearings for user's firm (role-based filtering)
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -18,6 +19,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Role-based filtering:
+    // - ADMIN sees hearings from all cases in their firm
+    // - ADVOCATE sees hearings only from cases they're assigned to
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+
     // Check if calendar mode is requested (optimized for calendar view)
     const url = new URL(request.url);
     const calendarMode = url.searchParams.get('calendar') === 'true';
@@ -26,7 +35,7 @@ export async function GET(request: NextRequest) {
       // Optimized query for calendar - only necessary fields
       const hearings = await prisma.hearing.findMany({
         where: {
-          case: { firmId: user.firmId },
+          Case: caseFilter,
         },
         select: {
           id: true,
@@ -35,29 +44,41 @@ export async function GET(request: NextRequest) {
           hearingTime: true,
           hearingType: true,
           courtRoom: true,
-          case: {
+          Case: {
             select: {
               caseNumber: true,
               caseTitle: true,
               clientName: true,
             },
           },
+          CalendarSync: {
+            select: {
+              id: true,
+              googleEventId: true,
+              syncStatus: true,
+              lastSyncedAt: true,
+            },
+          },
         },
         orderBy: { hearingDate: 'asc' },
       });
 
-      const response = NextResponse.json(hearings);
-      response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
-      return response;
+      return NextResponse.json(hearings, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
     }
 
     // Full data for other views
     const hearings = await prisma.hearing.findMany({
       where: {
-        case: { firmId: user.firmId },
+        Case: caseFilter,
       },
       include: {
-        case: {
+        Case: {
           select: {
             id: true,
             caseNumber: true,
@@ -66,12 +87,19 @@ export async function GET(request: NextRequest) {
             status: true,
           },
         },
-        reminders: true,
+        Reminder: true,
+        CalendarSync: true,
       },
       orderBy: { hearingDate: 'asc' },
     });
 
-    return NextResponse.json(hearings);
+    return NextResponse.json(hearings, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     console.error('Error fetching hearings:', error);
     return NextResponse.json(
@@ -113,9 +141,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify case ownership
+    // Role-based case access verification
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = {
+      id: caseId,
+      firmId: user.firmId,
+      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
+    };
+
     const caseRecord = await prisma.case.findFirst({
-      where: { id: caseId, firmId: user.firmId },
+      where: caseFilter,
     });
 
     if (!caseRecord) {
@@ -133,8 +168,8 @@ export async function POST(request: NextRequest) {
         notes,
       },
       include: {
-        case: true,
-        reminders: true,
+        Case: true,
+        Reminder: true,
       },
     });
 
@@ -149,6 +184,28 @@ export async function POST(request: NextRequest) {
         reminderTime: reminderDate,
       },
     });
+
+    // Auto-sync to Google Calendar if connected
+    try {
+      const googleConnected = await isGoogleCalendarConnected(user.id);
+      if (googleConnected) {
+        await createCalendarEvent(user.id, {
+          hearingId: hearing.id,
+          caseNumber: caseRecord.caseNumber,
+          caseTitle: caseRecord.caseTitle,
+          clientName: caseRecord.clientName,
+          hearingDate: new Date(hearingDate),
+          hearingTime,
+          hearingType: hearingType || 'ARGUMENTS',
+          courtRoom,
+          notes,
+        });
+        console.log('[Hearings] Auto-synced to Google Calendar:', hearing.id);
+      }
+    } catch (googleError) {
+      console.error('[Hearings] Google Calendar sync failed:', googleError);
+      // Don't fail the request if Google sync fails
+    }
 
     // Generate hearing insights asynchronously
     try {

@@ -35,6 +35,7 @@ import {
 import { Dropdown, MenuProps } from 'antd';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import AIAnalysisTab from '@/components/Cases/AIAnalysisTab';
+import CaseAssignment from '@/components/Cases/CaseAssignment';
 import DocumentViewer from '@/components/Documents/DocumentViewer';
 import { useAuth } from '@/context/AuthContext';
 import { useParams, useRouter } from 'next/navigation';
@@ -46,6 +47,18 @@ import { CaseDetailSkeleton, shimmerStyles, SectionLoader } from '@/components/S
 const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
 
 // Types
+interface CaseAssignmentData {
+  id: string;
+  userId: string;
+  assignedAt: string;
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+    role: string;
+  };
+}
+
 interface Case {
   id: string;
   caseNumber: string;
@@ -60,9 +73,10 @@ interface Case {
   judgeAssigned?: string;
   opponents?: string;
   createdAt: string;
-  hearings: any[];
-  fileDocuments: any[];
-  aiSummary?: any;
+  Hearing: any[];
+  FileDocument: any[];
+  AISummary?: any;
+  assignments?: CaseAssignmentData[];
 }
 
 // Static color maps
@@ -91,10 +105,13 @@ const HEARING_TYPES = [
 ] as const;
 
 export default function CaseDetailPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const params = useParams();
   const caseId = params.id as string;
   const router = useRouter();
+
+  // Check if user is admin
+  const isAdmin = user?.role === 'ADMIN';
 
   // State
   const [caseData, setCaseData] = useState<Case | null>(null);
@@ -439,14 +456,19 @@ export default function CaseDetailPage() {
               </Card>
             )}
 
-            {caseData.aiSummary && (
+            {caseData.AISummary && (
               <Card title="AI Summary & Insights" style={{ marginTop: '2vh' }}>
-                <Card.Meta title="Summary" description={caseData.aiSummary.summary} style={{ marginBottom: '1.5vh' }} />
+                <Card.Meta title="Summary" description={caseData.AISummary.summary} style={{ marginBottom: '1.5vh' }} />
                 <Card.Meta
                   title="Key Points"
                   description={
                     <ul>
-                      {JSON.parse(caseData.aiSummary.keyPoints).map((point: string, index: number) => (
+                      {(Array.isArray(caseData.AISummary.keyPoints)
+                        ? caseData.AISummary.keyPoints
+                        : typeof caseData.AISummary.keyPoints === 'string'
+                          ? JSON.parse(caseData.AISummary.keyPoints)
+                          : []
+                      ).map((point: string, index: number) => (
                         <li key={index} style={{ fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', marginBottom: '0.5vh' }}>
                           {point}
                         </li>
@@ -455,9 +477,18 @@ export default function CaseDetailPage() {
                   }
                   style={{ marginBottom: '1.5vh' }}
                 />
-                <Card.Meta title="Insights & Recommendations" description={caseData.aiSummary.insights} />
+                <Card.Meta title="Insights & Recommendations" description={caseData.AISummary.insights} />
               </Card>
             )}
+
+            {/* Case Assignments */}
+            <CaseAssignment
+              caseId={caseId}
+              assignments={caseData.assignments || []}
+              token={token || ''}
+              isAdmin={isAdmin}
+              onAssignmentChange={fetchCaseDetail}
+            />
           </Card>
         ),
       },
@@ -472,8 +503,8 @@ export default function CaseDetailPage() {
               </Button>
             }
           >
-            {caseData.hearings && caseData.hearings.length > 0 ? (
-              <Table columns={hearingColumns} dataSource={caseData.hearings} rowKey="id" pagination={false} />
+            {caseData.Hearing && caseData.Hearing.length > 0 ? (
+              <Table columns={hearingColumns} dataSource={caseData.Hearing} rowKey="id" pagination={false} />
             ) : (
               <Empty description="No hearings scheduled" />
             )}
@@ -491,8 +522,8 @@ export default function CaseDetailPage() {
               </Button>
             }
           >
-            {caseData.fileDocuments && caseData.fileDocuments.length > 0 ? (
-              <Table columns={fileColumns} dataSource={caseData.fileDocuments} rowKey="id" pagination={false} />
+            {caseData.FileDocument && caseData.FileDocument.length > 0 ? (
+              <Table columns={fileColumns} dataSource={caseData.FileDocument} rowKey="id" pagination={false} />
             ) : (
               <Empty description="No documents uploaded" />
             )}
@@ -506,15 +537,15 @@ export default function CaseDetailPage() {
           <AIAnalysisTab
             caseId={caseId}
             caseTitle={caseData.caseTitle}
-            aiSummary={caseData.aiSummary}
-            fileDocuments={caseData.fileDocuments || []}
+            aiSummary={caseData.AISummary}
+            fileDocuments={caseData.FileDocument || []}
             token={token || ''}
             onAnalysisComplete={fetchCaseDetail}
           />
         ),
       },
     ];
-  }, [caseData, caseId, token, hearingColumns, fileColumns, fetchCaseDetail]);
+  }, [caseData, caseId, token, hearingColumns, fileColumns, fetchCaseDetail, isAdmin]);
 
   // Loading state
   if (loading) {
@@ -557,9 +588,11 @@ export default function CaseDetailPage() {
                 <Button icon={<EditOutlined />} onClick={handleEditOpen} size="middle">
                   <span className="btn-text">Edit</span>
                 </Button>
-                <Button icon={<DeleteOutlined />} onClick={handleDelete} danger loading={deleting} size="middle">
-                  <span className="btn-text">Delete</span>
-                </Button>
+                {isAdmin && (
+                  <Button icon={<DeleteOutlined />} onClick={handleDelete} danger loading={deleting} size="middle">
+                    <span className="btn-text">Delete</span>
+                  </Button>
+                )}
                 <Link href="/calendar">
                   <Button icon={<CalendarOutlined />} size="middle">
                     <span className="btn-text">Calendar</span>
@@ -776,13 +809,13 @@ export default function CaseDetailPage() {
                 <Input.TextArea rows={4} />
               </Form.Item>
 
-              {caseData.fileDocuments && caseData.fileDocuments.length > 0 && (
+              {caseData.FileDocument && caseData.FileDocument.length > 0 && (
                 <Form.Item label="Manage Documents">
                   <Card type="inner" size="small">
                     <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#666' }}>
                       Click the checkbox to delete documents:
                     </p>
-                    {caseData.fileDocuments.map((doc: any) => (
+                    {caseData.FileDocument.map((doc: any) => (
                       <div key={doc.id} style={{ marginBottom: '0.5rem' }}>
                         <Checkbox
                           checked={documentsToDelete.includes(doc.id)}

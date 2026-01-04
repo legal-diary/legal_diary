@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, name, password, firmName, firmId, role = 'ADVOCATE' } = body;
+    const { email, name, password, firmName, firmId } = body;
 
     // Validation
     if (!email || !password || !name) {
@@ -65,14 +65,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate role
-    const validRoles = ['ADVOCATE', 'ADMIN', 'SUPPORT_STAFF'];
-    if (!validRoles.includes(role)) {
-      return NextResponse.json(
-        { error: 'Invalid role specified' },
-        { status: 400 }
-      );
-    }
+    // Determine role based on firm action:
+    // - Creating a new firm (firmName) → ADMIN (firm owner)
+    // - Joining existing firm (firmId) → ADVOCATE (team member)
+    const role = firmName ? 'ADMIN' : 'ADVOCATE';
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({

@@ -29,11 +29,18 @@ export async function POST(
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
-    // Get case
-    const caseRecord = await prisma.case.findUnique({
-      where: { id: caseId },
+    // Role-based case access verification
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = {
+      id: caseId,
+      firmId: user.firmId,
+      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
+    };
+
+    const caseRecord = await prisma.case.findFirst({
+      where: caseFilter,
       include: {
-        fileDocuments: true,
+        FileDocument: true,
       },
     });
 
@@ -41,15 +48,10 @@ export async function POST(
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    // Verify case belongs to user's firm
-    if (caseRecord.firmId !== user.firmId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     // Extract document contents if documentIds provided
     let documents;
     if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
-      const docsToAnalyze = caseRecord.fileDocuments.filter((doc) =>
+      const docsToAnalyze = caseRecord.FileDocument.filter((doc) =>
         documentIds.includes(doc.id)
       );
 
