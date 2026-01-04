@@ -163,35 +163,12 @@ export default function CasesPage() {
   }, [authHeaders]);
 
   useEffect(() => {
-    if (token) {
-      fetchCases();
-    }
-  }, [token, fetchCases]);
+    fetchCases();
+  }, [fetchCases]);
 
-  // Memoized filtered cases - computed only when dependencies change
-  const filteredCases = useMemo(() => {
-    let filtered = cases;
-
-    if (searchText) {
-      const search = searchText.toLowerCase();
-      filtered = filtered.filter(
-        (c) =>
-          c.caseNumber.toLowerCase().includes(search) ||
-          c.caseTitle.toLowerCase().includes(search) ||
-          c.clientName.toLowerCase().includes(search)
-      );
-    }
-
-    if (statusFilter) {
-      filtered = filtered.filter((c) => c.status === statusFilter);
-    }
-
-    if (priorityFilter) {
-      filtered = filtered.filter((c) => c.priority === priorityFilter);
-    }
-
-    return filtered;
-  }, [cases, searchText, statusFilter, priorityFilter]);
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
 
   // Memoized handlers
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
