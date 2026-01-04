@@ -57,6 +57,9 @@ export default function GoogleCallbackPage() {
         if (data.needsFirmSetup) {
           localStorage.setItem('needsFirmSetup', 'true');
         }
+        if (data.needsPasswordSetup) {
+          localStorage.setItem('needsPasswordSetup', 'true');
+        }
         if (data.googleCalendarConnected) {
           localStorage.setItem('googleCalendarConnected', 'true');
         }

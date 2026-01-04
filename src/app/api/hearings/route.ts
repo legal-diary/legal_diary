@@ -4,7 +4,7 @@ import { verifyToken } from '@/lib/middleware';
 import { generateHearingInsights } from '@/lib/openai';
 import { createCalendarEvent, isGoogleCalendarConnected } from '@/lib/googleCalendar';
 
-// GET hearings for user's firm
+// GET hearings for user's firm (role-based filtering)
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -19,6 +19,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Role-based filtering:
+    // - ADMIN sees hearings from all cases in their firm
+    // - ADVOCATE sees hearings only from cases they're assigned to
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+
     // Check if calendar mode is requested (optimized for calendar view)
     const url = new URL(request.url);
     const calendarMode = url.searchParams.get('calendar') === 'true';
@@ -27,7 +35,7 @@ export async function GET(request: NextRequest) {
       // Optimized query for calendar - only necessary fields
       const hearings = await prisma.hearing.findMany({
         where: {
-          Case: { firmId: user.firmId },
+          Case: caseFilter,
         },
         select: {
           id: true,
@@ -67,7 +75,7 @@ export async function GET(request: NextRequest) {
     // Full data for other views
     const hearings = await prisma.hearing.findMany({
       where: {
-        Case: { firmId: user.firmId },
+        Case: caseFilter,
       },
       include: {
         Case: {
@@ -133,9 +141,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify case ownership
+    // Role-based case access verification
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = {
+      id: caseId,
+      firmId: user.firmId,
+      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
+    };
+
     const caseRecord = await prisma.case.findFirst({
-      where: { id: caseId, firmId: user.firmId },
+      where: caseFilter,
     });
 
     if (!caseRecord) {

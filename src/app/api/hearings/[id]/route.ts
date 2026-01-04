@@ -7,7 +7,7 @@ import {
   isGoogleCalendarConnected,
 } from '@/lib/googleCalendar';
 
-// GET a specific hearing
+// GET a specific hearing (role-based access)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -26,10 +26,16 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Role-based filtering through case assignments
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+
     const hearing = await prisma.hearing.findFirst({
       where: {
         id,
-        Case: { firmId: user.firmId },
+        Case: caseFilter,
       },
       include: {
         Case: true,
@@ -51,7 +57,7 @@ export async function GET(
   }
 }
 
-// PUT - Update a hearing
+// PUT - Update a hearing (role-based access)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -70,11 +76,16 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Verify hearing ownership
+    // Role-based access verification
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+
     const existingHearing = await prisma.hearing.findFirst({
       where: {
         id,
-        Case: { firmId: user.firmId },
+        Case: caseFilter,
       },
     });
 
@@ -144,7 +155,7 @@ export async function PUT(
   }
 }
 
-// DELETE - Delete a hearing
+// DELETE - Delete a hearing (role-based access)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -163,11 +174,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Verify hearing ownership
+    // Role-based access verification
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+
     const existingHearing = await prisma.hearing.findFirst({
       where: {
         id,
-        Case: { firmId: user.firmId },
+        Case: caseFilter,
       },
     });
 

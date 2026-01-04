@@ -21,32 +21,46 @@ model AISummary {
 }
 
 model Case {
-  id            String         @id @default(cuid())
-  caseNumber    String         @unique
+  id            String           @id @default(cuid())
+  caseNumber    String           @unique
   clientName    String
   clientEmail   String?
   clientPhone   String?
   caseTitle     String
   description   String?
-  status        CaseStatus     @default(ACTIVE)
-  priority      Priority       @default(MEDIUM)
+  status        CaseStatus       @default(ACTIVE)
+  priority      Priority         @default(MEDIUM)
   createdById   String
   firmId        String
   opponents     String?
   courtName     String?
   judgeAssigned String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
   AISummary     AISummary?
-  User          User           @relation(fields: [createdById], references: [id])
-  Firm          Firm           @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  User          User             @relation(fields: [createdById], references: [id])
+  Firm          Firm             @relation(fields: [firmId], references: [id], onDelete: Cascade)
   FileDocument  FileDocument[]
   Hearing       Hearing[]
+  assignments   CaseAssignment[]
 
   @@index([caseNumber])
   @@index([createdById])
   @@index([firmId])
   @@index([status])
+}
+
+model CaseAssignment {
+  id         String   @id @default(cuid())
+  caseId     String
+  userId     String
+  assignedAt DateTime @default(now())
+  case       Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, userId])
+  @@index([caseId])
+  @@index([userId])
 }
 
 model FileDocument {
@@ -164,6 +178,7 @@ model User {
   Session                 Session[]
   Firm_User_firmIdToFirm  Firm?                @relation("User_firmIdToFirm", fields: [firmId], references: [id])
   GoogleCalendarToken     GoogleCalendarToken?
+  caseAssignments         CaseAssignment[]
 
   @@index([email])
   @@index([firmId])

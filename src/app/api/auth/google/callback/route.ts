@@ -240,6 +240,9 @@ export async function POST(request: NextRequest) {
       firm_name: Firm_User_firmIdToFirm?.name || null,
     };
 
+    // Check if user needs to set password (Google OAuth user without password)
+    const needsPasswordSetup = !user.password;
+
     return NextResponse.json({
       message: isNewUser ? 'Account created successfully' : 'Login successful',
       user: userData,
@@ -247,6 +250,7 @@ export async function POST(request: NextRequest) {
       expiresAt: expiresAt.toISOString(),
       isNewUser,
       needsFirmSetup,
+      needsPasswordSetup,
       googleCalendarConnected: !!(tokens.access_token && tokens.refresh_token),
     });
   } catch (error) {

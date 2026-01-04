@@ -80,6 +80,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if user has a password set (Google OAuth users may not have one)
+    if (!user.password) {
+      return NextResponse.json(
+        {
+          error: 'This account was created with Google Sign-In. Please set a password in Settings or use Google to sign in.',
+          code: 'NO_PASSWORD_SET',
+        },
+        { status: 400 }
+      );
+    }
+
     // Verify password
     const passwordValid = await verifyPassword(password, user.password);
     if (!passwordValid) {

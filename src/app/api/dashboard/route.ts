@@ -22,6 +22,14 @@ export async function GET(request: NextRequest) {
     const todayStart = dayjs().startOf('day').toDate();
     const todayEnd = dayjs().endOf('day').toDate();
 
+    // Role-based filtering:
+    // - ADMIN sees data from all cases in their firm
+    // - ADVOCATE sees data only from cases they're assigned to
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+
     // Execute all queries in parallel for maximum speed
     const [todaysHearings, upcomingHearings, casesMinimal] = await Promise.all([
       // Today's hearings with only necessary case fields
@@ -31,9 +39,7 @@ export async function GET(request: NextRequest) {
             gte: todayStart,
             lte: todayEnd,
           },
-          Case: {
-            firmId: user.firmId,
-          },
+          Case: caseFilter,
         },
         select: {
           id: true,
@@ -63,9 +69,7 @@ export async function GET(request: NextRequest) {
           hearingDate: {
             gte: todayStart,
           },
-          Case: {
-            firmId: user.firmId,
-          },
+          Case: caseFilter,
         },
         select: {
           id: true,
@@ -88,10 +92,10 @@ export async function GET(request: NextRequest) {
         take: 15, // Take a few extra to account for today's items
       }),
 
-      // Minimal case data for dropdown (only active cases)
+      // Minimal case data for dropdown (only active cases user has access to)
       prisma.case.findMany({
         where: {
-          firmId: user.firmId,
+          ...caseFilter,
           status: {
             in: ['ACTIVE', 'PENDING_JUDGMENT', 'APPEAL'],
           },

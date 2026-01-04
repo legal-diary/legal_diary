@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import FirmSelectionModal from '@/components/Auth/FirmSelectionModal';
+import SetPasswordModal from '@/components/Auth/SetPasswordModal';
 
 interface User {
   id: string;
@@ -10,6 +11,7 @@ interface User {
   role: string;
   firmId?: string;
   firm_name?: string;
+  password?: string | null;
 }
 
 interface AuthContextType {
@@ -21,7 +23,9 @@ interface AuthContextType {
   isLoading: boolean;
   isTokenExpired: () => boolean;
   needsFirmSetup: boolean;
+  needsPasswordSetup: boolean;
   updateUser: (userData: User) => void;
+  setNeedsPasswordSetup: (needs: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [needsFirmSetup, setNeedsFirmSetup] = useState(false);
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -46,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const savedUser = localStorage.getItem('user');
     const savedExpiresAt = localStorage.getItem('tokenExpiresAt');
     const firmSetupNeeded = localStorage.getItem('needsFirmSetup');
+    const passwordSetupNeeded = localStorage.getItem('needsPasswordSetup');
 
     if (savedToken && savedUser) {
       // Check if token has already expired
@@ -55,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('user');
         localStorage.removeItem('tokenExpiresAt');
         localStorage.removeItem('needsFirmSetup');
+        localStorage.removeItem('needsPasswordSetup');
       } else {
         setToken(savedToken);
         const parsedUser = JSON.parse(savedUser);
@@ -64,6 +71,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Check if user needs firm setup (Google OAuth user without firm)
         if (firmSetupNeeded === 'true' || !parsedUser.firmId) {
           setNeedsFirmSetup(true);
+        }
+
+        // Check if user needs password setup (Google OAuth user without password)
+        if (passwordSetupNeeded === 'true') {
+          setNeedsPasswordSetup(true);
         }
       }
     }
@@ -160,10 +172,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(null);
       setExpiresAt(null);
       setNeedsFirmSetup(false);
+      setNeedsPasswordSetup(false);
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       localStorage.removeItem('tokenExpiresAt');
       localStorage.removeItem('needsFirmSetup');
+      localStorage.removeItem('needsPasswordSetup');
       localStorage.removeItem('googleCalendarConnected');
     } finally {
       setIsLoading(false);
@@ -190,8 +204,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateUser(userData);
   };
 
+  // Handle password setup success
+  const handlePasswordSetupSuccess = () => {
+    setNeedsPasswordSetup(false);
+    localStorage.removeItem('needsPasswordSetup');
+  };
+
+  // Handle password setup skip
+  const handlePasswordSetupSkip = () => {
+    setNeedsPasswordSetup(false);
+    localStorage.removeItem('needsPasswordSetup');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, isLoading, isTokenExpired, needsFirmSetup, updateUser }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, isLoading, isTokenExpired, needsFirmSetup, needsPasswordSetup, updateUser, setNeedsPasswordSetup }}>
       {children}
       {/* Show firm selection modal for Google OAuth users without firm */}
       {token && needsFirmSetup && (
@@ -199,6 +225,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           open={needsFirmSetup}
           token={token}
           onSuccess={handleFirmSetupSuccess}
+        />
+      )}
+      {/* Show password setup modal for Google OAuth users without password */}
+      {token && needsPasswordSetup && !needsFirmSetup && (
+        <SetPasswordModal
+          open={needsPasswordSetup}
+          token={token}
+          onSuccess={handlePasswordSetupSuccess}
+          onSkip={handlePasswordSetupSkip}
         />
       )}
     </AuthContext.Provider>

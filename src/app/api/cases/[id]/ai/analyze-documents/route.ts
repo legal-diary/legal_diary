@@ -25,9 +25,16 @@ export async function POST(
 
     const { documentIds } = await request.json();
 
-    // Get case
-    const caseRecord = await prisma.case.findUnique({
-      where: { id: caseId },
+    // Role-based case access verification
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = {
+      id: caseId,
+      firmId: user.firmId,
+      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
+    };
+
+    const caseRecord = await prisma.case.findFirst({
+      where: caseFilter,
       include: {
         FileDocument: true,
       },
@@ -35,11 +42,6 @@ export async function POST(
 
     if (!caseRecord) {
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
-    }
-
-    // Verify case belongs to user's firm
-    if (caseRecord.firmId !== user.firmId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get specified documents or all if none specified

@@ -35,6 +35,7 @@ import {
 import { Dropdown, MenuProps } from 'antd';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import AIAnalysisTab from '@/components/Cases/AIAnalysisTab';
+import CaseAssignment from '@/components/Cases/CaseAssignment';
 import DocumentViewer from '@/components/Documents/DocumentViewer';
 import { useAuth } from '@/context/AuthContext';
 import { useParams, useRouter } from 'next/navigation';
@@ -46,6 +47,18 @@ import { CaseDetailSkeleton, shimmerStyles, SectionLoader } from '@/components/S
 const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
 
 // Types
+interface CaseAssignmentData {
+  id: string;
+  userId: string;
+  assignedAt: string;
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+    role: string;
+  };
+}
+
 interface Case {
   id: string;
   caseNumber: string;
@@ -63,6 +76,7 @@ interface Case {
   Hearing: any[];
   FileDocument: any[];
   AISummary?: any;
+  assignments?: CaseAssignmentData[];
 }
 
 // Static color maps
@@ -91,10 +105,13 @@ const HEARING_TYPES = [
 ] as const;
 
 export default function CaseDetailPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const params = useParams();
   const caseId = params.id as string;
   const router = useRouter();
+
+  // Check if user is admin
+  const isAdmin = user?.role === 'ADMIN';
 
   // State
   const [caseData, setCaseData] = useState<Case | null>(null);
@@ -463,6 +480,15 @@ export default function CaseDetailPage() {
                 <Card.Meta title="Insights & Recommendations" description={caseData.AISummary.insights} />
               </Card>
             )}
+
+            {/* Case Assignments */}
+            <CaseAssignment
+              caseId={caseId}
+              assignments={caseData.assignments || []}
+              token={token || ''}
+              isAdmin={isAdmin}
+              onAssignmentChange={fetchCaseDetail}
+            />
           </Card>
         ),
       },
@@ -519,7 +545,7 @@ export default function CaseDetailPage() {
         ),
       },
     ];
-  }, [caseData, caseId, token, hearingColumns, fileColumns, fetchCaseDetail]);
+  }, [caseData, caseId, token, hearingColumns, fileColumns, fetchCaseDetail, isAdmin]);
 
   // Loading state
   if (loading) {
@@ -562,9 +588,11 @@ export default function CaseDetailPage() {
                 <Button icon={<EditOutlined />} onClick={handleEditOpen} size="middle">
                   <span className="btn-text">Edit</span>
                 </Button>
-                <Button icon={<DeleteOutlined />} onClick={handleDelete} danger loading={deleting} size="middle">
-                  <span className="btn-text">Delete</span>
-                </Button>
+                {isAdmin && (
+                  <Button icon={<DeleteOutlined />} onClick={handleDelete} danger loading={deleting} size="middle">
+                    <span className="btn-text">Delete</span>
+                  </Button>
+                )}
                 <Link href="/calendar">
                   <Button icon={<CalendarOutlined />} size="middle">
                     <span className="btn-text">Calendar</span>

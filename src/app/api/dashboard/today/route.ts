@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import dayjs from 'dayjs';
 
-// GET today's hearings for the legal referencer dashboard
+// GET today's hearings for the legal referencer dashboard (role-based filtering)
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -18,6 +18,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Role-based filtering:
+    // - ADMIN sees hearings from all cases in their firm
+    // - ADVOCATE sees hearings only from cases they're assigned to
+    const isAdmin = user.role === 'ADMIN';
+    const caseFilter = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+
     // Get today's date range (start and end of day)
     const todayStart = dayjs().startOf('day').toDate();
     const todayEnd = dayjs().endOf('day').toDate();
@@ -29,9 +37,7 @@ export async function GET(request: NextRequest) {
           gte: todayStart,
           lte: todayEnd,
         },
-        Case: {
-          firmId: user.firmId,
-        },
+        Case: caseFilter,
       },
       include: {
         Case: {

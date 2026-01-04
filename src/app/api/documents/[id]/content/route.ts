@@ -23,9 +23,17 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Find document and verify ownership through case
+    // Role-based access - find document and verify through case assignments
+    const isAdmin = user.role === 'ADMIN';
+
     const document = await prisma.fileDocument.findFirst({
-      where: { id: documentId },
+      where: {
+        id: documentId,
+        Case: {
+          firmId: user.firmId,
+          ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
+        },
+      },
       include: {
         Case: {
           select: { firmId: true },
@@ -33,7 +41,7 @@ export async function GET(
       },
     });
 
-    if (!document || document.Case.firmId !== user.firmId) {
+    if (!document) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
 

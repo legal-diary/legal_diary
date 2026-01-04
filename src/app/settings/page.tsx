@@ -2,18 +2,24 @@
 
 import React from 'react';
 import { Typography, Divider, Card, Space } from 'antd';
-import { SettingOutlined, ApiOutlined } from '@ant-design/icons';
+import { SettingOutlined, ApiOutlined, TeamOutlined, LockOutlined } from '@ant-design/icons';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import GoogleCalendarConnect from '@/components/GoogleCalendar/GoogleCalendarConnect';
+import TeamManagement from '@/components/Settings/TeamManagement';
+import SetPassword from '@/components/Settings/SetPassword';
+import { useAuth } from '@/context/AuthContext';
 
 const { Title, Text } = Typography;
 
 export default function SettingsPage() {
+  const { token, user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
           <Title level={2} style={{ marginBottom: 8 }}>
             <SettingOutlined style={{ marginRight: 12 }} />
             Settings
@@ -41,6 +47,34 @@ export default function SettingsPage() {
 
             <GoogleCalendarConnect />
           </Card>
+
+          {/* Security / Password Section */}
+          {token && (
+            <>
+              <Divider orientation="left">
+                <Space>
+                  <LockOutlined />
+                  <span>Security</span>
+                </Space>
+              </Divider>
+
+              <SetPassword token={token} />
+            </>
+          )}
+
+          {/* Team Management - Only visible to Admins */}
+          {isAdmin && token && (
+            <>
+              <Divider orientation="left">
+                <Space>
+                  <TeamOutlined />
+                  <span>Team</span>
+                </Space>
+              </Divider>
+
+              <TeamManagement token={token} />
+            </>
+          )}
 
           <style jsx global>{`
             .integration-card {

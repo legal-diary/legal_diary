@@ -22,7 +22,9 @@
       "mcp__puppeteer__puppeteer_click",
       "mcp__puppeteer__puppeteer_evaluate",
       "mcp__puppeteer__puppeteer_navigate",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

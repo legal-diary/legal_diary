@@ -50,6 +50,11 @@ export async function POST(request: NextRequest) {
 
     let assignedFirmId: string;
 
+    // Determine role based on firm action:
+    // - Creating a new firm (firmName) → ADMIN (firm owner)
+    // - Joining existing firm (firmId) → ADVOCATE (team member)
+    const assignedRole = firmName ? 'ADMIN' : 'ADVOCATE';
+
     if (firmName) {
       // Create a new firm
       if (firmName.length < 2 || firmName.length > 100) {
@@ -87,11 +92,14 @@ export async function POST(request: NextRequest) {
       assignedFirmId = firmId;
     }
 
-    // Update user with firm ID
+    // Update user with firm ID and role
     const updatedUser = await withRetry(() =>
       prisma.user.update({
         where: { id: user.id },
-        data: { firmId: assignedFirmId },
+        data: {
+          firmId: assignedFirmId,
+          role: assignedRole,
+        },
         include: {
           Firm_User_firmIdToFirm: {
             select: { name: true },

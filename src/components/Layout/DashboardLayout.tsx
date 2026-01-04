@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback, memo, lazy, Suspense } from 'react';
-import { Layout, Menu, Button, Avatar } from 'antd';
+import { Layout, Menu, Button, Avatar, Tag } from 'antd';
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -225,6 +225,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const userInitial = useMemo(() => user?.name?.charAt(0).toUpperCase() || 'U', [user?.name]);
   const userName = useMemo(() => user?.name?.split(' ')[0] || 'User', [user?.name]);
   const firmName = useMemo(() => user?.firm_name?.toUpperCase() || 'Law Firm', [user?.firm_name]);
+  const isAdmin = user?.role === 'ADMIN';
 
   // Memoized drawer styles
   const drawerStyles = useMemo(() => ({
@@ -343,6 +344,9 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4vh 1vw' }}>
               <Avatar size={32} style={{ background: 'var(--primary-color)', color: '#fff' }}>{userInitial}</Avatar>
               <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>{userName}</span>
+              {isAdmin && (
+                <Tag color="gold" style={{ fontSize: '0.65rem', padding: '0 6px', fontWeight: '700' }}>ADMIN</Tag>
+              )}
             </div>
           }>
             <Dropdown menu={userMenuItems} trigger={['click']} placement="bottomRight">
@@ -383,6 +387,21 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
                 }}>
                   {userName}
                 </span>
+                {isAdmin && (
+                  <Tag
+                    color="gold"
+                    style={{
+                      marginLeft: '0.5rem',
+                      fontSize: '0.65rem',
+                      padding: '0 6px',
+                      lineHeight: '18px',
+                      fontWeight: '700',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    ADMIN
+                  </Tag>
+                )}
               </div>
             </Dropdown>
           </Suspense>
