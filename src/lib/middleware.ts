@@ -13,7 +13,7 @@ const tokenCache = new Map<
   { user: SessionWithUser['User']; expiresAt: Date; cachedAt: number }
 >();
 
-const getCachedUser = (token: string) => {
+const getCachedEntry = (token: string) => {
   const cached = tokenCache.get(token);
   if (!cached) return null;
 
@@ -26,7 +26,7 @@ const getCachedUser = (token: string) => {
     return null;
   }
 
-  return cached.user;
+  return cached;
 };
 
 const setCachedUser = (token: string, user: SessionWithUser['User'], expiresAt: Date) => {
@@ -42,11 +42,33 @@ const setCachedUser = (token: string, user: SessionWithUser['User'], expiresAt: 
   });
 };
 
+export const invalidateTokenCache = (token: string) => {
+  tokenCache.delete(token);
+};
+
 export async function verifyToken(token: string) {
   try {
-    const cachedUser = getCachedUser(token);
-    if (cachedUser) {
-      return cachedUser;
+    const cachedEntry = getCachedEntry(token);
+    if (cachedEntry) {
+      const session = await prisma.session.findUnique({
+        where: { token },
+        select: { id: true, expiresAt: true },
+      });
+
+      if (!session) {
+        tokenCache.delete(token);
+        return null;
+      }
+
+      if (session.expiresAt < new Date()) {
+        await prisma.session.delete({
+          where: { id: session.id },
+        });
+        tokenCache.delete(token);
+        return null;
+      }
+
+      return cachedEntry.user;
     }
 
     const session = await prisma.session.findUnique({
@@ -66,6 +88,7 @@ export async function verifyToken(token: string) {
       await prisma.session.delete({
         where: { id: session.id },
       });
+      tokenCache.delete(token);
       return null;
     }
 
