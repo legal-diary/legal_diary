@@ -41,6 +41,13 @@ interface Case {
   caseTitle: string;
 }
 
+interface PaginatedResponse<T> {
+  data: T[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
 // Static color map
 const HEARING_TYPE_COLORS: Record<string, string> = {
   ARGUMENTS: 'blue',
@@ -145,31 +152,34 @@ export default function HearingCalendar() {
 
     setLoading(true);
     try {
+      const rangeStart = selectedDate.startOf('month').toISOString();
+      const rangeEnd = selectedDate.endOf('month').toISOString();
+
       // Parallel fetch for hearings and cases
       const [hearingsRes, casesRes] = await Promise.all([
-        fetch('/api/hearings?calendar=true', {
+        fetch(`/api/hearings?calendar=true&startDate=${encodeURIComponent(rangeStart)}&endDate=${encodeURIComponent(rangeEnd)}&limit=200`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch('/api/cases?minimal=true', {
+        fetch('/api/cases?minimal=true&limit=200', {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
 
       if (hearingsRes.ok) {
-        const hearingsData = await hearingsRes.json();
-        setHearings(hearingsData);
+        const hearingsData: PaginatedResponse<Hearing> = await hearingsRes.json();
+        setHearings(hearingsData.data);
       }
 
       if (casesRes.ok) {
-        const casesData = await casesRes.json();
-        setCases(casesData);
+        const casesData: PaginatedResponse<Case> = await casesRes.json();
+        setCases(casesData.data);
       }
     } catch {
       message.error('Failed to load calendar data');
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, selectedDate]);
 
   // Fetch Google Calendar status
   const fetchGoogleStatus = useCallback(async () => {

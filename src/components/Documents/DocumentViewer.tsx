@@ -10,7 +10,10 @@ import {
   FileExcelOutlined,
   FileWordOutlined,
 } from '@ant-design/icons';
-import mammoth from 'mammoth';
+interface MammothResult {
+  value: string;
+  messages: unknown[];
+}
 
 interface DocumentViewerProps {
   visible: boolean;
@@ -83,25 +86,36 @@ export default function DocumentViewer({
         .catch(() => setError('Failed to load document'))
         .finally(() => setLoading(false));
     } else if (category === 'docx') {
-      // Fetch and convert DOCX using mammoth.js
-      fetch(document.fileUrl)
-        .then((res) => {
-          if (!res.ok) throw new Error('Failed to fetch document');
-          return res.arrayBuffer();
-        })
-        .then((arrayBuffer) => mammoth.convertToHtml({ arrayBuffer }))
-        .then((result) => {
-          setDocxHtml(result.value);
-          // Log any conversion warnings
-          if (result.messages.length > 0) {
-            console.warn('Mammoth conversion warnings:', result.messages);
+      let cancelled = false;
+
+      const convertDocx = async () => {
+        try {
+          const response = await fetch(document.fileUrl);
+          if (!response.ok) throw new Error('Failed to fetch document');
+          const arrayBuffer = await response.arrayBuffer();
+          const mammothModule = await import('mammoth');
+          const result: MammothResult = await mammothModule.convertToHtml({ arrayBuffer });
+
+          if (!cancelled) {
+            setDocxHtml(result.value);
           }
-        })
-        .catch((err) => {
-          console.error('DOCX conversion error:', err);
-          setError('Failed to load Word document');
-        })
-        .finally(() => setLoading(false));
+        } catch (err) {
+          if (!cancelled) {
+            console.error('DOCX conversion error:', err);
+            setError('Failed to load Word document');
+          }
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        }
+      };
+
+      convertDocx();
+
+      return () => {
+        cancelled = true;
+      };
     } else if (category === 'pdf' || category === 'image') {
       // PDF and images load directly, just clear loading state
       setLoading(false);

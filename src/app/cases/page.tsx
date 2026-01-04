@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Card,
   Tag,
@@ -32,6 +32,13 @@ interface Case {
   _count?: {
     Hearing: number;
   };
+}
+
+interface CasesResponse {
+  data: Case[];
+  page: number;
+  limit: number;
+  total: number;
 }
 
 // Static color maps - moved outside component
@@ -127,6 +134,9 @@ export default function CasesPage() {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCases, setTotalCases] = useState(0);
+  const pageSize = 20;
 
   // Fetch cases with optimized API call
   const fetchCases = useCallback(async () => {
@@ -134,12 +144,24 @@ export default function CasesPage() {
 
     setLoading(true);
     try {
-      const response = await fetch('/api/cases?minimal=true', {
+      const params = new URLSearchParams({
+        minimal: 'true',
+        page: String(currentPage),
+        limit: String(pageSize),
+      });
+
+      if (searchText) params.set('search', searchText);
+      if (statusFilter) params.set('status', statusFilter);
+      if (priorityFilter) params.set('priority', priorityFilter);
+
+      const response = await fetch(`/api/cases?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.ok) {
-        const data = await response.json();
-        setCases(data);
+        const payload: CasesResponse = await response.json();
+        setCases(payload.data);
+        setTotalCases(payload.total);
+        setCurrentPage(payload.page);
       } else {
         message.error('Failed to load cases');
       }
@@ -148,7 +170,7 @@ export default function CasesPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, currentPage, pageSize, searchText, statusFilter, priorityFilter]);
 
   useEffect(() => {
     if (token) {
@@ -156,42 +178,24 @@ export default function CasesPage() {
     }
   }, [token, fetchCases]);
 
-  // Memoized filtered cases - computed only when dependencies change
-  const filteredCases = useMemo(() => {
-    let filtered = cases;
-
-    if (searchText) {
-      const search = searchText.toLowerCase();
-      filtered = filtered.filter(
-        (c) =>
-          c.caseNumber.toLowerCase().includes(search) ||
-          c.caseTitle.toLowerCase().includes(search) ||
-          c.clientName.toLowerCase().includes(search)
-      );
-    }
-
-    if (statusFilter) {
-      filtered = filtered.filter((c) => c.status === statusFilter);
-    }
-
-    if (priorityFilter) {
-      filtered = filtered.filter((c) => c.priority === priorityFilter);
-    }
-
-    return filtered;
-  }, [cases, searchText, statusFilter, priorityFilter]);
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
 
   // Memoized handlers
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value);
+    setCurrentPage(1);
   }, []);
 
   const handleStatusChange = useCallback((value: string) => {
     setStatusFilter(value || '');
+    setCurrentPage(1);
   }, []);
 
   const handlePriorityChange = useCallback((value: string) => {
     setPriorityFilter(value || '');
+    setCurrentPage(1);
   }, []);
 
   return (
@@ -265,8 +269,24 @@ export default function CasesPage() {
               </Row>
             </div>
 
+            <div style={{ marginTop: '1rem', marginBottom: '1rem', textAlign: 'right' }}>
+              <Button
+                disabled={currentPage === 1}
+                onClick={() => handlePageChange(currentPage - 1)}
+                style={{ marginRight: '0.5rem' }}
+              >
+                Previous
+              </Button>
+              <Button
+                disabled={currentPage * pageSize >= totalCases}
+                onClick={() => handlePageChange(currentPage + 1)}
+              >
+                Next
+              </Button>
+            </div>
+
             {/* Cases Grid */}
-            {filteredCases.length === 0 ? (
+            {cases.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>
                 <p>
                   No cases found.{' '}
@@ -277,7 +297,7 @@ export default function CasesPage() {
               </div>
             ) : (
               <Row gutter={[16, 16]}>
-                {filteredCases.map((caseData) => (
+                {cases.map((caseData) => (
                   <Col key={caseData.id} xs={24} sm={12} md={8} lg={6}>
                     <CaseCard caseData={caseData} />
                   </Col>

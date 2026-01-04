@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { CaseStatus, Prisma, Priority } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import { analyzeCaseWithAI } from '@/lib/openai';
@@ -30,28 +31,60 @@ export async function GET(request: NextRequest) {
     // Check if minimal data is requested (for list views)
     const url = new URL(request.url);
     const minimal = url.searchParams.get('minimal') === 'true';
+    const page = Math.max(parseInt(url.searchParams.get('page') || '1', 10), 1);
+    const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '20', 10), 1), 100);
+    const skip = (page - 1) * limit;
+    const search = url.searchParams.get('search');
+    const statusParam = url.searchParams.get('status');
+    const priorityParam = url.searchParams.get('priority');
+    const status = statusParam && Object.values(CaseStatus).includes(statusParam as CaseStatus)
+      ? (statusParam as CaseStatus)
+      : undefined;
+    const priority = priorityParam && Object.values(Priority).includes(priorityParam as Priority)
+      ? (priorityParam as Priority)
+      : undefined;
+
+    const listFilter = {
+      ...caseFilter,
+      ...(status ? { status } : {}),
+      ...(priority ? { priority } : {}),
+      ...(search
+        ? {
+            OR: [
+              { caseNumber: { contains: search, mode: Prisma.QueryMode.insensitive } },
+              { caseTitle: { contains: search, mode: Prisma.QueryMode.insensitive } },
+              { clientName: { contains: search, mode: Prisma.QueryMode.insensitive } },
+            ],
+          }
+        : {}),
+    };
 
     if (minimal) {
       // Optimized query for list view - only essential fields
-      const cases = await prisma.case.findMany({
-        where: caseFilter,
-        select: {
-          id: true,
-          caseNumber: true,
-          caseTitle: true,
-          clientName: true,
-          status: true,
-          priority: true,
-          courtName: true,
-          createdAt: true,
-          _count: {
-            select: { Hearing: true },
+      const [cases, total] = await Promise.all([
+        prisma.case.findMany({
+          where: listFilter,
+          select: {
+            id: true,
+            caseNumber: true,
+            caseTitle: true,
+            clientName: true,
+            status: true,
+            priority: true,
+            courtName: true,
+            createdAt: true,
+            _count: {
+              select: { Hearing: true },
+            },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        prisma.case.count({ where: listFilter }),
+      ]);
 
-      return NextResponse.json(cases, {
+      return NextResponse.json({ data: cases, page, limit, total }, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
@@ -61,30 +94,35 @@ export async function GET(request: NextRequest) {
     }
 
     // Full data for detail views
-    const cases = await prisma.case.findMany({
-      where: caseFilter,
-      include: {
-        User: {
-          select: { id: true, name: true, email: true },
-        },
-        Hearing: {
-          orderBy: { hearingDate: 'desc' },
-          take: 10,
-        },
-        FileDocument: true,
-        AISummary: true,
-        assignments: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true },
+    const [cases, total] = await Promise.all([
+      prisma.case.findMany({
+        where: listFilter,
+        include: {
+          User: {
+            select: { id: true, name: true, email: true },
+          },
+          Hearing: {
+            orderBy: { hearingDate: 'desc' },
+            take: 10,
+          },
+          FileDocument: true,
+          AISummary: true,
+          assignments: {
+            include: {
+              user: {
+                select: { id: true, name: true, email: true },
+              },
             },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.case.count({ where: listFilter }),
+    ]);
 
-    return NextResponse.json(cases, {
+    return NextResponse.json({ data: cases, page, limit, total }, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
@@ -104,22 +142,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    console.log('[POST /api/cases] Authorization header:', authHeader?.substring(0, 30));
-
     const token = authHeader?.replace('Bearer ', '');
-    console.log('[POST /api/cases] Extracted token (first 20 chars):', token?.substring(0, 20));
-    console.log('[POST /api/cases] Token length:', token?.length);
 
     if (!token) {
-      console.log('[POST /api/cases] No token provided');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await verifyToken(token);
-    console.log('[POST /api/cases] User after verification:', user?.email);
 
     if (!user || !user.firmId) {
-      console.log('[POST /api/cases] User verification failed or no firmId');
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
