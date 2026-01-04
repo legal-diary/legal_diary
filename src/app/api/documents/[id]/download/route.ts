@@ -4,6 +4,7 @@ import { verifyToken } from '@/lib/middleware';
 import { getAuthToken } from '@/lib/authToken';
 import { resolveStoredPath } from '@/lib/uploads';
 import fs from 'fs';
+import { Readable } from 'stream';
 
 export async function GET(
   request: NextRequest,
@@ -38,17 +39,25 @@ export async function GET(
     }
 
     const filePath = resolveStoredPath(document.fileUrl);
-    if (!fs.existsSync(filePath)) {
+    let fileStat: fs.Stats;
+    try {
+      fileStat = await fs.promises.stat(filePath);
+      if (!fileStat.isFile()) {
+        return NextResponse.json({ error: 'File not found on disk' }, { status: 404 });
+      }
+    } catch {
       return NextResponse.json({ error: 'File not found on disk' }, { status: 404 });
     }
 
-    const fileBuffer = fs.readFileSync(filePath);
+    const fileStream = fs.createReadStream(filePath);
+    const body = Readable.toWeb(fileStream);
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(body, {
       headers: {
         'Content-Type': document.fileType,
         'Content-Disposition': `inline; filename="${encodeURIComponent(document.fileName)}"`,
         'Cache-Control': 'no-store',
+        'Content-Length': fileStat.size.toString(),
       },
     });
   } catch (error) {
