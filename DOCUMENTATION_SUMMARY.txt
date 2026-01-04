@@ -197,7 +197,7 @@ FOR PROJECT INFORMATION:
 SECURITY ISSUE - IMMEDIATE ACTION REQUIRED
 
 OpenAI API Key Exposed:
-  Key: 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
+  Key: <redacted>
 
 Actions Required:
   1. Revoke this key in OpenAI dashboard IMMEDIATELY

@@ -5,6 +5,7 @@ import { Calendar, Card, Tag, List, Empty, Form, Input, DatePicker, Select, Butt
 import { CalendarOutlined, FileTextOutlined, CheckCircleOutlined, SyncOutlined, CloudOutlined, GoogleOutlined, ClockCircleOutlined, ExclamationCircleOutlined, LinkOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAuth } from '@/context/AuthContext';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 import { CalendarSkeleton, shimmerStyles, SectionLoader } from '@/components/Skeletons';
 import { getDayStatus } from '@/data/bangaloreCourtHolidays2026';
 import GoogleCalendarConnect from '@/components/GoogleCalendar/GoogleCalendarConnect';
@@ -113,6 +114,7 @@ interface GoogleCalendarStatus {
 
 export default function HearingCalendar() {
   const { token } = useAuth();
+  const authHeaders = buildAuthHeaders(token);
   const [hearings, setHearings] = useState<Hearing[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,17 +143,15 @@ export default function HearingCalendar() {
 
   // Optimized single API call to fetch both hearings and cases
   const fetchCalendarData = useCallback(async () => {
-    if (!token) return;
-
     setLoading(true);
     try {
       // Parallel fetch for hearings and cases
       const [hearingsRes, casesRes] = await Promise.all([
         fetch('/api/hearings?calendar=true', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders,
         }),
         fetch('/api/cases?minimal=true', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders,
         }),
       ]);
 
@@ -169,15 +169,13 @@ export default function HearingCalendar() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [authHeaders]);
 
   // Fetch Google Calendar status
   const fetchGoogleStatus = useCallback(async () => {
-    if (!token) return;
-
     try {
       const response = await fetch('/api/google/status', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
 
       if (response.ok) {
@@ -188,17 +186,15 @@ export default function HearingCalendar() {
     } catch (error) {
       console.error('Failed to fetch Google Calendar status:', error);
     }
-  }, [token]);
+  }, [authHeaders]);
 
   // Sync all hearings to Google Calendar
   const handleSyncAll = useCallback(async () => {
-    if (!token) return;
-
     setSyncing(true);
     try {
       const response = await fetch('/api/google/calendar/sync', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
 
       if (response.ok) {
@@ -213,22 +209,20 @@ export default function HearingCalendar() {
         message.error('Sync failed');
       }
     } catch (error) {
-      console.error('Sync error:', error);
+      console.error('Sync error');
       message.error('Sync failed');
     } finally {
       setSyncing(false);
     }
-  }, [token, fetchGoogleStatus, fetchCalendarData]);
+  }, [authHeaders, fetchGoogleStatus, fetchCalendarData]);
 
   // Sync individual hearing to Google Calendar
   const handleSyncHearing = useCallback(async (hearingId: string) => {
-    if (!token) return;
-
     setSyncingHearingId(hearingId);
     try {
       const response = await fetch(`/api/google/calendar/sync/${hearingId}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
 
       if (response.ok) {
@@ -240,12 +234,12 @@ export default function HearingCalendar() {
         message.error(error.error || 'Failed to sync hearing');
       }
     } catch (error) {
-      console.error('Sync error:', error);
+      console.error('Sync error');
       message.error('Failed to sync hearing');
     } finally {
       setSyncingHearingId(null);
     }
-  }, [token, fetchCalendarData, fetchGoogleStatus]);
+  }, [authHeaders, fetchCalendarData, fetchGoogleStatus]);
 
   // Handle edit hearing
   const handleEditHearing = useCallback((hearing: Hearing) => {
@@ -275,7 +269,7 @@ export default function HearingCalendar() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify({
           hearingDate: values.hearingDate.toISOString(),
@@ -306,7 +300,7 @@ export default function HearingCalendar() {
     } finally {
       setSubmitting(false);
     }
-  }, [token, editingHearing, form, fetchCalendarData]);
+  }, [authHeaders, editingHearing, form, fetchCalendarData]);
 
   // Handle delete hearing
   const handleDeleteHearing = useCallback(async (hearingId: string) => {
@@ -314,9 +308,7 @@ export default function HearingCalendar() {
     try {
       const response = await fetch(`/api/hearings/${hearingId}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders,
       });
 
       if (response.ok) {
@@ -336,14 +328,12 @@ export default function HearingCalendar() {
     } finally {
       setDeleting(false);
     }
-  }, [token, fetchCalendarData]);
+  }, [authHeaders, fetchCalendarData]);
 
   useEffect(() => {
-    if (token) {
-      fetchCalendarData();
-      fetchGoogleStatus();
-    }
-  }, [token, fetchCalendarData, fetchGoogleStatus]);
+    fetchCalendarData();
+    fetchGoogleStatus();
+  }, [fetchCalendarData, fetchGoogleStatus]);
 
   // Memoized hearings grouped by date for fast lookup
   const hearingsByDate = useMemo(() => {
@@ -493,7 +483,7 @@ export default function HearingCalendar() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+            ...authHeaders,
           },
           body: JSON.stringify({
             caseId: selectedCaseId,
@@ -524,7 +514,7 @@ export default function HearingCalendar() {
         setSubmitting(false);
       }
     },
-    [token, selectedCaseId, form, fetchCalendarData]
+    [authHeaders, selectedCaseId, form, fetchCalendarData]
   );
 
   // Handle modal open with pre-filled date

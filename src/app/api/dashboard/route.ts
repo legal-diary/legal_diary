@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
 import dayjs from 'dayjs';
 
 // Optimized dashboard endpoint - returns all data in ONE call
 // with minimal fields for maximum performance
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -178,12 +178,11 @@ export async function GET(request: NextRequest) {
       cases: casesMinimal,
     });
 
-    // Add cache headers for performance
-    response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    response.headers.set('Cache-Control', 'no-store');
 
     return response;
   } catch (error) {
-    console.error('Error fetching dashboard data:', error);
+    console.error('Error fetching dashboard data');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

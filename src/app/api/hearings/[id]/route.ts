@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
 import {
   updateCalendarEvent,
   deleteCalendarEvent,
@@ -14,8 +15,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -49,7 +49,7 @@ export async function GET(
 
     return NextResponse.json(hearing);
   } catch (error) {
-    console.error('Error fetching hearing:', error);
+    console.error('Error fetching hearing');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -64,8 +64,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -93,6 +92,13 @@ export async function PUT(
       return NextResponse.json({ error: 'Hearing not found' }, { status: 404 });
     }
 
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+
     const {
       hearingDate,
       hearingTime,
@@ -100,7 +106,7 @@ export async function PUT(
       courtRoom,
       notes,
       status,
-    } = await request.json();
+    } = body;
 
     const updatedHearing = await prisma.hearing.update({
       where: { id },
@@ -139,15 +145,15 @@ export async function PUT(
           courtRoom: updatedHearing.courtRoom,
           notes: updatedHearing.notes,
         });
-        console.log('[Hearings] Updated Google Calendar event:', updatedHearing.id);
+        console.log('[Hearings] Updated Google Calendar event');
       }
     } catch (googleError) {
-      console.error('[Hearings] Google Calendar update failed:', googleError);
+      console.error('[Hearings] Google Calendar update failed');
     }
 
     return NextResponse.json(updatedHearing);
   } catch (error) {
-    console.error('Error updating hearing:', error);
+    console.error('Error updating hearing');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -162,8 +168,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -196,10 +201,10 @@ export async function DELETE(
       const googleConnected = await isGoogleCalendarConnected(user.id);
       if (googleConnected) {
         await deleteCalendarEvent(user.id, id);
-        console.log('[Hearings] Deleted Google Calendar event:', id);
+        console.log('[Hearings] Deleted Google Calendar event');
       }
     } catch (googleError) {
-      console.error('[Hearings] Google Calendar delete failed:', googleError);
+      console.error('[Hearings] Google Calendar delete failed');
     }
 
     await prisma.hearing.delete({
@@ -208,7 +213,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Hearing deleted successfully' });
   } catch (error) {
-    console.error('Error deleting hearing:', error);
+    console.error('Error deleting hearing');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -11,6 +11,7 @@ import {
   FileWordOutlined,
 } from '@ant-design/icons';
 import mammoth from 'mammoth';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 
 interface DocumentViewerProps {
   visible: boolean;
@@ -22,7 +23,7 @@ interface DocumentViewerProps {
     fileType: string;
     fileSize: number;
   } | null;
-  token: string;
+  token?: string | null;
 }
 
 type FileCategory = 'pdf' | 'image' | 'text' | 'docx' | 'doc' | 'excel' | 'unsupported';
@@ -38,6 +39,8 @@ export default function DocumentViewer({
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fullScreen, setFullScreen] = useState(false);
+  const downloadUrl = document ? `/api/documents/${document.id}/download` : '';
+  const authHeaders = buildAuthHeaders(token);
 
   // Determine file category based on MIME type
   const getFileCategory = (fileType: string): FileCategory => {
@@ -70,7 +73,7 @@ export default function DocumentViewer({
     if (category === 'text') {
       // Fetch text content from API
       fetch(`/api/documents/${document.id}/content`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       })
         .then((res) => res.json())
         .then((data) => {
@@ -84,7 +87,7 @@ export default function DocumentViewer({
         .finally(() => setLoading(false));
     } else if (category === 'docx') {
       // Fetch and convert DOCX using mammoth.js
-      fetch(document.fileUrl)
+      fetch(downloadUrl)
         .then((res) => {
           if (!res.ok) throw new Error('Failed to fetch document');
           return res.arrayBuffer();
@@ -94,11 +97,11 @@ export default function DocumentViewer({
           setDocxHtml(result.value);
           // Log any conversion warnings
           if (result.messages.length > 0) {
-            console.warn('Mammoth conversion warnings:', result.messages);
+            console.warn('Mammoth conversion warnings');
           }
         })
-        .catch((err) => {
-          console.error('DOCX conversion error:', err);
+        .catch(() => {
+          console.error('DOCX conversion error');
           setError('Failed to load Word document');
         })
         .finally(() => setLoading(false));
@@ -150,7 +153,7 @@ export default function DocumentViewer({
       case 'pdf':
         return (
           <iframe
-            src={document.fileUrl}
+            src={downloadUrl}
             style={{
               width: '100%',
               height: fullScreen ? '85vh' : '70vh',
@@ -171,7 +174,7 @@ export default function DocumentViewer({
             }}
           >
             <img
-              src={document.fileUrl}
+              src={downloadUrl}
               alt={document.fileName}
               style={{
                 maxWidth: '100%',
@@ -241,7 +244,7 @@ export default function DocumentViewer({
             <Button
               type="primary"
               icon={<DownloadOutlined />}
-              href={document.fileUrl}
+              href={downloadUrl}
               target="_blank"
             >
               Download to View
@@ -268,7 +271,7 @@ export default function DocumentViewer({
             <Button
               type="primary"
               icon={<DownloadOutlined />}
-              href={document.fileUrl}
+              href={downloadUrl}
               target="_blank"
             >
               Download to View
@@ -290,7 +293,7 @@ export default function DocumentViewer({
             <Button
               type="primary"
               icon={<DownloadOutlined />}
-              href={document.fileUrl}
+              href={downloadUrl}
               target="_blank"
             >
               Download to View
@@ -322,7 +325,7 @@ export default function DocumentViewer({
           <Button
             type="primary"
             icon={<DownloadOutlined />}
-            href={document.fileUrl}
+            href={downloadUrl}
             target="_blank"
           >
             Download

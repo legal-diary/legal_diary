@@ -38,6 +38,7 @@ import AIAnalysisTab from '@/components/Cases/AIAnalysisTab';
 import CaseAssignment from '@/components/Cases/CaseAssignment';
 import DocumentViewer from '@/components/Documents/DocumentViewer';
 import { useAuth } from '@/context/AuthContext';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 import { useParams, useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import Link from 'next/link';
@@ -109,6 +110,7 @@ export default function CaseDetailPage() {
   const params = useParams();
   const caseId = params.id as string;
   const router = useRouter();
+  const authHeaders = buildAuthHeaders(token);
 
   // Check if user is admin
   const isAdmin = user?.role === 'ADMIN';
@@ -132,12 +134,12 @@ export default function CaseDetailPage() {
 
   // Fetch case details
   const fetchCaseDetail = useCallback(async () => {
-    if (!token || !caseId) return;
+    if (!caseId) return;
 
     setLoading(true);
     try {
       const response = await fetch(`/api/cases/${caseId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
       if (response.ok) {
         const data = await response.json();
@@ -150,13 +152,13 @@ export default function CaseDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, caseId]);
+  }, [authHeaders, caseId]);
 
   useEffect(() => {
-    if (token && caseId) {
+    if (caseId) {
       fetchCaseDetail();
     }
-  }, [token, caseId, fetchCaseDetail]);
+  }, [caseId, fetchCaseDetail]);
 
   // Memoized handlers
   const handleAIQuickAction = useCallback(async (action: string) => {
@@ -168,7 +170,7 @@ export default function CaseDetailPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
       });
 
@@ -184,7 +186,7 @@ export default function CaseDetailPage() {
     } finally {
       setAiLoading(false);
     }
-  }, [caseId, token, fetchCaseDetail]);
+  }, [caseId, authHeaders, fetchCaseDetail]);
 
   const handleViewDocument = useCallback((record: any) => {
     setSelectedDocument(record);
@@ -213,7 +215,7 @@ export default function CaseDetailPage() {
 
       const response = await fetch(`/api/cases/${caseId}/upload`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
         body: formData,
       });
 
@@ -232,7 +234,7 @@ export default function CaseDetailPage() {
     } finally {
       setUploading(false);
     }
-  }, [uploadedFiles, caseId, token, fetchCaseDetail]);
+  }, [uploadedFiles, caseId, authHeaders, fetchCaseDetail]);
 
   const handleHearingSubmit = useCallback(async (values: any) => {
     try {
@@ -240,7 +242,7 @@ export default function CaseDetailPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify({
           caseId,
@@ -260,7 +262,7 @@ export default function CaseDetailPage() {
     } catch {
       message.error('Failed to schedule hearing');
     }
-  }, [caseId, token, form, fetchCaseDetail]);
+  }, [caseId, authHeaders, form, fetchCaseDetail]);
 
   const handleEditOpen = useCallback(() => {
     if (caseData) {
@@ -286,7 +288,7 @@ export default function CaseDetailPage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify({
           ...values,
@@ -307,7 +309,7 @@ export default function CaseDetailPage() {
     } catch {
       message.error('Failed to update case');
     }
-  }, [caseId, token, documentsToDelete, fetchCaseDetail]);
+  }, [caseId, authHeaders, documentsToDelete, fetchCaseDetail]);
 
   const handleDelete = useCallback(() => {
     setDeleteConfirmOpen(true);
@@ -318,7 +320,7 @@ export default function CaseDetailPage() {
     try {
       const response = await fetch(`/api/cases/${caseId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
 
       if (response.ok) {
@@ -334,7 +336,7 @@ export default function CaseDetailPage() {
     } finally {
       setDeleting(false);
     }
-  }, [caseId, token, router]);
+  }, [caseId, authHeaders, router]);
 
   // Memoized table columns
   const hearingColumns = useMemo(() => [
@@ -393,7 +395,7 @@ export default function CaseDetailPage() {
           >
             View
           </Button>
-          <a href={record.fileUrl} target="_blank" rel="noopener noreferrer">
+          <a href={`/api/documents/${record.id}/download`} target="_blank" rel="noopener noreferrer">
             <Button icon={<DownloadOutlined />} size="small" type="link">
               Download
             </Button>

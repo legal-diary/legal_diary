@@ -3,10 +3,11 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input, Button, message, Alert } from 'antd';
 import { LockOutlined, GoogleOutlined } from '@ant-design/icons';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 
 interface SetPasswordModalProps {
   open: boolean;
-  token: string;
+  token?: string | null;
   onSuccess: () => void;
   onSkip: () => void;
 }
@@ -19,6 +20,7 @@ export default function SetPasswordModal({
 }: SetPasswordModalProps) {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
+  const authHeaders = buildAuthHeaders(token);
 
   const handleSubmit = async (values: any) => {
     setSubmitting(true);
@@ -27,7 +29,7 @@ export default function SetPasswordModal({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify({
           newPassword: values.newPassword,

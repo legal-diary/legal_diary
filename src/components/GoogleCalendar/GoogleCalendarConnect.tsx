@@ -10,6 +10,7 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/context/AuthContext';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 
 interface GoogleCalendarStatus {
   connected: boolean;
@@ -29,17 +30,16 @@ export default function GoogleCalendarConnect({
   onStatusChange,
 }: GoogleCalendarConnectProps) {
   const { token } = useAuth();
+  const authHeaders = buildAuthHeaders(token);
   const [status, setStatus] = useState<GoogleCalendarStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
   const fetchStatus = useCallback(async () => {
-    if (!token) return;
-
     try {
       const response = await fetch('/api/google/status', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
 
       if (response.ok) {
@@ -48,11 +48,11 @@ export default function GoogleCalendarConnect({
         onStatusChange?.(data.connected);
       }
     } catch (error) {
-      console.error('Failed to fetch Google Calendar status:', error);
+      console.error('Failed to fetch Google Calendar status');
     } finally {
       setLoading(false);
     }
-  }, [token, onStatusChange]);
+  }, [authHeaders, onStatusChange]);
 
   useEffect(() => {
     fetchStatus();
@@ -76,12 +76,10 @@ export default function GoogleCalendarConnect({
   }, [fetchStatus]);
 
   const handleConnect = async () => {
-    if (!token) return;
-
     setConnecting(true);
     try {
       const response = await fetch('/api/google/auth', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
 
       if (response.ok) {
@@ -92,7 +90,7 @@ export default function GoogleCalendarConnect({
         message.error('Failed to initiate Google connection');
       }
     } catch (error) {
-      console.error('Connect error:', error);
+      console.error('Connect error');
       message.error('Failed to connect to Google');
     } finally {
       setConnecting(false);
@@ -100,12 +98,10 @@ export default function GoogleCalendarConnect({
   };
 
   const handleDisconnect = async () => {
-    if (!token) return;
-
     try {
       const response = await fetch('/api/google/disconnect', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
 
       if (response.ok) {
@@ -116,19 +112,17 @@ export default function GoogleCalendarConnect({
         message.error('Failed to disconnect');
       }
     } catch (error) {
-      console.error('Disconnect error:', error);
+      console.error('Disconnect error');
       message.error('Failed to disconnect');
     }
   };
 
   const handleSync = async () => {
-    if (!token) return;
-
     setSyncing(true);
     try {
       const response = await fetch('/api/google/calendar/sync', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
 
       if (response.ok) {
@@ -142,7 +136,7 @@ export default function GoogleCalendarConnect({
         message.error('Sync failed');
       }
     } catch (error) {
-      console.error('Sync error:', error);
+      console.error('Sync error');
       message.error('Sync failed');
     } finally {
       setSyncing(false);

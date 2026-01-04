@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
+import { resolveStoredPath } from '@/lib/uploads';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { analyzeCaseWithAI } from '@/lib/openai';
 import { safeExtractFileContent } from '@/lib/fileProcessor';
-import path from 'path';
+
+const MAX_AI_DOCUMENT_CHARS = 120000;
 
 export async function POST(
   request: NextRequest,
@@ -11,24 +15,24 @@ export async function POST(
 ) {
   try {
     const { id: caseId } = await params;
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    console.log('[POST /api/cases/[id]/ai/reanalyze] Authorization header:', authHeader?.substring(0, 30));
-    console.log('[POST /api/cases/[id]/ai/reanalyze] Token:', token?.substring(0, 20));
-    console.log('[POST /api/cases/[id]/ai/reanalyze] Case ID:', caseId);
+    const token = getAuthToken(request);
 
     if (!token) {
-      console.log('[POST /api/cases/[id]/ai/reanalyze] No token provided');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await verifyToken(token);
-    console.log('[POST /api/cases/[id]/ai/reanalyze] User verified:', user?.email);
 
     if (!user || !user.firmId) {
-      console.log('[POST /api/cases/[id]/ai/reanalyze] Invalid user or no firmId');
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const rateLimit = checkRateLimit(`ai-reanalyze:${user.id}`, 6, 10 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many AI requests. Please try again later.', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
     }
 
     // Role-based case access verification
@@ -53,11 +57,19 @@ export async function POST(
 
     // Extract document contents
     const documents = [];
+    let totalChars = 0;
     for (const doc of caseRecord.FileDocument) {
-      const filePath = path.join(process.cwd(), 'public', doc.fileUrl.replace(/^\//, ''));
+      const filePath = resolveStoredPath(doc.fileUrl);
       const extraction = await safeExtractFileContent(filePath, doc.fileType);
 
       if (extraction.success && extraction.content) {
+        totalChars += extraction.content.length;
+        if (totalChars > MAX_AI_DOCUMENT_CHARS) {
+          return NextResponse.json(
+            { error: 'Document content exceeds analysis limits. Please analyze fewer documents.' },
+            { status: 400 }
+          );
+        }
         documents.push({
           fileName: doc.fileName,
           content: extraction.content,
@@ -66,9 +78,6 @@ export async function POST(
     }
 
     // Perform analysis with documents
-    console.log('[POST /api/cases/[id]/ai/reanalyze] Starting AI analysis with', documents.length, 'documents');
-    console.log('[POST /api/cases/[id]/ai/reanalyze] Case title:', caseRecord.caseTitle);
-
     let analysis;
     try {
       analysis = await analyzeCaseWithAI({
@@ -76,10 +85,8 @@ export async function POST(
         caseDescription: caseRecord.description || '',
         documents: documents.length > 0 ? documents : undefined,
       });
-      console.log('[POST /api/cases/[id]/ai/reanalyze] Analysis successful');
-      console.log('[POST /api/cases/[id]/ai/reanalyze] Summary:', analysis.summary.substring(0, 100));
     } catch (analysisError) {
-      console.error('[POST /api/cases/[id]/ai/reanalyze] OpenAI Analysis Error:', analysisError);
+      console.error('[POST /api/cases/[id]/ai/reanalyze] OpenAI Analysis Error');
       throw analysisError;
     }
 
@@ -113,7 +120,7 @@ export async function POST(
       documentsAnalyzed: documents.length,
     });
   } catch (error) {
-    console.error('Error re-analyzing case:', error);
+    console.error('Error re-analyzing case');
     return NextResponse.json(
       { error: 'Failed to re-analyze case', details: error instanceof Error ? error.message : '' },
       { status: 500 }

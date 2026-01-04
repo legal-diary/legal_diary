@@ -35,6 +35,7 @@ import {
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/context/AuthContext';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 import Link from 'next/link';
 import dayjs from 'dayjs';
 import {
@@ -487,6 +488,7 @@ TodayScheduleTable.displayName = 'TodayScheduleTable';
 // Main Dashboard Component
 export default function DashboardPage() {
   const { token, user } = useAuth();
+  const authHeaders = buildAuthHeaders(token);
 
   // Separate loading states for incremental loading
   const [headerLoading, setHeaderLoading] = useState(true);
@@ -507,12 +509,10 @@ export default function DashboardPage() {
 
   // Fetch all dashboard data with a single optimized API call
   const fetchDashboardData = useCallback(async () => {
-    if (!token) return;
-
     try {
       const response = await fetch('/api/dashboard', {
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
           'Cache-Control': 'no-cache',
         },
       });
@@ -545,14 +545,14 @@ export default function DashboardPage() {
       setTodayLoading(false);
       setUpcomingLoading(false);
     }
-  }, [token]);
+  }, [authHeaders]);
 
   // Initial data fetch
   useEffect(() => {
-    if (token && user) {
+    if (user) {
       fetchDashboardData();
     }
-  }, [token, user, fetchDashboardData]);
+  }, [user, fetchDashboardData]);
 
   // Memoized handlers
   const handleAddHearing = useCallback(() => {
@@ -583,7 +583,7 @@ export default function DashboardPage() {
       try {
         const response = await fetch(`/api/hearings/${hearingId}`, {
           method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders,
         });
         if (response.ok) {
           message.success('Hearing deleted successfully');
@@ -597,7 +597,7 @@ export default function DashboardPage() {
         message.error('Failed to delete hearing');
       }
     },
-    [token, fetchDashboardData]
+    [authHeaders, fetchDashboardData]
   );
 
   const handleSubmit = useCallback(
@@ -621,7 +621,7 @@ export default function DashboardPage() {
           method,
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+            ...authHeaders,
           },
           body: JSON.stringify(payload),
         });
@@ -644,7 +644,7 @@ export default function DashboardPage() {
         setSubmitting(false);
       }
     },
-    [editingHearing, token, form, fetchDashboardData]
+    [editingHearing, authHeaders, form, fetchDashboardData]
   );
 
   const handleModalClose = useCallback(() => {

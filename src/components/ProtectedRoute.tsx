@@ -13,15 +13,22 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Check if token exists in localStorage
-    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+    const checkSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        if (response.ok) {
+          setIsAuthenticated(true);
+        } else {
+          router.push('/login');
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        router.push('/login');
+        setIsAuthenticated(false);
+      }
+    };
 
-    if (!token) {
-      router.push('/login');
-      setIsAuthenticated(false);
-    } else {
-      setIsAuthenticated(true);
-    }
+    checkSession();
   }, [router]);
 
   // Show loading spinner while checking authentication

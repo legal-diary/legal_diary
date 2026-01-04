@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/middleware';
 import { disconnectGoogleCalendar } from '@/lib/googleCalendar';
+import { getAuthToken } from '@/lib/authToken';
 
 /**
  * POST /api/google/disconnect
@@ -8,8 +9,7 @@ import { disconnectGoogleCalendar } from '@/lib/googleCalendar';
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -22,14 +22,12 @@ export async function POST(request: NextRequest) {
 
     await disconnectGoogleCalendar(user.id);
 
-    console.log('[Google Disconnect] Successfully disconnected for user:', user.id);
-
     return NextResponse.json({
       success: true,
       message: 'Google Calendar disconnected successfully',
     });
   } catch (error) {
-    console.error('[Google Disconnect] Error:', error);
+    console.error('[Google Disconnect] Error');
     return NextResponse.json(
       { error: 'Failed to disconnect Google Calendar' },
       { status: 500 }

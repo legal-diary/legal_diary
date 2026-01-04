@@ -34,7 +34,7 @@
 
 **ISSUE:** OpenAI API key is exposed in `.env.local` file
 **LOCATION:** Root directory `.env.local`
-**KEY:** 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
+**KEY:** <redacted>
 
 **IMMEDIATE ACTIONS:**
 1. Revoke this key in OpenAI dashboard
@@ -290,4 +290,3 @@ If type errors = Fix TypeScript issues first
 
 **This context file updates when work is completed on the project.**
 **Refer back to this file when starting new development sessions.**
-

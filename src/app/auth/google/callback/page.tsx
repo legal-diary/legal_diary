@@ -48,27 +48,9 @@ export default function GoogleCallbackPage() {
           throw new Error(data.error || 'Authentication failed');
         }
 
-        // Store auth data in localStorage
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('tokenExpiresAt', data.expiresAt);
-
-        // Store flags for the app to handle
-        if (data.needsFirmSetup) {
-          localStorage.setItem('needsFirmSetup', 'true');
-        }
-        if (data.needsPasswordSetup) {
-          localStorage.setItem('needsPasswordSetup', 'true');
-        }
-        if (data.googleCalendarConnected) {
-          localStorage.setItem('googleCalendarConnected', 'true');
-        }
-
-        // Redirect to dashboard (AuthContext will pick up the data)
-        // Use window.location for a full page reload to ensure AuthContext loads fresh
+        // Redirect to dashboard (AuthContext will load session from cookie)
         window.location.href = '/dashboard';
       } catch (err) {
-        console.error('Google callback error:', err);
         setError(err instanceof Error ? err.message : 'Authentication failed');
         setIsProcessing(false);
       }

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
 import dayjs from 'dayjs';
 
 // GET today's hearings for the legal referencer dashboard (role-based filtering)
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       totalCount: processedHearings.length,
     });
   } catch (error) {
-    console.error('Error fetching today\'s hearings:', error);
+    console.error('Error fetching today\'s hearings');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
+import { resolveStoredPath } from '@/lib/uploads';
 import fs from 'fs';
-import path from 'path';
 
 // Allowed fields for case updates (whitelist approach)
 const ALLOWED_UPDATE_FIELDS = [
@@ -27,8 +27,7 @@ export async function GET(
   try {
     const { id: caseId } = await params;
 
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -72,7 +71,7 @@ export async function GET(
 
     return NextResponse.json(caseRecord);
   } catch (error) {
-    console.error('Error fetching case:', error);
+    console.error('Error fetching case');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -88,8 +87,7 @@ export async function PUT(
   try {
     const { id: caseId } = await params;
 
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -118,7 +116,15 @@ export async function PUT(
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    const updates = await request.json();
+    let updates;
+    try {
+      updates = await request.json();
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
 
     // Extract document IDs to delete (not part of case update)
     const documentsToDelete = updates.documentsToDelete || [];
@@ -144,12 +150,12 @@ export async function PUT(
 
       for (const doc of docsToDelete) {
         try {
-          const filePath = path.join(process.cwd(), 'public', doc.fileUrl.replace(/^\//, ''));
+          const filePath = resolveStoredPath(doc.fileUrl);
           if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
           }
         } catch (err) {
-          console.error(`Failed to delete file ${doc.fileUrl}:`, err);
+          console.error('Failed to delete file for document');
         }
       }
 
@@ -213,7 +219,7 @@ export async function PUT(
 
     return NextResponse.json(updatedCase);
   } catch (error) {
-    console.error('Error updating case:', error);
+    console.error('Error updating case');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -229,8 +235,7 @@ export async function DELETE(
   try {
     const { id: caseId } = await params;
 
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -268,7 +273,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Case deleted successfully' }, { status: 200 });
   } catch (error) {
-    console.error('Error deleting case:', error);
+    console.error('Error deleting case');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -14,7 +14,7 @@
 
 - [ ] **API Key Rotation**
   - [ ] Open OpenAI dashboard
-  - [ ] Revoke current key: `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`
+  - [ ] Revoke current key: `<redacted>`
   - [ ] Generate new API key
   - [ ] Update `.env.local` with new key
   - [ ] Test OpenAI integration works
@@ -497,4 +497,3 @@ npx prisma studio    # Open GUI
 **Last Updated:** November 16, 2025
 **Checked By:** Claude Code
 **Next Review:** After Priority 1 completion
-

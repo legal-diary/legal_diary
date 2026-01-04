@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, withRetry } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
 
 /**
  * POST /api/auth/setup-firm
@@ -9,8 +10,7 @@ import { verifyToken } from '@/lib/middleware';
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -29,7 +29,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
     const { firmName, firmId } = body;
 
     // Validate that either firmName or firmId is provided
@@ -120,7 +125,7 @@ export async function POST(request: NextRequest) {
       user: userData,
     });
   } catch (error) {
-    console.error('[Setup Firm] Error:', error);
+    console.error('[Setup Firm] Error');
     return NextResponse.json(
       { error: 'Failed to set up firm' },
       { status: 500 }

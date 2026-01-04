@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/middleware';
 import { isGoogleCalendarConnected, getTokens } from '@/lib/googleCalendar';
 import { prisma } from '@/lib/prisma';
+import { getAuthToken } from '@/lib/authToken';
 
 /**
  * GET /api/google/status
@@ -10,8 +11,7 @@ import { prisma } from '@/lib/prisma';
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       failedCount,
     });
   } catch (error) {
-    console.error('[Google Status] Error:', error);
+    console.error('[Google Status] Error');
     return NextResponse.json(
       { error: 'Failed to get Google Calendar status' },
       { status: 500 }

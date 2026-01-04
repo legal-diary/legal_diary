@@ -17,6 +17,7 @@ import {
   Alert,
 } from 'antd';
 import { ThunderboltOutlined, LoadingOutlined } from '@ant-design/icons';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 
 interface FileDocument {
   id: string;
@@ -49,6 +50,7 @@ export default function AIAnalysisTab({
   token,
   onAnalysisComplete,
 }: AIAnalysisTabProps) {
+  const authHeaders = buildAuthHeaders(token);
   const [reanalyzeLoading, setReanalyzeLoading] = useState(false);
   const [documentAnalysisLoading, setDocumentAnalysisLoading] = useState(false);
   const [customAnalysisLoading, setCustomAnalysisLoading] = useState(false);
@@ -64,7 +66,7 @@ export default function AIAnalysisTab({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
       });
 
@@ -77,7 +79,6 @@ export default function AIAnalysisTab({
       }
     } catch (error) {
       message.error('Failed to re-analyze case');
-      console.error(error);
     } finally {
       setReanalyzeLoading(false);
     }
@@ -95,7 +96,7 @@ export default function AIAnalysisTab({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify({ documentIds: selectedDocuments }),
       });
@@ -110,7 +111,6 @@ export default function AIAnalysisTab({
       }
     } catch (error) {
       message.error('Failed to analyze documents');
-      console.error(error);
     } finally {
       setDocumentAnalysisLoading(false);
     }
@@ -128,7 +128,7 @@ export default function AIAnalysisTab({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify({
           prompt: customPrompt,
@@ -146,7 +146,6 @@ export default function AIAnalysisTab({
       }
     } catch (error) {
       message.error('Failed to perform analysis');
-      console.error(error);
     } finally {
       setCustomAnalysisLoading(false);
     }

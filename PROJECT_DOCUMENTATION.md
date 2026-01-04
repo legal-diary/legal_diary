@@ -1135,7 +1135,7 @@ enum ReminderStatus {
 **Problem:**
 API key is committed to repository and visible in file:
 ```
-OPENAI_API_KEY=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
+OPENAI_API_KEY=<redacted>
 ```
 
 **Immediate Actions:**
@@ -2257,4 +2257,3 @@ npx prisma migrate status    # Check migration status
 **Last Updated:** November 16, 2025
 **Document Version:** 1.0
 **Status:** Comprehensive Review Complete
-

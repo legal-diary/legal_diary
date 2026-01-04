@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Input, Select, Button, Divider, Spin, message } from 'antd';
 import { HomeOutlined } from '@ant-design/icons';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 
 interface Firm {
   id: string;
@@ -11,12 +12,13 @@ interface Firm {
 
 interface FirmSelectionModalProps {
   open: boolean;
-  token: string;
+  token?: string | null;
   onSuccess: (userData: any) => void;
 }
 
 export default function FirmSelectionModal({ open, token, onSuccess }: FirmSelectionModalProps) {
   const [form] = Form.useForm();
+  const authHeaders = buildAuthHeaders(token);
   const [firms, setFirms] = useState<Firm[]>([]);
   const [loadingFirms, setLoadingFirms] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -26,13 +28,15 @@ export default function FirmSelectionModal({ open, token, onSuccess }: FirmSelec
   useEffect(() => {
     const fetchFirms = async () => {
       try {
-        const response = await fetch('/api/firms');
+        const response = await fetch('/api/firms', {
+          headers: authHeaders,
+        });
         if (response.ok) {
           const data = await response.json();
           setFirms(data);
         }
       } catch (error) {
-        console.error('Error fetching firms:', error);
+        console.error('Error fetching firms');
       } finally {
         setLoadingFirms(false);
       }
@@ -64,7 +68,7 @@ export default function FirmSelectionModal({ open, token, onSuccess }: FirmSelec
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify(firmParam),
       });

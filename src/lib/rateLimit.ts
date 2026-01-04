@@ -14,6 +14,34 @@ const MAX_ATTEMPTS = 5; // Maximum login attempts
 const WINDOW_MS = 15 * 60 * 1000; // 15 minute window
 const LOCKOUT_MS = 60 * 60 * 1000; // 1 hour lockout
 
+interface GenericRateLimitRecord {
+  count: number;
+  resetTime: number;
+}
+
+const genericRateLimitStore = new Map<string, GenericRateLimitRecord>();
+
+export function checkRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number
+): { allowed: boolean; retryAfter: number } {
+  const now = Date.now();
+  const record = genericRateLimitStore.get(key);
+
+  if (!record || now > record.resetTime) {
+    genericRateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
+    return { allowed: true, retryAfter: 0 };
+  }
+
+  if (record.count >= limit) {
+    return { allowed: false, retryAfter: Math.ceil((record.resetTime - now) / 1000) };
+  }
+
+  record.count += 1;
+  return { allowed: true, retryAfter: 0 };
+}
+
 /**
  * Check if an email is currently rate limited
  */

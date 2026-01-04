@@ -22,6 +22,7 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 
 interface Member {
   id: string;
@@ -42,6 +43,7 @@ interface TeamManagementProps {
 }
 
 export default function TeamManagement({ token }: TeamManagementProps) {
+  const authHeaders = buildAuthHeaders(token);
   const [members, setMembers] = useState<Member[]>([]);
   const [firm, setFirm] = useState<Firm | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>('');
@@ -54,7 +56,7 @@ export default function TeamManagement({ token }: TeamManagementProps) {
     setLoading(true);
     try {
       const response = await fetch('/api/firms/members', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
 
       if (response.ok) {
@@ -69,11 +71,11 @@ export default function TeamManagement({ token }: TeamManagementProps) {
         message.error('Failed to load team members');
       }
     } catch (error) {
-      console.error('Error fetching members:', error);
+      console.error('Error fetching members');
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [authHeaders]);
 
   useEffect(() => {
     fetchMembers();
@@ -112,7 +114,7 @@ export default function TeamManagement({ token }: TeamManagementProps) {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
+              ...authHeaders,
             },
             body: JSON.stringify({ role: newRole }),
           });
@@ -164,7 +166,7 @@ export default function TeamManagement({ token }: TeamManagementProps) {
           const response = await fetch(`/api/firms/members/${userId}`, {
             method: 'DELETE',
             headers: {
-              Authorization: `Bearer ${token}`,
+              ...authHeaders,
             },
           });
 

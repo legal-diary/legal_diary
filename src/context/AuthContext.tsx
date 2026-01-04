@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import FirmSelectionModal from '@/components/Auth/FirmSelectionModal';
 import SetPasswordModal from '@/components/Auth/SetPasswordModal';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 
 interface User {
   id: string;
@@ -45,41 +46,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [needsFirmSetup, setNeedsFirmSetup] = useState(false);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
 
-  // Load user from localStorage on mount
+  // Load user from session cookie on mount
   useEffect(() => {
-    const savedToken = localStorage.getItem('authToken');
-    const savedUser = localStorage.getItem('user');
-    const savedExpiresAt = localStorage.getItem('tokenExpiresAt');
-    const firmSetupNeeded = localStorage.getItem('needsFirmSetup');
-    const passwordSetupNeeded = localStorage.getItem('needsPasswordSetup');
-
-    if (savedToken && savedUser) {
-      // Check if token has already expired
-      if (savedExpiresAt && isTokenExpiredLocal(savedExpiresAt)) {
-        // Token has expired, clear everything
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        localStorage.removeItem('tokenExpiresAt');
-        localStorage.removeItem('needsFirmSetup');
-        localStorage.removeItem('needsPasswordSetup');
-      } else {
-        setToken(savedToken);
-        const parsedUser = JSON.parse(savedUser);
-        setUser(parsedUser);
-        setExpiresAt(savedExpiresAt);
-
-        // Check if user needs firm setup (Google OAuth user without firm)
-        if (firmSetupNeeded === 'true' || !parsedUser.firmId) {
-          setNeedsFirmSetup(true);
+    const loadSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        if (!response.ok) {
+          setIsLoading(false);
+          return;
         }
 
-        // Check if user needs password setup (Google OAuth user without password)
-        if (passwordSetupNeeded === 'true') {
-          setNeedsPasswordSetup(true);
-        }
+        const data = await response.json();
+        setUser(data.user);
+        setExpiresAt(data.expiresAt);
+        setNeedsFirmSetup(!!data.needsFirmSetup || !data.user?.firmId);
+        setNeedsPasswordSetup(!!data.needsPasswordSetup);
+      } catch (error) {
+        // Ignore session load errors
+      } finally {
+        setIsLoading(false);
       }
-    }
-    setIsLoading(false);
+    };
+
+    loadSession();
   }, []);
 
   // Periodically check if token has expired (check every minute)
@@ -92,9 +81,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         setToken(null);
         setExpiresAt(null);
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        localStorage.removeItem('tokenExpiresAt');
       }
     }, 60 * 1000); // Check every minute
 
@@ -119,9 +105,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(data.token);
       setUser(data.user);
       setExpiresAt(data.expiresAt);
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      localStorage.setItem('tokenExpiresAt', data.expiresAt);
     } finally {
       setIsLoading(false);
     }
@@ -165,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await fetch('/api/auth/logout', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: buildAuthHeaders(token),
       });
 
       setUser(null);
@@ -173,9 +156,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setExpiresAt(null);
       setNeedsFirmSetup(false);
       setNeedsPasswordSetup(false);
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      localStorage.removeItem('tokenExpiresAt');
       localStorage.removeItem('needsFirmSetup');
       localStorage.removeItem('needsPasswordSetup');
       localStorage.removeItem('googleCalendarConnected');
@@ -191,7 +171,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Update user data (e.g., after firm setup)
   const updateUser = (userData: User) => {
     setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
     // Clear firm setup flag if user now has a firm
     if (userData.firmId) {
       setNeedsFirmSetup(false);
@@ -220,7 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{ user, token, login, register, logout, isLoading, isTokenExpired, needsFirmSetup, needsPasswordSetup, updateUser, setNeedsPasswordSetup }}>
       {children}
       {/* Show firm selection modal for Google OAuth users without firm */}
-      {token && needsFirmSetup && (
+      {needsFirmSetup && (
         <FirmSelectionModal
           open={needsFirmSetup}
           token={token}
@@ -228,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         />
       )}
       {/* Show password setup modal for Google OAuth users without password */}
-      {token && needsPasswordSetup && !needsFirmSetup && (
+      {needsPasswordSetup && !needsFirmSetup && (
         <SetPasswordModal
           open={needsPasswordSetup}
           token={token}

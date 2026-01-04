@@ -20,6 +20,7 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 
 interface Advocate {
   id: string;
@@ -54,6 +55,7 @@ export default function CaseAssignment({
   isAdmin,
   onAssignmentChange,
 }: CaseAssignmentProps) {
+  const authHeaders = buildAuthHeaders(token);
   const [advocates, setAdvocates] = useState<Advocate[]>([]);
   const [selectedAdvocates, setSelectedAdvocates] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,18 +69,18 @@ export default function CaseAssignment({
     setLoading(true);
     try {
       const response = await fetch('/api/firms/advocates', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
       if (response.ok) {
         const data = await response.json();
         setAdvocates(data);
       }
     } catch (error) {
-      console.error('Failed to fetch advocates:', error);
+      console.error('Failed to fetch advocates');
     } finally {
       setLoading(false);
     }
-  }, [token, isAdmin]);
+  }, [authHeaders, isAdmin]);
 
   useEffect(() => {
     fetchAdvocates();
@@ -105,7 +107,7 @@ export default function CaseAssignment({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify({ userIds: selectedAdvocates }),
       });
@@ -133,7 +135,7 @@ export default function CaseAssignment({
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify({ userIds: [userId] }),
       });

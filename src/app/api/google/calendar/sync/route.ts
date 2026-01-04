@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/middleware';
 import { syncAllHearings, isGoogleCalendarConnected } from '@/lib/googleCalendar';
+import { getAuthToken } from '@/lib/authToken';
 
 /**
  * POST /api/google/calendar/sync
@@ -8,8 +9,7 @@ import { syncAllHearings, isGoogleCalendarConnected } from '@/lib/googleCalendar
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -32,8 +32,6 @@ export async function POST(request: NextRequest) {
     // Sync all hearings
     const result = await syncAllHearings(user.id, user.firmId);
 
-    console.log('[Google Sync] Completed:', result);
-
     return NextResponse.json({
       success: true,
       synced: result.synced,
@@ -42,7 +40,7 @@ export async function POST(request: NextRequest) {
       message: `Synced ${result.synced} hearings, ${result.failed} failed`,
     });
   } catch (error) {
-    console.error('[Google Sync] Error:', error);
+    console.error('[Google Sync] Error');
     return NextResponse.json(
       { error: 'Failed to sync hearings' },
       { status: 500 }

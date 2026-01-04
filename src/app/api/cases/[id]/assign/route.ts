@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
 
 /**
  * POST /api/cases/[id]/assign
@@ -14,8 +15,7 @@ export async function POST(
   try {
     const { id: caseId } = await params;
 
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -34,7 +34,14 @@ export async function POST(
       );
     }
 
-    const { userIds } = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+
+    const { userIds } = body;
 
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return NextResponse.json(
@@ -111,7 +118,7 @@ export async function POST(
       case: updatedCase,
     });
   } catch (error) {
-    console.error('Error assigning advocates:', error);
+    console.error('Error assigning advocates');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -131,8 +138,7 @@ export async function DELETE(
   try {
     const { id: caseId } = await params;
 
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -151,7 +157,14 @@ export async function DELETE(
       );
     }
 
-    const { userIds } = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+
+    const { userIds } = body;
 
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return NextResponse.json(
@@ -199,7 +212,7 @@ export async function DELETE(
       case: updatedCase,
     });
   } catch (error) {
-    console.error('Error removing advocates:', error);
+    console.error('Error removing advocates');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -218,8 +231,7 @@ export async function GET(
   try {
     const { id: caseId } = await params;
 
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -257,7 +269,7 @@ export async function GET(
 
     return NextResponse.json(caseRecord.assignments);
   } catch (error) {
-    console.error('Error fetching assignments:', error);
+    console.error('Error fetching assignments');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -16,6 +16,7 @@ import Link from 'next/link';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/context/AuthContext';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 import dayjs from 'dayjs';
 import { CasesPageSkeleton, SectionLoader, shimmerStyles } from '@/components/Skeletons';
 
@@ -122,6 +123,7 @@ CaseCard.displayName = 'CaseCard';
 
 export default function CasesPage() {
   const { token } = useAuth();
+  const authHeaders = buildAuthHeaders(token);
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
@@ -130,12 +132,10 @@ export default function CasesPage() {
 
   // Fetch cases with optimized API call
   const fetchCases = useCallback(async () => {
-    if (!token) return;
-
     setLoading(true);
     try {
       const response = await fetch('/api/cases?minimal=true', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
       if (response.ok) {
         const data = await response.json();
@@ -148,13 +148,11 @@ export default function CasesPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [authHeaders]);
 
   useEffect(() => {
-    if (token) {
-      fetchCases();
-    }
-  }, [token, fetchCases]);
+    fetchCases();
+  }, [fetchCases]);
 
   // Memoized filtered cases - computed only when dependencies change
   const filteredCases = useMemo(() => {

@@ -3,41 +3,27 @@ import { prisma } from '@/lib/prisma';
 
 export async function verifyToken(token: string) {
   try {
-    console.log('[verifyToken] Received token (first 20 chars):', token?.substring(0, 20));
-    console.log('[verifyToken] Token length:', token?.length);
-
     const session = await prisma.session.findUnique({
       where: { token },
       include: { User: { include: { Firm_User_firmIdToFirm: true } } },
     });
 
-    console.log('[verifyToken] Session found:', !!session);
-
     if (!session || !session.User) {
-      console.log('[verifyToken] No session found in database for token');
       return null;
     }
 
     // Check if session is expired
     const now = new Date();
-    const isExpired = session.expiresAt < now;
-    console.log('[verifyToken] Session expiresAt:', session.expiresAt.toISOString());
-    console.log('[verifyToken] Current time:', now.toISOString());
-    console.log('[verifyToken] Is expired:', isExpired);
-
-    if (isExpired) {
-      console.log('[verifyToken] Session expired, deleting');
+    if (session.expiresAt < now) {
       await prisma.session.delete({
         where: { id: session.id },
       });
       return null;
     }
 
-    console.log('[verifyToken] Token verified successfully for user:', session.User.email);
-    console.log('[verifyToken] User firmId:', session.User.firmId);
     return session.User;
   } catch (error) {
-    console.error('[verifyToken] Token verification error:', error);
+    console.error('[verifyToken] Token verification error');
     return null;
   }
 }

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { analyzeCaseWithAI } from '@/lib/openai';
 
 // GET all cases for a firm (role-based filtering)
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -92,7 +93,7 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Error fetching cases:', error);
+    console.error('Error fetching cases');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -103,24 +104,31 @@ export async function GET(request: NextRequest) {
 // POST - Create a new case
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    console.log('[POST /api/cases] Authorization header:', authHeader?.substring(0, 30));
-
-    const token = authHeader?.replace('Bearer ', '');
-    console.log('[POST /api/cases] Extracted token (first 20 chars):', token?.substring(0, 20));
-    console.log('[POST /api/cases] Token length:', token?.length);
+    const token = getAuthToken(request);
 
     if (!token) {
-      console.log('[POST /api/cases] No token provided');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await verifyToken(token);
-    console.log('[POST /api/cases] User after verification:', user?.email);
 
     if (!user || !user.firmId) {
-      console.log('[POST /api/cases] User verification failed or no firmId');
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const rateLimit = checkRateLimit(`cases-create:${user.id}`, 20, 10 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many case creation requests. Please try again later.', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
     }
 
     const {
@@ -134,7 +142,7 @@ export async function POST(request: NextRequest) {
       courtName,
       judgeAssigned,
       priority,
-    } = await request.json();
+    } = body;
 
     // Validation
     if (!caseNumber || !clientName || !caseTitle) {
@@ -196,13 +204,13 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (aiError) {
-      console.error('Error generating AI summary:', aiError);
+      console.error('Error generating AI summary');
       // Don't fail the case creation if AI fails
     }
 
     return NextResponse.json(newCase, { status: 201 });
   } catch (error) {
-    console.error('Error creating case:', error);
+    console.error('Error creating case');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

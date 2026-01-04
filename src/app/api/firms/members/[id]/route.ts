@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
 
 /**
  * PUT /api/firms/members/[id]
@@ -13,8 +14,7 @@ export async function PUT(
 ) {
   try {
     const { id: targetUserId } = await params;
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -30,7 +30,12 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
     const { role } = body;
 
     // Validate role
@@ -95,7 +100,7 @@ export async function PUT(
       user: updatedUser,
     });
   } catch (error) {
-    console.error('Error updating user role:', error);
+    console.error('Error updating user role');
     return NextResponse.json(
       { error: 'Failed to update user role' },
       { status: 500 }
@@ -114,8 +119,7 @@ export async function DELETE(
 ) {
   try {
     const { id: targetUserId } = await params;
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -180,7 +184,7 @@ export async function DELETE(
       message: 'User removed from firm',
     });
   } catch (error) {
-    console.error('Error removing user from firm:', error);
+    console.error('Error removing user from firm');
     return NextResponse.json(
       { error: 'Failed to remove user from firm' },
       { status: 500 }

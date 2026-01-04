@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
+import { resolveStoredPath } from '@/lib/uploads';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { performCustomAnalysis } from '@/lib/openai';
 import { safeExtractFileContent } from '@/lib/fileProcessor';
-import path from 'path';
+
+const MAX_PROMPT_LENGTH = 4000;
+const MAX_AI_DOCUMENT_CHARS = 80000;
 
 export async function POST(
   request: NextRequest,
@@ -11,8 +16,7 @@ export async function POST(
 ) {
   try {
     const { id: caseId } = await params;
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -23,10 +27,31 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { prompt, documentIds } = await request.json();
+    const rateLimit = checkRateLimit(`ai-custom:${user.id}`, 8, 10 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many AI requests. Please try again later.', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+
+    const { prompt, documentIds } = body;
 
     if (!prompt || prompt.trim().length === 0) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+    }
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: `Prompt exceeds maximum length of ${MAX_PROMPT_LENGTH} characters` },
+        { status: 400 }
+      );
     }
 
     // Role-based case access verification
@@ -56,11 +81,19 @@ export async function POST(
       );
 
       documents = [];
+      let totalChars = 0;
       for (const doc of docsToAnalyze) {
-        const filePath = path.join(process.cwd(), 'public', doc.fileUrl.replace(/^\//, ''));
+        const filePath = resolveStoredPath(doc.fileUrl);
         const extraction = await safeExtractFileContent(filePath, doc.fileType);
 
         if (extraction.success && extraction.content) {
+          totalChars += extraction.content.length;
+          if (totalChars > MAX_AI_DOCUMENT_CHARS) {
+            return NextResponse.json(
+              { error: 'Document content exceeds analysis limits. Please analyze fewer documents.' },
+              { status: 400 }
+            );
+          }
           documents.push({
             fileName: doc.fileName,
             content: extraction.content,
@@ -79,7 +112,7 @@ export async function POST(
       documentsIncluded: documents ? documents.length : 0,
     });
   } catch (error) {
-    console.error('Error performing custom analysis:', error);
+    console.error('Error performing custom analysis');
     return NextResponse.json(
       { error: 'Failed to perform analysis', details: error instanceof Error ? error.message : '' },
       { status: 500 }

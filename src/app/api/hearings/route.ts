@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
 import { generateHearingInsights } from '@/lib/openai';
 import { createCalendarEvent, isGoogleCalendarConnected } from '@/lib/googleCalendar';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // GET hearings for user's firm (role-based filtering)
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -101,7 +102,7 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Error fetching hearings:', error);
+    console.error('Error fetching hearings');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -112,8 +113,7 @@ export async function GET(request: NextRequest) {
 // POST - Create a new hearing
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -124,6 +124,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+
     const {
       caseId,
       hearingDate,
@@ -131,7 +138,7 @@ export async function POST(request: NextRequest) {
       hearingType,
       courtRoom,
       notes,
-    } = await request.json();
+    } = body;
 
     // Validation
     if (!caseId || !hearingDate) {
@@ -200,33 +207,36 @@ export async function POST(request: NextRequest) {
           courtRoom,
           notes,
         });
-        console.log('[Hearings] Auto-synced to Google Calendar:', hearing.id);
+        console.log('[Hearings] Auto-synced to Google Calendar');
       }
     } catch (googleError) {
-      console.error('[Hearings] Google Calendar sync failed:', googleError);
+      console.error('[Hearings] Google Calendar sync failed');
       // Don't fail the request if Google sync fails
     }
 
     // Generate hearing insights asynchronously
     try {
-      const insights = await generateHearingInsights(
-        caseRecord.caseTitle,
-        hearingType || 'ARGUMENTS'
-      );
-      // Store insights in notes
-      if (!notes || notes.length === 0) {
-        await prisma.hearing.update({
-          where: { id: hearing.id },
-          data: { notes: insights },
-        });
+      const aiRateLimit = checkRateLimit(`ai-hearing:${user.id}`, 10, 10 * 60 * 1000);
+      if (aiRateLimit.allowed) {
+        const insights = await generateHearingInsights(
+          caseRecord.caseTitle,
+          hearingType || 'ARGUMENTS'
+        );
+        // Store insights in notes
+        if (!notes || notes.length === 0) {
+          await prisma.hearing.update({
+            where: { id: hearing.id },
+            data: { notes: insights },
+          });
+        }
       }
     } catch (aiError) {
-      console.error('Error generating hearing insights:', aiError);
+      console.error('Error generating hearing insights');
     }
 
     return NextResponse.json(hearing, { status: 201 });
   } catch (error) {
-    console.error('Error creating hearing:', error);
+    console.error('Error creating hearing');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -6,6 +6,7 @@ import {
   updateCalendarEvent,
   isGoogleCalendarConnected,
 } from '@/lib/googleCalendar';
+import { getAuthToken } from '@/lib/authToken';
 
 /**
  * POST /api/google/calendar/sync/[hearingId]
@@ -18,8 +19,7 @@ export async function POST(
   try {
     const { hearingId } = await params;
 
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -93,7 +93,7 @@ export async function POST(
       { status: 500 }
     );
   } catch (error) {
-    console.error('[Google Sync Single] Error:', error);
+    console.error('[Google Sync Single] Error');
     return NextResponse.json(
       { error: 'Failed to sync hearing' },
       { status: 500 }

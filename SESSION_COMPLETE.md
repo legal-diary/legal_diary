@@ -120,7 +120,7 @@
 ### 🔴 SECURITY ISSUE (IMMEDIATE)
 **Exposed OpenAI API Key**
 - Location: `.env.local`
-- Key: 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
+- Key: <redacted>
 - Action: Revoke immediately and rotate
 - Instructions: See FIXES_CHECKLIST.md Priority 1
 
@@ -391,4 +391,3 @@ Start with FIXES_CHECKLIST.md Priority 1 section
 **Next Session Action:** FIXES_CHECKLIST.md Priority 1
 
 All information is in place for continued development. Claude will automatically load `.claude/context.md` at the start of the next session.
-

@@ -21,12 +21,8 @@ const MAX_CONTENT_LENGTH = 50000; // 50KB limit to avoid token overflow
  * pdf2json is pure JavaScript with no canvas/DOM dependencies
  */
 export async function extractTextFromPDF(filePath: string): Promise<ExtractionResult> {
-  console.log(`[extractTextFromPDF] Starting extraction for: ${filePath}`);
   try {
-    // Dynamic import to work better with Next.js bundling
-    console.log('[extractTextFromPDF] Loading pdf2json library...');
     const { default: PDFParser } = await import('pdf2json');
-    console.log('[extractTextFromPDF] pdf2json loaded successfully');
 
     return new Promise((resolve) => {
       const pdfParser = new PDFParser();
@@ -58,7 +54,6 @@ export async function extractTextFromPDF(filePath: string): Promise<ExtractionRe
           text = text.trim();
 
           if (!text || text.length === 0) {
-            console.log(`[extractTextFromPDF] No text found in PDF: ${path.basename(filePath)}`);
             resolve({
               success: true,
               content: `[PDF Document: ${path.basename(filePath)}] - No readable text content found in PDF (may be scanned/image-based).`,
@@ -72,9 +67,6 @@ export async function extractTextFromPDF(filePath: string): Promise<ExtractionRe
             .replace(/[ \t]+/g, ' ')
             .replace(/\n{3,}/g, '\n\n')
             .trim();
-
-          console.log(`[extractTextFromPDF] Successfully extracted ${cleanedText.length} characters from PDF`);
-          console.log(`[extractTextFromPDF] First 500 chars: ${cleanedText.substring(0, 500)}...`);
 
           resolve({
             success: true,
@@ -102,15 +94,12 @@ export async function extractTextFromPDF(filePath: string): Promise<ExtractionRe
  * Extract text from DOCX file using mammoth library
  */
 export async function extractTextFromDocx(filePath: string): Promise<ExtractionResult> {
-  console.log(`[extractTextFromDocx] Starting extraction for: ${filePath}`);
   try {
     const fileBuffer = fs.readFileSync(filePath);
-    console.log(`[extractTextFromDocx] Read file buffer, size: ${fileBuffer.length} bytes`);
 
     const result = await mammoth.extractRawText({ buffer: fileBuffer });
 
     if (!result.value || result.value.trim().length === 0) {
-      console.log(`[extractTextFromDocx] No text found in DOCX: ${path.basename(filePath)}`);
       return {
         success: true,
         content: `[Word Document: ${path.basename(filePath)}] - No readable text content found in document.`,
@@ -119,18 +108,15 @@ export async function extractTextFromDocx(filePath: string): Promise<ExtractionR
 
     // Log any warnings from mammoth (useful for debugging)
     if (result.messages && result.messages.length > 0) {
-      console.log(`[extractTextFromDocx] Warnings for ${path.basename(filePath)}:`, result.messages);
+      console.warn(`[extractTextFromDocx] Warnings during DOCX processing.`);
     }
-
-    console.log(`[extractTextFromDocx] Successfully extracted ${result.value.length} characters from DOCX`);
-    console.log(`[extractTextFromDocx] First 500 chars: ${result.value.substring(0, 500)}...`);
 
     return {
       success: true,
       content: result.value.substring(0, MAX_CONTENT_LENGTH),
     };
   } catch (error) {
-    console.error(`[extractTextFromDocx] Error extracting DOCX:`, error);
+    console.error(`[extractTextFromDocx] Error extracting DOCX`);
     return {
       success: false,
       error: `Failed to extract DOCX: ${error instanceof Error ? error.message : 'Unknown error'}`,

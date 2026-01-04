@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import { hashPassword, verifyPassword } from '@/lib/auth';
+import { getAuthToken } from '@/lib/authToken';
 
 /**
  * POST /api/auth/set-password
@@ -11,8 +12,7 @@ import { hashPassword, verifyPassword } from '@/lib/auth';
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -23,7 +23,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
     const { currentPassword, newPassword, confirmPassword } = body;
 
     // Validate new password
@@ -94,7 +99,7 @@ export async function POST(request: NextRequest) {
         : 'Password set successfully. You can now login with email and password.',
     });
   } catch (error) {
-    console.error('Set password error:', error);
+    console.error('Set password error');
     return NextResponse.json(
       { error: 'Failed to set password' },
       { status: 500 }
@@ -108,8 +113,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -130,7 +134,7 @@ export async function GET(request: NextRequest) {
       hasPassword: !!fullUser?.password,
     });
   } catch (error) {
-    console.error('Check password error:', error);
+    console.error('Check password error');
     return NextResponse.json(
       { error: 'Failed to check password status' },
       { status: 500 }

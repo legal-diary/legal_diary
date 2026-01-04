@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import { prisma, withRetry } from '@/lib/prisma';
 import { generateSessionToken } from '@/lib/auth';
 import { encrypt } from '@/lib/encryption';
+import { AUTH_COOKIE_NAME } from '@/lib/authToken';
 
 // Google OAuth2 configuration for login
 // Use GOOGLE_AUTH_REDIRECT_URI if set, otherwise fall back to /auth/google/callback
@@ -40,7 +41,15 @@ interface GoogleUserInfo {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
     const { code, state } = body;
 
     if (!code) {
@@ -91,7 +100,7 @@ export async function POST(request: NextRequest) {
       const response = await oauth2Client.getToken(code);
       tokens = response.tokens;
     } catch (error) {
-      console.error('[Google Auth Callback] Token exchange failed:', error);
+      console.error('[Google Auth Callback] Token exchange failed');
       return NextResponse.json(
         { error: 'Failed to exchange authorization code' },
         { status: 400 }
@@ -119,7 +128,7 @@ export async function POST(request: NextRequest) {
         picture: response.data.picture || undefined,
       };
     } catch (error) {
-      console.error('[Google Auth Callback] Failed to get user info:', error);
+      console.error('[Google Auth Callback] Failed to get user info');
       return NextResponse.json(
         { error: 'Failed to get user information from Google' },
         { status: 400 }
@@ -243,7 +252,7 @@ export async function POST(request: NextRequest) {
     // Check if user needs to set password (Google OAuth user without password)
     const needsPasswordSetup = !user.password;
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       message: isNewUser ? 'Account created successfully' : 'Login successful',
       user: userData,
       token: sessionToken,
@@ -253,8 +262,18 @@ export async function POST(request: NextRequest) {
       needsPasswordSetup,
       googleCalendarConnected: !!(tokens.access_token && tokens.refresh_token),
     });
+
+    response.cookies.set(AUTH_COOKIE_NAME, sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      expires: expiresAt,
+    });
+
+    return response;
   } catch (error) {
-    console.error('[Google Auth Callback] Error:', error);
+    console.error('[Google Auth Callback] Error');
     return NextResponse.json(
       {
         error: 'Authentication failed',

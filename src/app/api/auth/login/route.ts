@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, withRetry } from '@/lib/prisma';
 import { verifyPassword, generateSessionToken } from '@/lib/auth';
+import { AUTH_COOKIE_NAME } from '@/lib/authToken';
 import {
   isRateLimited,
   recordFailedAttempt,
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
       firm_name: Firm_User_firmIdToFirm?.name || null,
     };
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         message: 'Login successful',
         user: userData,
@@ -140,15 +141,18 @@ export async function POST(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error) {
-    console.error('Login error:', error);
 
-    // Log detailed error information for debugging
-    if (error instanceof Error) {
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-    }
+    response.cookies.set(AUTH_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      expires: expiresAt,
+    });
+
+    return response;
+  } catch (error) {
+    console.error('Login error');
 
     // Check for Prisma-specific errors
     let errorMessage = 'Authentication service unavailable. Please try again later.';

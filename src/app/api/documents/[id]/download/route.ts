@@ -13,7 +13,6 @@ export async function GET(
     const { id: documentId } = await params;
 
     const token = getAuthToken(request);
-
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -23,9 +22,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based access - find document and verify through case assignments
     const isAdmin = user.role === 'ADMIN';
-
     const document = await prisma.fileDocument.findFirst({
       where: {
         id: documentId,
@@ -34,44 +31,28 @@ export async function GET(
           ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
         },
       },
-      include: {
-        Case: {
-          select: { firmId: true },
-        },
-      },
     });
 
     if (!document) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
 
-    // Only allow text files to be read via this endpoint
-    if (document.fileType !== 'text/plain') {
-      return NextResponse.json(
-        { error: 'Only text files can be read via this endpoint' },
-        { status: 400 }
-      );
-    }
-
-    // Construct file path and verify it exists
     const filePath = resolveStoredPath(document.fileUrl);
-
     if (!fs.existsSync(filePath)) {
-      return NextResponse.json(
-        { error: 'File not found on disk' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'File not found on disk' }, { status: 404 });
     }
 
-    // Read and return full file content (no truncation)
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const fileBuffer = fs.readFileSync(filePath);
 
-    return NextResponse.json({ content }, { headers: { 'Cache-Control': 'no-store' } });
+    return new NextResponse(fileBuffer, {
+      headers: {
+        'Content-Type': document.fileType,
+        'Content-Disposition': `inline; filename="${encodeURIComponent(document.fileName)}"`,
+        'Cache-Control': 'no-store',
+      },
+    });
   } catch (error) {
-    console.error('Error reading document content');
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Error downloading document');
+    return NextResponse.json({ error: 'Failed to download document' }, { status: 500 });
   }
 }

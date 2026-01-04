@@ -18,11 +18,13 @@ import { UploadOutlined } from '@ant-design/icons';
 import type { RcFile } from 'antd/es/upload';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 import { useRouter } from 'next/navigation';
 
 export default function CreateCasePage() {
   const { token } = useAuth();
   const router = useRouter();
+  const authHeaders = buildAuthHeaders(token);
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -36,7 +38,7 @@ export default function CreateCasePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify(values),
       });
@@ -56,7 +58,7 @@ export default function CreateCasePage() {
 
         const uploadResponse = await fetch(`/api/cases/${caseData.id}/upload`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders,
           body: formData,
         });
 
@@ -69,7 +71,6 @@ export default function CreateCasePage() {
       router.push('/cases');
     } catch (error) {
       message.error('Failed to create case');
-      console.error(error);
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
 import { getAuthUrl } from '@/lib/googleCalendar';
 import crypto from 'crypto';
 
@@ -10,8 +11,7 @@ import crypto from 'crypto';
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -31,8 +31,21 @@ export async function GET(request: NextRequest) {
       nonce: crypto.randomBytes(8).toString('hex'),
     };
 
-    // Encode state as base64
-    const state = Buffer.from(JSON.stringify(stateData)).toString('base64');
+    const stateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET || process.env.NEXTAUTH_SECRET;
+    if (!stateSecret) {
+      return NextResponse.json(
+        { error: 'OAuth configuration missing' },
+        { status: 500 }
+      );
+    }
+
+    // Encode state as base64 + HMAC signature
+    const payload = Buffer.from(JSON.stringify(stateData)).toString('base64');
+    const signature = crypto
+      .createHmac('sha256', stateSecret)
+      .update(payload)
+      .digest('hex');
+    const state = `${payload}.${signature}`;
 
     // Generate OAuth URL
     const authUrl = getAuthUrl(state);

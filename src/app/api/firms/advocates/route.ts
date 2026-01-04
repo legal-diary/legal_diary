@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
 
 /**
  * GET /api/firms/advocates
@@ -9,8 +10,7 @@ import { verifyToken } from '@/lib/middleware';
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(advocates);
   } catch (error) {
-    console.error('Error fetching advocates:', error);
+    console.error('Error fetching advocates');
     return NextResponse.json(
       { error: 'Failed to fetch advocates' },
       { status: 500 }

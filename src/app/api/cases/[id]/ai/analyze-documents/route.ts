@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { getAuthToken } from '@/lib/authToken';
+import { resolveStoredPath } from '@/lib/uploads';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { analyzeDocumentsWithAI } from '@/lib/openai';
 import { safeExtractFileContent } from '@/lib/fileProcessor';
-import path from 'path';
+
+const MAX_AI_DOCUMENT_CHARS = 120000;
 
 export async function POST(
   request: NextRequest,
@@ -11,8 +15,7 @@ export async function POST(
 ) {
   try {
     const { id: caseId } = await params;
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -23,7 +26,22 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { documentIds } = await request.json();
+    const rateLimit = checkRateLimit(`ai-docs:${user.id}`, 10, 10 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many AI requests. Please try again later.', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+
+    const { documentIds } = body;
 
     // Role-based case access verification
     const isAdmin = user.role === 'ADMIN';
@@ -55,24 +73,25 @@ export async function POST(
     }
 
     // Extract document contents
-    console.log(`[analyze-documents] Starting document extraction for ${docsToAnalyze.length} documents`);
     const documents = [];
+    let totalChars = 0;
     for (const doc of docsToAnalyze) {
-      const filePath = path.join(process.cwd(), 'public', doc.fileUrl.replace(/^\//, ''));
-      console.log(`[analyze-documents] Processing document: ${doc.fileName} (${doc.fileType})`);
-      console.log(`[analyze-documents] File path: ${filePath}`);
+      const filePath = resolveStoredPath(doc.fileUrl);
 
       const extraction = await safeExtractFileContent(filePath, doc.fileType);
-      console.log(`[analyze-documents] Extraction result for ${doc.fileName}: success=${extraction.success}, content length=${extraction.content?.length || 0}`);
 
       if (extraction.success && extraction.content) {
+        totalChars += extraction.content.length;
+        if (totalChars > MAX_AI_DOCUMENT_CHARS) {
+          return NextResponse.json(
+            { error: 'Document content exceeds analysis limits. Please analyze fewer documents.' },
+            { status: 400 }
+          );
+        }
         documents.push({
           fileName: doc.fileName,
           content: extraction.content,
         });
-        console.log(`[analyze-documents] Added document ${doc.fileName} with ${extraction.content.length} chars`);
-      } else {
-        console.log(`[analyze-documents] Failed to extract ${doc.fileName}: ${extraction.error}`);
       }
     }
 
@@ -84,11 +103,7 @@ export async function POST(
     }
 
     // Analyze documents (document-focused analysis only)
-    console.log(`[analyze-documents] Sending ${documents.length} documents to OpenAI for analysis`);
-    console.log(`[analyze-documents] Total content size: ${documents.reduce((sum, d) => sum + d.content.length, 0)} chars`);
-
     const analysis = await analyzeDocumentsWithAI(documents);
-    console.log(`[analyze-documents] Analysis complete. Summary length: ${analysis.summary?.length || 0}`);
 
     return NextResponse.json({
       success: true,
@@ -97,7 +112,7 @@ export async function POST(
       documentsAnalyzed: documents.length,
     });
   } catch (error) {
-    console.error('Error analyzing documents:', error);
+    console.error('Error analyzing documents');
     return NextResponse.json(
       { error: 'Failed to analyze documents', details: error instanceof Error ? error.message : '' },
       { status: 500 }

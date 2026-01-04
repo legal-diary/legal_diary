@@ -15,6 +15,7 @@ import {
   CheckCircleOutlined,
   GoogleOutlined,
 } from '@ant-design/icons';
+import { buildAuthHeaders } from '@/lib/authHeaders';
 
 interface SetPasswordProps {
   token: string;
@@ -22,6 +23,7 @@ interface SetPasswordProps {
 
 export default function SetPassword({ token }: SetPasswordProps) {
   const [form] = Form.useForm();
+  const authHeaders = buildAuthHeaders(token);
   const [hasPassword, setHasPassword] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -31,7 +33,7 @@ export default function SetPassword({ token }: SetPasswordProps) {
     const checkPasswordStatus = async () => {
       try {
         const response = await fetch('/api/auth/set-password', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders,
         });
 
         if (response.ok) {
@@ -39,7 +41,7 @@ export default function SetPassword({ token }: SetPasswordProps) {
           setHasPassword(data.hasPassword);
         }
       } catch (error) {
-        console.error('Error checking password status:', error);
+        console.error('Error checking password status');
       } finally {
         setLoading(false);
       }
@@ -56,7 +58,7 @@ export default function SetPassword({ token }: SetPasswordProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify({
           currentPassword: values.currentPassword,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCodeForTokens, storeTokens } from '@/lib/googleCalendar';
+import crypto from 'crypto';
 
 /**
  * GET /api/google/callback
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     // Handle user cancellation or errors
     if (error) {
-      console.error('[Google Callback] OAuth error:', error);
+      console.error('[Google Callback] OAuth error');
       return NextResponse.redirect(
         new URL('/calendar?google=error&message=' + encodeURIComponent(error), request.url)
       );
@@ -29,8 +30,33 @@ export async function GET(request: NextRequest) {
 
     // Decode and validate state
     let stateData: { userId: string; firmId: string; timestamp: number; nonce: string };
+    const stateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET || process.env.NEXTAUTH_SECRET;
+    if (!stateSecret) {
+      return NextResponse.redirect(
+        new URL('/calendar?google=error&message=OAuth+configuration+missing', request.url)
+      );
+    }
+
+    const [payload, signature] = state.split('.');
+    if (!payload || !signature) {
+      return NextResponse.redirect(
+        new URL('/calendar?google=error&message=Invalid+state', request.url)
+      );
+    }
+
+    const expectedSignature = crypto
+      .createHmac('sha256', stateSecret)
+      .update(payload)
+      .digest('hex');
+
+    if (signature.length !== expectedSignature.length ||
+        !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+      return NextResponse.redirect(
+        new URL('/calendar?google=error&message=Invalid+state', request.url)
+      );
+    }
     try {
-      stateData = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
+      stateData = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
     } catch {
       return NextResponse.redirect(
         new URL('/calendar?google=error&message=Invalid+state', request.url)
@@ -49,7 +75,7 @@ export async function GET(request: NextRequest) {
     const tokens = await exchangeCodeForTokens(code);
 
     if (!tokens.access_token || !tokens.refresh_token) {
-      console.error('[Google Callback] Missing tokens:', tokens);
+      console.error('[Google Callback] Missing tokens');
       return NextResponse.redirect(
         new URL('/calendar?google=error&message=Failed+to+get+tokens', request.url)
       );
@@ -68,14 +94,12 @@ export async function GET(request: NextRequest) {
       expiresAt
     );
 
-    console.log('[Google Callback] Successfully connected for user:', stateData.userId);
-
     // Redirect to calendar page with success message
     return NextResponse.redirect(
       new URL('/calendar?google=connected', request.url)
     );
   } catch (error) {
-    console.error('[Google Callback] Error:', error);
+    console.error('[Google Callback] Error');
     return NextResponse.redirect(
       new URL('/calendar?google=error&message=Connection+failed', request.url)
     );
