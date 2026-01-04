@@ -59,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json();
         setUser(data.user);
         setExpiresAt(data.expiresAt);
+        setToken(null);
         setNeedsFirmSetup(!!data.needsFirmSetup || !data.user?.firmId);
         setNeedsPasswordSetup(!!data.needsPasswordSetup);
       } catch (error) {
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Periodically check if token has expired (check every minute)
   useEffect(() => {
-    if (!token || !expiresAt) return;
+    if (!expiresAt) return;
 
     const interval = setInterval(() => {
       if (isTokenExpiredLocal(expiresAt)) {
@@ -102,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const data = await response.json();
-      setToken(data.token);
+      setToken(null);
       setUser(data.user);
       setExpiresAt(data.expiresAt);
     } finally {

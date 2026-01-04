@@ -136,7 +136,6 @@ export async function POST(request: NextRequest) {
       {
         message: 'Login successful',
         user: userData,
-        token,
         expiresAt: expiresAt.toISOString(),
       },
       { status: 200 }
