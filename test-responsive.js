@@ -20,6 +20,8 @@ const SCREEN_SIZES = [
   { name: 'laptop', width: 1024, height: 768, device: 'Small Laptop' },
   { name: 'desktop', width: 1440, height: 900, device: 'Desktop' },
   { name: 'monitor', width: 1920, height: 1080, device: 'Full HD Monitor' },
+  { name: 'qhd', width: 2560, height: 1440, device: 'QHD Monitor' },
+  { name: '4k-tv', width: 3840, height: 2160, device: '4K TV' },
 ];
 
 // Pages to test
@@ -127,6 +129,8 @@ async function run() {
   });
 
   let isLoggedIn = false;
+  const pagesToTest = [...PAGES_TO_TEST];
+  let caseDetailPath = null;
 
   try {
     // First, login to get session
@@ -138,8 +142,29 @@ async function run() {
     const cookies = await loginPage.cookies();
     await loginPage.close();
 
+    if (isLoggedIn) {
+      const casePage = await browser.newPage();
+      await casePage.setViewport({ width: 1280, height: 720 });
+      await casePage.goto(`${BASE_URL}/cases`, { waitUntil: 'networkidle0', timeout: 30000 });
+      caseDetailPath = await casePage.evaluate(() => {
+        const links = Array.from(document.querySelectorAll('a[href^="/cases/"]'));
+        const detailLink = links.find((link) => {
+          const href = link.getAttribute('href') || '';
+          return href.startsWith('/cases/') && !href.includes('/cases/create');
+        });
+        return detailLink ? detailLink.getAttribute('href') : null;
+      });
+      await casePage.close();
+
+      if (caseDetailPath) {
+        pagesToTest.push({ name: 'case-detail', path: caseDetailPath, requiresAuth: true });
+      } else {
+        console.log('No case detail link found. Skipping case-detail page.');
+      }
+    }
+
     // Test each page at each screen size
-    for (const pageConfig of PAGES_TO_TEST) {
+    for (const pageConfig of pagesToTest) {
       if (pageConfig.requiresAuth && !isLoggedIn) {
         console.log(`Skipping ${pageConfig.name} (requires auth but not logged in)`);
         continue;
@@ -158,7 +183,7 @@ async function run() {
     console.log('\n' + '='.repeat(60));
     console.log('TEST COMPLETED');
     console.log('='.repeat(60));
-    console.log(`Total screenshots: ${PAGES_TO_TEST.length * SCREEN_SIZES.length}`);
+    console.log(`Total screenshots: ${pagesToTest.length * SCREEN_SIZES.length}`);
     console.log(`Location: ${screenshotDir}`);
 
   } catch (error) {
