@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import { analyzeDocumentsWithAI } from '@/lib/openai';
 import { safeExtractFileContent } from '@/lib/fileProcessor';
-import path from 'path';
 
 export async function POST(
   request: NextRequest,
@@ -54,15 +53,15 @@ export async function POST(
       return NextResponse.json({ error: 'No documents found to analyze' }, { status: 400 });
     }
 
-    // Extract document contents
+    // Extract document contents from Supabase Storage
     console.log(`[analyze-documents] Starting document extraction for ${docsToAnalyze.length} documents`);
     const documents = [];
     for (const doc of docsToAnalyze) {
-      const filePath = path.join(process.cwd(), 'public', doc.fileUrl.replace(/^\//, ''));
       console.log(`[analyze-documents] Processing document: ${doc.fileName} (${doc.fileType})`);
-      console.log(`[analyze-documents] File path: ${filePath}`);
+      console.log(`[analyze-documents] Storage path: ${doc.fileUrl}`);
 
-      const extraction = await safeExtractFileContent(filePath, doc.fileType);
+      // fileUrl now contains the Supabase storage path
+      const extraction = await safeExtractFileContent(doc.fileUrl, doc.fileType);
       console.log(`[analyze-documents] Extraction result for ${doc.fileName}: success=${extraction.success}, content length=${extraction.content?.length || 0}`);
 
       if (extraction.success && extraction.content) {

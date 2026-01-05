@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
-import { downloadFile } from '@/lib/supabase';
+import { getSignedUrl } from '@/lib/supabase';
 
+/**
+ * GET /api/documents/[id]/url
+ * Generate a signed URL for secure document access
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -22,9 +26,8 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based access - find document and verify through case assignments
+    // Role-based document access verification
     const isAdmin = user.role === 'ADMIN';
-
     const document = await prisma.fileDocument.findFirst({
       where: {
         id: documentId,
@@ -44,30 +47,24 @@ export async function GET(
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
 
-    // Only allow text files to be read via this endpoint
-    if (document.fileType !== 'text/plain') {
+    // Generate signed URL (valid for 1 hour)
+    const signedUrl = await getSignedUrl(document.fileUrl, 3600);
+
+    if (!signedUrl) {
       return NextResponse.json(
-        { error: 'Only text files can be read via this endpoint' },
-        { status: 400 }
+        { error: 'Failed to generate document URL' },
+        { status: 500 }
       );
     }
 
-    // Download file from Supabase Storage
-    const fileBuffer = await downloadFile(document.fileUrl);
-
-    if (!fileBuffer) {
-      return NextResponse.json(
-        { error: 'File not found in storage' },
-        { status: 404 }
-      );
-    }
-
-    // Convert buffer to text content
-    const content = fileBuffer.toString('utf-8');
-
-    return NextResponse.json({ content });
+    return NextResponse.json({
+      url: signedUrl,
+      fileName: document.fileName,
+      fileType: document.fileType,
+      expiresIn: 3600, // 1 hour in seconds
+    });
   } catch (error) {
-    console.error('Error reading document content:', error);
+    console.error('Error generating document URL:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

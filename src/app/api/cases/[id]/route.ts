@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
-import fs from 'fs';
-import path from 'path';
+import { deleteFile, deleteFiles } from '@/lib/supabase';
 
 // Allowed fields for case updates (whitelist approach)
 const ALLOWED_UPDATE_FIELDS = [
@@ -142,15 +141,11 @@ export async function PUT(
         },
       });
 
-      for (const doc of docsToDelete) {
-        try {
-          const filePath = path.join(process.cwd(), 'public', doc.fileUrl.replace(/^\//, ''));
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
-        } catch (err) {
-          console.error(`Failed to delete file ${doc.fileUrl}:`, err);
-        }
+      // Delete files from Supabase Storage
+      const storagePaths = docsToDelete.map((doc) => doc.fileUrl);
+      if (storagePaths.length > 0) {
+        const deletedCount = await deleteFiles(storagePaths);
+        console.log(`Deleted ${deletedCount} files from Supabase Storage`);
       }
 
       await prisma.fileDocument.deleteMany({
@@ -249,16 +244,26 @@ export async function DELETE(
       );
     }
 
-    // Verify case belongs to firm
+    // Verify case belongs to firm and get associated documents
     const caseRecord = await prisma.case.findFirst({
       where: {
         id: caseId,
         firmId: user.firmId,
       },
+      include: {
+        FileDocument: true,
+      },
     });
 
     if (!caseRecord) {
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
+    }
+
+    // Delete files from Supabase Storage before deleting the case
+    if (caseRecord.FileDocument.length > 0) {
+      const storagePaths = caseRecord.FileDocument.map((doc) => doc.fileUrl);
+      const deletedCount = await deleteFiles(storagePaths);
+      console.log(`Deleted ${deletedCount} files from Supabase Storage for case ${caseId}`);
     }
 
     // Delete the case (cascading deletes will be handled by Prisma)

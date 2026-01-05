@@ -9,6 +9,7 @@ import {
   FileTextOutlined,
   FileExcelOutlined,
   FileWordOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import mammoth from 'mammoth';
 
@@ -36,6 +37,7 @@ export default function DocumentViewer({
   const [loading, setLoading] = useState(true);
   const [textContent, setTextContent] = useState<string | null>(null);
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fullScreen, setFullScreen] = useState(false);
 
@@ -59,6 +61,25 @@ export default function DocumentViewer({
     return 'unsupported';
   };
 
+  // Fetch signed URL from Supabase
+  const fetchSignedUrl = async (docId: string): Promise<string | null> => {
+    try {
+      const response = await fetch(`/api/documents/${docId}/url`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (data.url) {
+        return data.url;
+      } else {
+        console.error('Failed to get signed URL:', data.error);
+        return null;
+      }
+    } catch (err) {
+      console.error('Error fetching signed URL:', err);
+      return null;
+    }
+  };
+
   // Load content when modal opens
   useEffect(() => {
     if (!document || !visible) return;
@@ -66,49 +87,63 @@ export default function DocumentViewer({
     const category = getFileCategory(document.fileType);
     setLoading(true);
     setError(null);
+    setSignedUrl(null);
 
-    if (category === 'text') {
-      // Fetch text content from API
-      fetch(`/api/documents/${document.id}/content`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => res.json())
-        .then((data) => {
+    const loadContent = async () => {
+      try {
+        if (category === 'text') {
+          // Fetch text content from API
+          const response = await fetch(`/api/documents/${document.id}/content`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await response.json();
           if (data.content) {
             setTextContent(data.content);
           } else {
             setError(data.error || 'Failed to load text content');
           }
-        })
-        .catch(() => setError('Failed to load document'))
-        .finally(() => setLoading(false));
-    } else if (category === 'docx') {
-      // Fetch and convert DOCX using mammoth.js
-      fetch(document.fileUrl)
-        .then((res) => {
-          if (!res.ok) throw new Error('Failed to fetch document');
-          return res.arrayBuffer();
-        })
-        .then((arrayBuffer) => mammoth.convertToHtml({ arrayBuffer }))
-        .then((result) => {
-          setDocxHtml(result.value);
-          // Log any conversion warnings
-          if (result.messages.length > 0) {
-            console.warn('Mammoth conversion warnings:', result.messages);
+        } else if (category === 'pdf' || category === 'image') {
+          // Fetch signed URL for PDF and images
+          const url = await fetchSignedUrl(document.id);
+          if (url) {
+            setSignedUrl(url);
+          } else {
+            setError('Failed to load document URL');
           }
-        })
-        .catch((err) => {
-          console.error('DOCX conversion error:', err);
-          setError('Failed to load Word document');
-        })
-        .finally(() => setLoading(false));
-    } else if (category === 'pdf' || category === 'image') {
-      // PDF and images load directly, just clear loading state
-      setLoading(false);
-    } else {
-      // Unsupported types
-      setLoading(false);
-    }
+        } else if (category === 'docx') {
+          // Fetch signed URL first, then convert DOCX using mammoth.js
+          const url = await fetchSignedUrl(document.id);
+          if (url) {
+            setSignedUrl(url);
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to fetch document');
+            const arrayBuffer = await response.arrayBuffer();
+            const result = await mammoth.convertToHtml({ arrayBuffer });
+            setDocxHtml(result.value);
+            if (result.messages.length > 0) {
+              console.warn('Mammoth conversion warnings:', result.messages);
+            }
+          } else {
+            setError('Failed to load document URL');
+          }
+        } else if (category === 'doc' || category === 'excel') {
+          // For download-only files, just get the signed URL
+          const url = await fetchSignedUrl(document.id);
+          if (url) {
+            setSignedUrl(url);
+          } else {
+            setError('Failed to generate download URL');
+          }
+        }
+      } catch (err) {
+        console.error('Error loading document:', err);
+        setError('Failed to load document');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadContent();
   }, [document, visible, token]);
 
   // Reset state when modal closes
@@ -116,11 +151,26 @@ export default function DocumentViewer({
     if (!visible) {
       setTextContent(null);
       setDocxHtml(null);
+      setSignedUrl(null);
       setError(null);
       setLoading(true);
       setFullScreen(false);
     }
   }, [visible]);
+
+  // Refresh signed URL (useful if it expires)
+  const handleRefreshUrl = async () => {
+    if (!document) return;
+    setLoading(true);
+    setError(null);
+    const url = await fetchSignedUrl(document.id);
+    if (url) {
+      setSignedUrl(url);
+    } else {
+      setError('Failed to refresh document URL');
+    }
+    setLoading(false);
+  };
 
   if (!document) return null;
 
@@ -143,14 +193,26 @@ export default function DocumentViewer({
     }
 
     if (error) {
-      return <Alert type="error" message={error} showIcon />;
+      return (
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <Alert
+            type="error"
+            message={error}
+            showIcon
+            style={{ marginBottom: '1rem' }}
+          />
+          <Button icon={<ReloadOutlined />} onClick={handleRefreshUrl}>
+            Retry
+          </Button>
+        </div>
+      );
     }
 
     switch (category) {
       case 'pdf':
         return (
           <iframe
-            src={document.fileUrl}
+            src={signedUrl || ''}
             style={{
               width: '100%',
               height: fullScreen ? '85vh' : '70vh',
@@ -171,7 +233,7 @@ export default function DocumentViewer({
             }}
           >
             <img
-              src={document.fileUrl}
+              src={signedUrl || ''}
               alt={document.fileName}
               style={{
                 maxWidth: '100%',
@@ -241,8 +303,9 @@ export default function DocumentViewer({
             <Button
               type="primary"
               icon={<DownloadOutlined />}
-              href={document.fileUrl}
+              href={signedUrl || ''}
               target="_blank"
+              disabled={!signedUrl}
             >
               Download to View
             </Button>
@@ -268,8 +331,9 @@ export default function DocumentViewer({
             <Button
               type="primary"
               icon={<DownloadOutlined />}
-              href={document.fileUrl}
+              href={signedUrl || ''}
               target="_blank"
+              disabled={!signedUrl}
             >
               Download to View
             </Button>
@@ -290,8 +354,9 @@ export default function DocumentViewer({
             <Button
               type="primary"
               icon={<DownloadOutlined />}
-              href={document.fileUrl}
+              href={signedUrl || ''}
               target="_blank"
+              disabled={!signedUrl}
             >
               Download to View
             </Button>
@@ -322,8 +387,9 @@ export default function DocumentViewer({
           <Button
             type="primary"
             icon={<DownloadOutlined />}
-            href={document.fileUrl}
+            href={signedUrl || ''}
             target="_blank"
+            disabled={!signedUrl}
           >
             Download
           </Button>

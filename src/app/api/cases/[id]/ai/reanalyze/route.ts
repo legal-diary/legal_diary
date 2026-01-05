@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import { analyzeCaseWithAI } from '@/lib/openai';
 import { safeExtractFileContent } from '@/lib/fileProcessor';
-import path from 'path';
 
 export async function POST(
   request: NextRequest,
@@ -51,11 +50,11 @@ export async function POST(
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    // Extract document contents
+    // Extract document contents from Supabase Storage
     const documents = [];
     for (const doc of caseRecord.FileDocument) {
-      const filePath = path.join(process.cwd(), 'public', doc.fileUrl.replace(/^\//, ''));
-      const extraction = await safeExtractFileContent(filePath, doc.fileType);
+      // fileUrl now contains the Supabase storage path
+      const extraction = await safeExtractFileContent(doc.fileUrl, doc.fileType);
 
       if (extraction.success && extraction.content) {
         documents.push({
