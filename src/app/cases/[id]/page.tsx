@@ -430,25 +430,76 @@ export default function CaseDetailPage() {
         key: 'overview',
         label: 'Overview',
         children: (
-          <Card>
-            <Descriptions column={2} bordered>
-              <Descriptions.Item label="Case Number">{caseData.caseNumber}</Descriptions.Item>
-              <Descriptions.Item label="Status">
-                <Tag color={STATUS_COLORS[caseData.status]}>{caseData.status.replace(/_/g, ' ')}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Priority">
-                <Tag color={PRIORITY_COLORS[caseData.priority]}>{caseData.priority}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Client Name">{caseData.clientName}</Descriptions.Item>
-              <Descriptions.Item label="Client Email">{caseData.clientEmail || 'N/A'}</Descriptions.Item>
-              <Descriptions.Item label="Client Phone">{caseData.clientPhone || 'N/A'}</Descriptions.Item>
-              <Descriptions.Item label="Court Name">{caseData.courtName || 'N/A'}</Descriptions.Item>
-              <Descriptions.Item label="Judge Assigned">{caseData.judgeAssigned || 'N/A'}</Descriptions.Item>
-              <Descriptions.Item label="Opponents" span={2}>{caseData.opponents || 'N/A'}</Descriptions.Item>
-              <Descriptions.Item label="Created Date" span={2}>
-                {dayjs(caseData.createdAt).format('YYYY-MM-DD HH:mm')}
-              </Descriptions.Item>
-            </Descriptions>
+          <Card className="overview-card">
+            {/* Custom Two-Column Grid for Case Details */}
+            <div className="case-details-grid">
+              <Row gutter={[12, 12]}>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Case Number</div>
+                    <div className="detail-value">{caseData.caseNumber}</div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Status</div>
+                    <div className="detail-value">
+                      <Tag color={STATUS_COLORS[caseData.status]}>{caseData.status.replace(/_/g, ' ')}</Tag>
+                    </div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Priority</div>
+                    <div className="detail-value">
+                      <Tag color={PRIORITY_COLORS[caseData.priority]}>{caseData.priority}</Tag>
+                    </div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Client Name</div>
+                    <div className="detail-value">{caseData.clientName}</div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Client Email</div>
+                    <div className="detail-value">{caseData.clientEmail || 'N/A'}</div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Client Phone</div>
+                    <div className="detail-value">{caseData.clientPhone || 'N/A'}</div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Court Name</div>
+                    <div className="detail-value">{caseData.courtName || 'N/A'}</div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Judge Assigned</div>
+                    <div className="detail-value">{caseData.judgeAssigned || 'N/A'}</div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Opponents</div>
+                    <div className="detail-value">{caseData.opponents || 'N/A'}</div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Created Date</div>
+                    <div className="detail-value">{dayjs(caseData.createdAt).format('DD/MM/YYYY')}</div>
+                  </div>
+                </Col>
+              </Row>
+            </div>
 
             {caseData.description && (
               <Card title="Case Description" style={{ marginTop: '2vh' }}>
@@ -523,7 +574,69 @@ export default function CaseDetailPage() {
             }
           >
             {caseData.FileDocument && caseData.FileDocument.length > 0 ? (
-              <Table columns={fileColumns} dataSource={caseData.FileDocument} rowKey="id" pagination={false} />
+              <>
+                {/* Desktop Table View */}
+                <div className="documents-table-view">
+                  <Table
+                    columns={fileColumns}
+                    dataSource={caseData.FileDocument}
+                    rowKey="id"
+                    pagination={false}
+                    scroll={{ x: 'max-content' }}
+                  />
+                </div>
+                {/* Mobile Card View */}
+                <div className="documents-card-view">
+                  <Row gutter={[12, 12]}>
+                    {caseData.FileDocument.map((doc: any) => (
+                      <Col xs={24} sm={12} key={doc.id}>
+                        <Card
+                          size="small"
+                          className="document-card"
+                          styles={{ body: { padding: '12px' } }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                            <FileTextOutlined style={{ fontSize: '24px', color: '#1a3a52', flexShrink: 0 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{
+                                fontWeight: 600,
+                                fontSize: 'clamp(0.8rem, 2.5vw, 0.95rem)',
+                                marginBottom: '4px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {doc.fileName}
+                              </div>
+                              <div style={{ fontSize: 'clamp(0.7rem, 2vw, 0.8rem)', color: '#666', marginBottom: '8px' }}>
+                                <span>{doc.fileType}</span>
+                                <span style={{ margin: '0 8px' }}>•</span>
+                                <span>{(doc.fileSize / 1024).toFixed(2)} KB</span>
+                              </div>
+                              <Space size={8} wrap>
+                                <Button
+                                  icon={<EyeOutlined />}
+                                  size="small"
+                                  type="primary"
+                                  ghost
+                                  onClick={() => handleViewDocument(doc)}
+                                >
+                                  View
+                                </Button>
+                                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer">
+                                  <Button icon={<DownloadOutlined />} size="small" type="default">
+                                    Download
+                                  </Button>
+                                </a>
+                              </Space>
+                            </div>
+                          </div>
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
+                </div>
+              </>
             ) : (
               <Empty description="No documents uploaded" />
             )}
@@ -662,6 +775,159 @@ export default function CaseDetailPage() {
             .action-buttons .ant-btn {
               width: 100%;
               justify-content: center;
+            }
+          }
+
+          /* Overview Tab - Custom Grid Styles */
+          .overview-card {
+            overflow: hidden;
+          }
+
+          .case-details-grid {
+            background: #fafafa;
+            border-radius: 8px;
+            padding: clamp(12px, 3vw, 20px);
+            border: 1px solid #e8e8e8;
+          }
+
+          .detail-item {
+            background: #ffffff;
+            border-radius: 6px;
+            padding: clamp(8px, 2vw, 12px);
+            height: 100%;
+            border: 1px solid #f0f0f0;
+          }
+
+          .detail-label {
+            font-size: clamp(0.65rem, 1.8vw, 0.8rem);
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+          }
+
+          .detail-value {
+            font-size: clamp(0.8rem, 2.2vw, 0.95rem);
+            color: #000;
+            word-break: break-word;
+          }
+
+          /* Mobile adjustments */
+          @media (max-width: 576px) {
+            .case-details-grid {
+              padding: 8px;
+            }
+
+            .detail-item {
+              padding: 8px;
+            }
+
+            .detail-label {
+              font-size: 0.6rem;
+              margin-bottom: 2px;
+            }
+
+            .detail-value {
+              font-size: 0.75rem;
+            }
+
+            .detail-value .ant-tag {
+              font-size: 0.65rem !important;
+              padding: 0 4px !important;
+              line-height: 1.5;
+            }
+          }
+
+          /* Tablet adjustments */
+          @media (min-width: 577px) and (max-width: 768px) {
+            .detail-label {
+              font-size: 0.7rem;
+            }
+
+            .detail-value {
+              font-size: 0.85rem;
+            }
+          }
+
+          /* Large screens */
+          @media (min-width: 1200px) {
+            .detail-item {
+              padding: 14px;
+            }
+
+            .detail-label {
+              font-size: 0.85rem;
+            }
+
+            .detail-value {
+              font-size: 1rem;
+            }
+          }
+
+          /* Documents Tab - Table vs Card View */
+          .documents-table-view {
+            display: block;
+          }
+
+          .documents-card-view {
+            display: none;
+          }
+
+          @media (max-width: 768px) {
+            .documents-table-view {
+              display: none;
+            }
+
+            .documents-card-view {
+              display: block;
+            }
+          }
+
+          .document-card {
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+          }
+
+          .document-card:hover {
+            border-color: #1a3a52;
+            box-shadow: 0 2px 8px rgba(26, 58, 82, 0.1);
+          }
+
+          /* Hearings Table Responsive */
+          @media (max-width: 768px) {
+            .ant-table-wrapper {
+              overflow-x: auto;
+            }
+
+            .ant-table {
+              min-width: 500px;
+            }
+          }
+
+          /* Large screens optimization */
+          @media (min-width: 1920px) {
+            .case-descriptions .ant-descriptions-item-label {
+              font-size: 1rem !important;
+              padding: 16px !important;
+            }
+
+            .case-descriptions .ant-descriptions-item-content {
+              font-size: 1.05rem !important;
+              padding: 16px !important;
+            }
+          }
+
+          @media (min-width: 2560px) {
+            .case-descriptions .ant-descriptions-item-label,
+            .case-descriptions .ant-descriptions-item-content {
+              font-size: 1.1rem !important;
+              padding: 18px !important;
+            }
+
+            .document-card {
+              padding: 16px;
             }
           }
         `}</style>

@@ -1,25 +1,159 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Form, Input, Button, Card, message, Spin, Row, Col, Divider } from 'antd';
-import { LockOutlined, UserOutlined, GoogleOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Form, Input, Button, Card, message, Spin, Row, Col, Divider, Alert } from 'antd';
+import {
+  LockOutlined,
+  UserOutlined,
+  GoogleOutlined,
+  ExclamationCircleOutlined,
+  ClockCircleOutlined,
+  WarningOutlined,
+} from '@ant-design/icons';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+
+// Error types for different UI treatments
+type ErrorType = 'error' | 'warning' | 'info' | 'rate_limit';
+
+interface LoginError {
+  message: string;
+  type: ErrorType;
+  attemptsRemaining?: number;
+  retryAfter?: number;
+  code?: string;
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, isLoading } = useAuth();
   const [form] = Form.useForm();
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [loginError, setLoginError] = useState<LoginError | null>(null);
+  const [countdown, setCountdown] = useState<number>(0);
+
+  // Countdown timer for rate limiting
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (countdown === 0 && loginError?.type === 'rate_limit') {
+      setLoginError(null);
+    }
+  }, [countdown, loginError?.type]);
+
+  // Clear error when user starts typing
+  const handleFieldChange = () => {
+    if (loginError && loginError.type !== 'rate_limit') {
+      setLoginError(null);
+    }
+  };
+
+  const parseLoginError = async (response: Response): Promise<LoginError> => {
+    try {
+      const data = await response.json();
+      const errorMessage = data.error || 'Login failed';
+
+      // Rate limiting (429)
+      if (response.status === 429) {
+        const retryAfter = data.retryAfter || 60;
+        setCountdown(retryAfter);
+        return {
+          message: `Too many login attempts. Please wait ${retryAfter} seconds before trying again.`,
+          type: 'rate_limit',
+          retryAfter,
+        };
+      }
+
+      // Google OAuth user without password
+      if (data.code === 'NO_PASSWORD_SET') {
+        return {
+          message: 'This account uses Google Sign-In. Please click "Sign in with Google" below, or set a password in Settings.',
+          type: 'info',
+          code: 'NO_PASSWORD_SET',
+        };
+      }
+
+      // Invalid credentials (401)
+      if (response.status === 401) {
+        const attemptsRemaining = data.attemptsRemaining;
+        let msg = 'Invalid email or password.';
+        if (attemptsRemaining !== undefined) {
+          if (attemptsRemaining === 0) {
+            msg = 'Invalid credentials. Your account has been temporarily locked due to too many failed attempts.';
+          } else if (attemptsRemaining <= 2) {
+            msg = `Invalid email or password. ${attemptsRemaining} attempt${attemptsRemaining === 1 ? '' : 's'} remaining before lockout.`;
+          } else {
+            msg = `Invalid email or password. ${attemptsRemaining} attempts remaining.`;
+          }
+        }
+        return {
+          message: msg,
+          type: attemptsRemaining !== undefined && attemptsRemaining <= 2 ? 'warning' : 'error',
+          attemptsRemaining,
+        };
+      }
+
+      // Validation errors (400)
+      if (response.status === 400) {
+        return {
+          message: errorMessage,
+          type: 'error',
+        };
+      }
+
+      // Server errors (500)
+      if (response.status >= 500) {
+        return {
+          message: 'Unable to connect to the server. Please check your internet connection and try again.',
+          type: 'error',
+        };
+      }
+
+      return { message: errorMessage, type: 'error' };
+    } catch {
+      return { message: 'An unexpected error occurred. Please try again.', type: 'error' };
+    }
+  };
 
   const onFinish = async (values: { email: string; password: string }) => {
+    setLoginError(null);
+
+    // Don't attempt if rate limited
+    if (countdown > 0) {
+      return;
+    }
+
     try {
-      await login(values.email, values.password);
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        const error = await parseLoginError(response.clone());
+        setLoginError(error);
+        return;
+      }
+
+      const data = await response.json();
+
+      // Manual login success - store in localStorage and redirect
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('tokenExpiresAt', data.expiresAt);
+
       message.success('Login successful!');
       router.push('/dashboard');
+      // Force page reload to update AuthContext
+      window.location.href = '/dashboard';
     } catch (error) {
-      message.error('Login failed. Please check your credentials.');
+      setLoginError({
+        message: 'Network error. Please check your internet connection and try again.',
+        type: 'error',
+      });
     }
   };
 
@@ -84,7 +218,51 @@ export default function LoginPage() {
               layout="vertical"
               size="large"
               style={{ marginTop: '1rem' }}
+              onValuesChange={handleFieldChange}
             >
+              {/* Error Alert */}
+              {loginError && (
+                <Alert
+                  message={
+                    loginError.type === 'rate_limit' ? (
+                      <span>
+                        <ClockCircleOutlined style={{ marginRight: 8 }} />
+                        Account Temporarily Locked
+                      </span>
+                    ) : loginError.type === 'warning' ? (
+                      <span>
+                        <WarningOutlined style={{ marginRight: 8 }} />
+                        Warning
+                      </span>
+                    ) : loginError.code === 'NO_PASSWORD_SET' ? (
+                      'Google Account Detected'
+                    ) : (
+                      'Login Failed'
+                    )
+                  }
+                  description={
+                    loginError.type === 'rate_limit' && countdown > 0 ? (
+                      <div>
+                        <p style={{ margin: 0 }}>{loginError.message}</p>
+                        <p style={{ margin: '8px 0 0 0', fontWeight: 600, fontSize: '1.1rem' }}>
+                          Try again in: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
+                        </p>
+                      </div>
+                    ) : (
+                      loginError.message
+                    )
+                  }
+                  type={loginError.type === 'rate_limit' ? 'error' : loginError.type === 'info' ? 'info' : loginError.type}
+                  showIcon
+                  closable={loginError.type !== 'rate_limit'}
+                  onClose={() => setLoginError(null)}
+                  style={{
+                    marginBottom: '1rem',
+                    borderRadius: '0.5rem',
+                  }}
+                />
+              )}
+
               <Form.Item
                 name="email"
                 label={<span style={{ fontWeight: '600', color: '#1a1a1a' }}>Email</span>}
@@ -92,12 +270,14 @@ export default function LoginPage() {
                   { required: true, message: 'Please enter your email' },
                   { type: 'email', message: 'Please enter a valid email' },
                 ]}
+                validateStatus={loginError?.type === 'error' || loginError?.type === 'warning' ? 'error' : undefined}
               >
                 <Input
                   prefix={<UserOutlined style={{ color: 'var(--primary-color)' }} />}
                   placeholder="your@email.com"
                   type="email"
                   style={{ borderRadius: '0.6rem' }}
+                  disabled={countdown > 0}
                 />
               </Form.Item>
 
@@ -107,11 +287,13 @@ export default function LoginPage() {
                 rules={[
                   { required: true, message: 'Please enter your password' },
                 ]}
+                validateStatus={loginError?.type === 'error' || loginError?.type === 'warning' ? 'error' : undefined}
               >
                 <Input.Password
                   prefix={<LockOutlined style={{ color: 'var(--primary-color)' }} />}
                   placeholder="Password"
                   style={{ borderRadius: '0.6rem' }}
+                  disabled={countdown > 0}
                 />
               </Form.Item>
 
@@ -122,24 +304,27 @@ export default function LoginPage() {
                   block
                   size="large"
                   loading={isLoading}
+                  disabled={countdown > 0}
                   style={{
                     height: '3rem',
                     fontSize: 'clamp(0.95rem, 2vw, 1.1rem)',
                     fontWeight: '700',
-                    background: 'var(--primary-color)',
-                    border: '1px solid var(--primary-color)',
+                    background: countdown > 0 ? '#d9d9d9' : 'var(--primary-color)',
+                    border: `1px solid ${countdown > 0 ? '#d9d9d9' : 'var(--primary-color)'}`,
                     borderRadius: '0.6rem',
-                    boxShadow: 'var(--shadow-sm)',
+                    boxShadow: countdown > 0 ? 'none' : 'var(--shadow-sm)',
                     transition: 'all 0.3s ease',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                    if (countdown === 0) {
+                      e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                    e.currentTarget.style.boxShadow = countdown > 0 ? 'none' : 'var(--shadow-sm)';
                   }}
                 >
-                  Login
+                  {countdown > 0 ? `Locked (${countdown}s)` : 'Login'}
                 </Button>
               </Form.Item>
 
