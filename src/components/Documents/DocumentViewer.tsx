@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Modal, Spin, Button, Space, Alert } from 'antd';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Modal, Spin, Button, Space, Alert, Progress } from 'antd';
 import {
   DownloadOutlined,
   ExpandOutlined,
@@ -9,6 +9,7 @@ import {
   FileTextOutlined,
   FileExcelOutlined,
   FileWordOutlined,
+  FilePdfOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
 import mammoth from 'mammoth';
@@ -28,6 +29,13 @@ interface DocumentViewerProps {
 
 type FileCategory = 'pdf' | 'image' | 'text' | 'docx' | 'doc' | 'excel' | 'unsupported';
 
+// Format file size for display
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function DocumentViewer({
   visible,
   onClose,
@@ -35,11 +43,13 @@ export default function DocumentViewer({
   token,
 }: DocumentViewerProps) {
   const [loading, setLoading] = useState(true);
+  const [pdfLoading, setPdfLoading] = useState(true); // Separate state for PDF iframe loading
   const [textContent, setTextContent] = useState<string | null>(null);
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fullScreen, setFullScreen] = useState(false);
+  const [loadProgress, setLoadProgress] = useState(0); // Progress for visual feedback
 
   // Determine file category based on MIME type
   const getFileCategory = (fileType: string): FileCategory => {
@@ -80,12 +90,35 @@ export default function DocumentViewer({
     }
   };
 
+  // Simulate progress for better UX during loading
+  useEffect(() => {
+    if (!loading && !pdfLoading) {
+      setLoadProgress(100);
+      return;
+    }
+
+    if (loading || pdfLoading) {
+      setLoadProgress(0);
+      const interval = setInterval(() => {
+        setLoadProgress((prev) => {
+          // Slow down as we approach 90% (never reach 100 until actually loaded)
+          if (prev >= 90) return prev;
+          const increment = prev < 30 ? 10 : prev < 60 ? 5 : prev < 80 ? 2 : 1;
+          return Math.min(prev + increment, 90);
+        });
+      }, 200);
+      return () => clearInterval(interval);
+    }
+  }, [loading, pdfLoading]);
+
   // Load content when modal opens
   useEffect(() => {
     if (!document || !visible) return;
 
     const category = getFileCategory(document.fileType);
     setLoading(true);
+    setPdfLoading(true);
+    setLoadProgress(0);
     setError(null);
     setSignedUrl(null);
 
@@ -102,13 +135,17 @@ export default function DocumentViewer({
           } else {
             setError(data.error || 'Failed to load text content');
           }
+          setPdfLoading(false);
         } else if (category === 'pdf' || category === 'image') {
           // Fetch signed URL for PDF and images
           const url = await fetchSignedUrl(document.id);
           if (url) {
             setSignedUrl(url);
+            // For PDFs, keep pdfLoading true until iframe loads
+            // For images, we'll handle it in onLoad
           } else {
             setError('Failed to load document URL');
+            setPdfLoading(false);
           }
         } else if (category === 'docx') {
           // Fetch signed URL first, then convert DOCX using mammoth.js
@@ -126,6 +163,7 @@ export default function DocumentViewer({
           } else {
             setError('Failed to load document URL');
           }
+          setPdfLoading(false);
         } else if (category === 'doc' || category === 'excel') {
           // For download-only files, just get the signed URL
           const url = await fetchSignedUrl(document.id);
@@ -134,10 +172,14 @@ export default function DocumentViewer({
           } else {
             setError('Failed to generate download URL');
           }
+          setPdfLoading(false);
+        } else {
+          setPdfLoading(false);
         }
       } catch (err) {
         console.error('Error loading document:', err);
         setError('Failed to load document');
+        setPdfLoading(false);
       } finally {
         setLoading(false);
       }
@@ -154,9 +196,23 @@ export default function DocumentViewer({
       setSignedUrl(null);
       setError(null);
       setLoading(true);
+      setPdfLoading(true);
+      setLoadProgress(0);
       setFullScreen(false);
     }
   }, [visible]);
+
+  // Handle PDF/Image iframe load complete
+  const handleIframeLoad = useCallback(() => {
+    setPdfLoading(false);
+    setLoadProgress(100);
+  }, []);
+
+  // Handle image load complete
+  const handleImageLoad = useCallback(() => {
+    setPdfLoading(false);
+    setLoadProgress(100);
+  }, []);
 
   // Refresh signed URL (useful if it expires)
   const handleRefreshUrl = async () => {
@@ -177,17 +233,28 @@ export default function DocumentViewer({
   const category = getFileCategory(document.fileType);
 
   const renderContent = () => {
-    if (loading) {
+    // Show initial loading only when fetching signed URL
+    if (loading && !signedUrl) {
       return (
         <div
           style={{
             display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
             height: '50vh',
+            gap: '1rem',
           }}
         >
-          <Spin size="large" tip="Loading document..." />
+          <Spin size="large" />
+          <div style={{ color: '#666', fontSize: '0.95rem' }}>
+            Preparing document...
+          </div>
+          {document && (
+            <div style={{ color: '#999', fontSize: '0.85rem' }}>
+              {formatFileSize(document.fileSize)}
+            </div>
+          )}
         </div>
       );
     }
@@ -211,16 +278,56 @@ export default function DocumentViewer({
     switch (category) {
       case 'pdf':
         return (
-          <iframe
-            src={signedUrl || ''}
-            style={{
-              width: '100%',
-              height: fullScreen ? '85vh' : '70vh',
-              border: 'none',
-              borderRadius: '0.5rem',
-            }}
-            title={document.fileName}
-          />
+          <div style={{ position: 'relative' }}>
+            {/* Loading overlay - shows while PDF is loading in iframe */}
+            {pdfLoading && signedUrl && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  zIndex: 10,
+                  borderRadius: '0.5rem',
+                  gap: '1rem',
+                }}
+              >
+                <FilePdfOutlined style={{ fontSize: '3rem', color: '#ff4d4f' }} />
+                <div style={{ width: '60%', maxWidth: '300px' }}>
+                  <Progress
+                    percent={loadProgress}
+                    status="active"
+                    strokeColor={{ from: '#ff4d4f', to: '#ff7875' }}
+                    showInfo={false}
+                  />
+                </div>
+                <div style={{ color: '#666', fontSize: '0.95rem' }}>
+                  Loading PDF...
+                </div>
+                <div style={{ color: '#999', fontSize: '0.85rem' }}>
+                  {formatFileSize(document.fileSize)}
+                </div>
+              </div>
+            )}
+            <iframe
+              src={signedUrl || ''}
+              style={{
+                width: '100%',
+                height: fullScreen ? '85vh' : '70vh',
+                border: 'none',
+                borderRadius: '0.5rem',
+                background: '#f5f5f5',
+              }}
+              title={document.fileName}
+              onLoad={handleIframeLoad}
+            />
+          </div>
         );
 
       case 'image':
@@ -230,8 +337,31 @@ export default function DocumentViewer({
               textAlign: 'center',
               overflow: 'auto',
               maxHeight: fullScreen ? '85vh' : '70vh',
+              position: 'relative',
             }}
           >
+            {/* Loading overlay for images */}
+            {pdfLoading && signedUrl && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  zIndex: 10,
+                  gap: '0.5rem',
+                }}
+              >
+                <Spin size="large" />
+                <div style={{ color: '#666', fontSize: '0.9rem' }}>Loading image...</div>
+              </div>
+            )}
             <img
               src={signedUrl || ''}
               alt={document.fileName}
@@ -241,6 +371,7 @@ export default function DocumentViewer({
                 objectFit: 'contain',
                 borderRadius: '0.5rem',
               }}
+              onLoad={handleImageLoad}
             />
           </div>
         );
