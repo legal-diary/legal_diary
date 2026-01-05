@@ -1,6 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import mammoth from 'mammoth';
+import { downloadFile } from './supabase';
 
 interface DocumentContent {
   fileName: string;
@@ -17,13 +16,36 @@ interface ExtractionResult {
 const MAX_CONTENT_LENGTH = 50000; // 50KB limit to avoid token overflow
 
 /**
- * Extract text from PDF file using pdf2json library
- * pdf2json is pure JavaScript with no canvas/DOM dependencies
+ * Download file buffer from Supabase Storage
  */
-export async function extractTextFromPDF(filePath: string): Promise<ExtractionResult> {
-  console.log(`[extractTextFromPDF] Starting extraction for: ${filePath}`);
+async function getFileBuffer(storagePath: string): Promise<Buffer | null> {
+  return await downloadFile(storagePath);
+}
+
+/**
+ * Get file extension from storage path
+ */
+function getExtension(storagePath: string): string {
+  const lastDotIndex = storagePath.lastIndexOf('.');
+  if (lastDotIndex === -1) return '';
+  return storagePath.substring(lastDotIndex).toLowerCase();
+}
+
+/**
+ * Get filename from storage path
+ */
+function getFileName(storagePath: string): string {
+  const parts = storagePath.split('/');
+  return parts[parts.length - 1] || storagePath;
+}
+
+/**
+ * Extract text from PDF file using pdf2json library
+ * Now accepts a Buffer instead of file path
+ */
+export async function extractTextFromPDF(buffer: Buffer, fileName: string): Promise<ExtractionResult> {
+  console.log(`[extractTextFromPDF] Starting extraction for: ${fileName}`);
   try {
-    // Dynamic import to work better with Next.js bundling
     console.log('[extractTextFromPDF] Loading pdf2json library...');
     const { default: PDFParser } = await import('pdf2json');
     console.log('[extractTextFromPDF] pdf2json loaded successfully');
@@ -58,10 +80,10 @@ export async function extractTextFromPDF(filePath: string): Promise<ExtractionRe
           text = text.trim();
 
           if (!text || text.length === 0) {
-            console.log(`[extractTextFromPDF] No text found in PDF: ${path.basename(filePath)}`);
+            console.log(`[extractTextFromPDF] No text found in PDF: ${fileName}`);
             resolve({
               success: true,
-              content: `[PDF Document: ${path.basename(filePath)}] - No readable text content found in PDF (may be scanned/image-based).`,
+              content: `[PDF Document: ${fileName}] - No readable text content found in PDF (may be scanned/image-based).`,
             });
             return;
           }
@@ -88,7 +110,8 @@ export async function extractTextFromPDF(filePath: string): Promise<ExtractionRe
         }
       });
 
-      pdfParser.loadPDF(filePath);
+      // Parse from buffer instead of file path
+      pdfParser.parseBuffer(buffer);
     });
   } catch (error) {
     return {
@@ -100,26 +123,26 @@ export async function extractTextFromPDF(filePath: string): Promise<ExtractionRe
 
 /**
  * Extract text from DOCX file using mammoth library
+ * Now accepts a Buffer instead of file path
  */
-export async function extractTextFromDocx(filePath: string): Promise<ExtractionResult> {
-  console.log(`[extractTextFromDocx] Starting extraction for: ${filePath}`);
+export async function extractTextFromDocx(buffer: Buffer, fileName: string): Promise<ExtractionResult> {
+  console.log(`[extractTextFromDocx] Starting extraction for: ${fileName}`);
   try {
-    const fileBuffer = fs.readFileSync(filePath);
-    console.log(`[extractTextFromDocx] Read file buffer, size: ${fileBuffer.length} bytes`);
+    console.log(`[extractTextFromDocx] Buffer size: ${buffer.length} bytes`);
 
-    const result = await mammoth.extractRawText({ buffer: fileBuffer });
+    const result = await mammoth.extractRawText({ buffer });
 
     if (!result.value || result.value.trim().length === 0) {
-      console.log(`[extractTextFromDocx] No text found in DOCX: ${path.basename(filePath)}`);
+      console.log(`[extractTextFromDocx] No text found in DOCX: ${fileName}`);
       return {
         success: true,
-        content: `[Word Document: ${path.basename(filePath)}] - No readable text content found in document.`,
+        content: `[Word Document: ${fileName}] - No readable text content found in document.`,
       };
     }
 
     // Log any warnings from mammoth (useful for debugging)
     if (result.messages && result.messages.length > 0) {
-      console.log(`[extractTextFromDocx] Warnings for ${path.basename(filePath)}:`, result.messages);
+      console.log(`[extractTextFromDocx] Warnings for ${fileName}:`, result.messages);
     }
 
     console.log(`[extractTextFromDocx] Successfully extracted ${result.value.length} characters from DOCX`);
@@ -140,10 +163,11 @@ export async function extractTextFromDocx(filePath: string): Promise<ExtractionR
 
 /**
  * Extract text from plain text files
+ * Now accepts a Buffer instead of file path
  */
-export async function extractTextFromText(filePath: string): Promise<ExtractionResult> {
+export async function extractTextFromText(buffer: Buffer): Promise<ExtractionResult> {
   try {
-    const text = fs.readFileSync(filePath, 'utf-8');
+    const text = buffer.toString('utf-8');
 
     return {
       success: true,
@@ -160,13 +184,13 @@ export async function extractTextFromText(filePath: string): Promise<ExtractionR
 /**
  * Extract text from Excel files (XLSX)
  */
-export async function extractTextFromExcel(filePath: string): Promise<ExtractionResult> {
+export async function extractTextFromExcel(fileName: string): Promise<ExtractionResult> {
   try {
     // For now, return a simple message indicating Excel support
     // Full implementation would use xlsx library
     return {
       success: true,
-      content: `[Excel file: ${path.basename(filePath)}] - Excel files require special parsing library. Please use PDF export from Excel for full content extraction.`,
+      content: `[Excel file: ${fileName}] - Excel files require special parsing library. Please use PDF export from Excel for full content extraction.`,
     };
   } catch (error) {
     return {
@@ -178,33 +202,39 @@ export async function extractTextFromExcel(filePath: string): Promise<Extraction
 
 /**
  * Extract file content based on file type
+ * Now accepts Supabase storage path instead of local file path
  */
 export async function safeExtractFileContent(
-  filePath: string,
+  storagePath: string,
   fileType: string
 ): Promise<ExtractionResult> {
-  // Check if file exists
-  if (!fs.existsSync(filePath)) {
-    return {
-      success: false,
-      error: `File not found: ${filePath}`,
-    };
+  const ext = getExtension(storagePath);
+  const fileName = getFileName(storagePath);
+
+  // For Excel files, we don't need to download
+  if (ext === '.xlsx' || ext === '.xls') {
+    return await extractTextFromExcel(fileName);
   }
 
-  const ext = path.extname(filePath).toLowerCase();
+  // Download file from Supabase Storage
+  const buffer = await getFileBuffer(storagePath);
+
+  if (!buffer) {
+    return {
+      success: false,
+      error: `Failed to download file from storage: ${storagePath}`,
+    };
+  }
 
   try {
     switch (ext) {
       case '.pdf':
-        return await extractTextFromPDF(filePath);
+        return await extractTextFromPDF(buffer, fileName);
       case '.docx':
       case '.doc':
-        return await extractTextFromDocx(filePath);
+        return await extractTextFromDocx(buffer, fileName);
       case '.txt':
-        return await extractTextFromText(filePath);
-      case '.xlsx':
-      case '.xls':
-        return await extractTextFromExcel(filePath);
+        return await extractTextFromText(buffer);
       default:
         return {
           success: false,
@@ -221,14 +251,15 @@ export async function safeExtractFileContent(
 
 /**
  * Extract content from multiple files
+ * Now accepts Supabase storage paths instead of local file paths
  */
 export async function extractMultipleFiles(
-  filePaths: Array<{ path: string; fileName: string; fileType: string }>
+  files: Array<{ storagePath: string; fileName: string; fileType: string }>
 ): Promise<DocumentContent[]> {
   const results: DocumentContent[] = [];
 
-  for (const file of filePaths) {
-    const extraction = await safeExtractFileContent(file.path, file.fileType);
+  for (const file of files) {
+    const extraction = await safeExtractFileContent(file.storagePath, file.fileType);
 
     if (extraction.success && extraction.content) {
       results.push({

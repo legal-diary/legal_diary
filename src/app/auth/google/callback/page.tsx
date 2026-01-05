@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Spin, Result, Button } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 
-export default function GoogleCallbackPage() {
+function GoogleCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -122,5 +122,30 @@ export default function GoogleCallbackPage() {
         {isProcessing ? 'Completing sign-in with Google...' : 'Redirecting...'}
       </div>
     </div>
+  );
+}
+
+export default function GoogleCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            minHeight: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#f5f7fa',
+            gap: '1rem',
+          }}
+        >
+          <Spin indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} />
+          <div style={{ color: '#666', fontSize: '1.1rem' }}>Loading...</div>
+        </div>
+      }
+    >
+      <GoogleCallbackContent />
+    </Suspense>
   );
 }

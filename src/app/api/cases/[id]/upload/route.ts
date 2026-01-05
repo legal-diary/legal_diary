@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { uploadFile, getStoragePath } from '@/lib/supabase';
 
 // Allowed MIME types for file uploads
 const ALLOWED_MIME_TYPES = [
@@ -111,27 +109,25 @@ export async function POST(
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      // Create upload directory
-      const uploadDir = join(process.cwd(), 'public', 'uploads', caseId);
-      if (!existsSync(uploadDir)) {
-        await mkdir(uploadDir, { recursive: true });
+      // Generate storage path and upload to Supabase Storage
+      const sanitizedFileName = sanitizeFileName(file.name);
+      const storagePath = getStoragePath(caseId, sanitizedFileName);
+
+      const uploadResult = await uploadFile(storagePath, buffer, file.type);
+
+      if (!uploadResult.success) {
+        return NextResponse.json(
+          { error: `Failed to upload ${file.name}: ${uploadResult.error}` },
+          { status: 500 }
+        );
       }
 
-      // Save file with sanitized name
-      const timestamp = Date.now();
-      const sanitizedFileName = sanitizeFileName(file.name);
-      const fileName = `${timestamp}-${sanitizedFileName}`;
-      const filePath = join(uploadDir, fileName);
-      const fileUrl = `/uploads/${caseId}/${fileName}`;
-
-      await writeFile(filePath, buffer);
-
-      // Save to database
+      // Save to database with Supabase storage path
       const fileDoc = await prisma.fileDocument.create({
         data: {
           caseId,
           fileName: sanitizedFileName,
-          fileUrl,
+          fileUrl: storagePath, // Store Supabase storage path
           fileType: file.type,
           fileSize: file.size,
         },
