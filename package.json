@@ -26,7 +26,8 @@
     "pdf2json": "^4.0.0",
     "prisma": "^6.19.0",
     "react": "19.2.1",
-    "react-dom": "19.2.1"
+    "react-dom": "19.2.1",
+    "react-pdf": "^10.3.0"
   },
   "devDependencies": {
     "@types/node": "^20",
