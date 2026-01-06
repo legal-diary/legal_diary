@@ -59,7 +59,7 @@ export default function DocumentViewer({
 
   // PDF specific states
   const [numPages, setNumPages] = useState<number>(0);
-  const [scale, setScale] = useState<number>(1.0);
+  const [scale, setScale] = useState<number>(0.75);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(800);
@@ -255,7 +255,7 @@ export default function DocumentViewer({
       setPdfLoading(true);
       setFullScreen(false);
       setNumPages(0);
-      setScale(1.0);
+      setScale(0.75);
     }
   }, [visible]);
 
@@ -297,7 +297,7 @@ export default function DocumentViewer({
   // Zoom handlers
   const zoomIn = () => setScale((prev) => Math.min(3, prev + 0.25));
   const zoomOut = () => setScale((prev) => Math.max(0.5, prev - 0.25));
-  const resetZoom = () => setScale(1.0);
+  const resetZoom = () => setScale(0.75);
 
   if (!document) return null;
 
@@ -413,8 +413,7 @@ export default function DocumentViewer({
                   flexDirection: 'column',
                   alignItems: 'center',
                   overflow: 'auto',
-                  height: `${getPdfContainerHeight()}px`,
-                  maxHeight: fullScreen ? '90vh' : '75vh',
+                  height: '100%',
                   background: '#525659',
                   borderRadius: '0.5rem',
                   padding: '1rem',
