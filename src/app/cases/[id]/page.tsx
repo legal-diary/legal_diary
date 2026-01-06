@@ -191,6 +191,25 @@ export default function CaseDetailPage() {
     setViewerOpen(true);
   }, []);
 
+  // Download document by fetching signed URL from Supabase
+  const handleDownloadDocument = useCallback(async (doc: any) => {
+    try {
+      const response = await fetch(`/api/documents/${doc.id}/url`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+
+      if (data.url) {
+        // Open the signed URL in a new tab for download
+        window.open(data.url, '_blank');
+      } else {
+        message.error(data.error || 'Failed to get download URL');
+      }
+    } catch {
+      message.error('Failed to download document');
+    }
+  }, [token]);
+
   const handleFileUpload = useCallback((info: any) => {
     const fileList = info.fileList
       .filter((file: any) => file.originFileObj)
@@ -393,15 +412,18 @@ export default function CaseDetailPage() {
           >
             View
           </Button>
-          <a href={record.fileUrl} target="_blank" rel="noopener noreferrer">
-            <Button icon={<DownloadOutlined />} size="small" type="link">
-              Download
-            </Button>
-          </a>
+          <Button
+            icon={<DownloadOutlined />}
+            size="small"
+            type="link"
+            onClick={() => handleDownloadDocument(record)}
+          >
+            Download
+          </Button>
         </Space>
       ),
     },
-  ], [handleViewDocument]);
+  ], [handleViewDocument, handleDownloadDocument]);
 
   // AI dropdown menu items
   const aiMenuItems: MenuProps['items'] = useMemo(() => [
@@ -623,11 +645,14 @@ export default function CaseDetailPage() {
                                 >
                                   View
                                 </Button>
-                                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer">
-                                  <Button icon={<DownloadOutlined />} size="small" type="default">
-                                    Download
-                                  </Button>
-                                </a>
+                                <Button
+                                  icon={<DownloadOutlined />}
+                                  size="small"
+                                  type="default"
+                                  onClick={() => handleDownloadDocument(doc)}
+                                >
+                                  Download
+                                </Button>
                               </Space>
                             </div>
                           </div>
