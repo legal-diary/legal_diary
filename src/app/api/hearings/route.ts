@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import { generateHearingInsights } from '@/lib/openai';
 import { createCalendarEvent, isGoogleCalendarConnected } from '@/lib/googleCalendar';
+import { ActivityLogger } from '@/lib/activityLog';
 
 // GET hearings for user's firm (role-based filtering)
 export async function GET(request: NextRequest) {
@@ -206,6 +207,10 @@ export async function POST(request: NextRequest) {
       console.error('[Hearings] Google Calendar sync failed:', googleError);
       // Don't fail the request if Google sync fails
     }
+
+    // Log the hearing creation activity
+    const hearingDateStr = new Date(hearingDate).toLocaleDateString();
+    ActivityLogger.hearingCreated(user.id, user.firmId, hearing.id, caseRecord.caseNumber, hearingDateStr, request);
 
     // Generate hearing insights asynchronously
     try {

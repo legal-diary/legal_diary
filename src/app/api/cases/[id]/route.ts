@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import { deleteFile, deleteFiles } from '@/lib/supabase';
+import { ActivityLogger } from '@/lib/activityLog';
 
 // Allowed fields for case updates (whitelist approach)
 const ALLOWED_UPDATE_FIELDS = [
@@ -206,6 +207,9 @@ export async function PUT(
       },
     });
 
+    // Log the case update activity
+    ActivityLogger.caseUpdated(user.id, user.firmId, caseId, caseRecord.caseNumber, validatedUpdates, request);
+
     return NextResponse.json(updatedCase);
   } catch (error) {
     console.error('Error updating case:', error);
@@ -270,6 +274,9 @@ export async function DELETE(
     await prisma.case.delete({
       where: { id: caseId },
     });
+
+    // Log the case deletion activity
+    ActivityLogger.caseDeleted(user.id, user.firmId, caseId, caseRecord.caseNumber, request);
 
     return NextResponse.json({ message: 'Case deleted successfully' }, { status: 200 });
   } catch (error) {

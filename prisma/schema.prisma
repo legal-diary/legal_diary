@@ -180,6 +180,7 @@ model User {
   Firm_User_firmIdToFirm  Firm?                @relation("User_firmIdToFirm", fields: [firmId], references: [id])
   GoogleCalendarToken     GoogleCalendarToken?
   caseAssignments         CaseAssignment[]
+  activityLogs            ActivityLog[]
 
   @@index([email])
   @@index([firmId])
@@ -235,4 +236,78 @@ enum UserRole {
   ADVOCATE
   ADMIN
   SUPPORT_STAFF
+}
+
+// Activity Log for tracking all actions in the system
+model ActivityLog {
+  id          String       @id @default(cuid())
+  userId      String
+  firmId      String
+  action      ActivityAction
+  entityType  EntityType
+  entityId    String?      // ID of the affected entity (case, hearing, etc.)
+  entityName  String?      // Human-readable name (case number, hearing date, etc.)
+  details     String?      @db.Text // JSON string with additional details
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime     @default(now())
+
+  User        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
+  @@index([userId])
+  @@index([entityType])
+  @@index([createdAt])
+  @@index([action])
+}
+
+enum ActivityAction {
+  // Case actions
+  CASE_CREATED
+  CASE_UPDATED
+  CASE_DELETED
+  CASE_ASSIGNED
+  CASE_UNASSIGNED
+
+  // Hearing actions
+  HEARING_CREATED
+  HEARING_UPDATED
+  HEARING_DELETED
+  HEARING_COMPLETED
+  HEARING_POSTPONED
+
+  // Document actions
+  DOCUMENT_UPLOADED
+  DOCUMENT_DELETED
+  DOCUMENT_VIEWED
+
+  // AI actions
+  AI_ANALYSIS_RUN
+  AI_DOCUMENT_ANALYSIS
+  AI_CUSTOM_QUERY
+
+  // Team actions
+  MEMBER_INVITED
+  MEMBER_REMOVED
+  MEMBER_ROLE_CHANGED
+
+  // Auth actions
+  USER_LOGIN
+  USER_LOGOUT
+  PASSWORD_CHANGED
+
+  // Calendar actions
+  CALENDAR_CONNECTED
+  CALENDAR_DISCONNECTED
+  CALENDAR_SYNCED
+}
+
+enum EntityType {
+  CASE
+  HEARING
+  DOCUMENT
+  USER
+  FIRM
+  CALENDAR
+  AI_ANALYSIS
 }

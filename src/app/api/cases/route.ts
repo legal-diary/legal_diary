@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import { analyzeCaseWithAI } from '@/lib/openai';
+import { ActivityLogger } from '@/lib/activityLog';
 
 // GET all cases for a firm (role-based filtering)
 export async function GET(request: NextRequest) {
@@ -179,6 +180,9 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    // Log the case creation activity
+    ActivityLogger.caseCreated(user.id, user.firmId, newCase.id, caseNumber, request);
 
     // Generate AI summary asynchronously
     try {

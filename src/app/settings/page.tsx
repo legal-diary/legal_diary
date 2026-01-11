@@ -2,12 +2,13 @@
 
 import React from 'react';
 import { Typography, Divider, Card, Space } from 'antd';
-import { SettingOutlined, ApiOutlined, TeamOutlined, LockOutlined } from '@ant-design/icons';
+import { SettingOutlined, ApiOutlined, TeamOutlined, LockOutlined, HistoryOutlined } from '@ant-design/icons';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import GoogleCalendarConnect from '@/components/GoogleCalendar/GoogleCalendarConnect';
 import TeamManagement from '@/components/Settings/TeamManagement';
 import SetPassword from '@/components/Settings/SetPassword';
+import ActivityLog from '@/components/Settings/ActivityLog';
 import { useAuth } from '@/context/AuthContext';
 
 const { Title, Text } = Typography;
@@ -73,6 +74,20 @@ export default function SettingsPage() {
               </Divider>
 
               <TeamManagement token={token} />
+            </>
+          )}
+
+          {/* Activity Log - Only visible to Admins */}
+          {isAdmin && token && (
+            <>
+              <Divider orientation="left">
+                <Space>
+                  <HistoryOutlined />
+                  <span>Activity Log</span>
+                </Space>
+              </Divider>
+
+              <ActivityLog token={token} />
             </>
           )}
 

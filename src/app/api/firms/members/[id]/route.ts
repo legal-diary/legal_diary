@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { ActivityLogger } from '@/lib/activityLog';
 
 /**
  * PUT /api/firms/members/[id]
@@ -90,6 +91,17 @@ export async function PUT(
       },
     });
 
+    // Log the role change activity
+    ActivityLogger.memberRoleChanged(
+      user.id,
+      user.firmId,
+      targetUserId,
+      targetUser.name || targetUser.email,
+      targetUser.role,
+      role,
+      request
+    );
+
     return NextResponse.json({
       message: `User role updated to ${role}`,
       user: updatedUser,
@@ -175,6 +187,15 @@ export async function DELETE(
         role: 'ADVOCATE', // Reset role
       },
     });
+
+    // Log the member removal activity
+    ActivityLogger.memberRemoved(
+      user.id,
+      user.firmId,
+      targetUserId,
+      targetUser.name || targetUser.email,
+      request
+    );
 
     return NextResponse.json({
       message: 'User removed from firm',
