@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Terms of Service | Legal Diary",
@@ -23,6 +24,16 @@ export default function TermsOfServicePage() {
         boxShadow: "0 10px 30px rgba(0, 0, 0, 0.04)",
       }}>
         <header style={{ marginBottom: "24px" }}>
+          <Link href="/" style={{
+            display: "inline-block",
+            marginBottom: "16px",
+            color: "#1a3a52",
+            textDecoration: "none",
+            fontSize: "0.9rem",
+            fontWeight: 500,
+          }}>
+            ← Back to Home
+          </Link>
           <p style={{
             textTransform: "uppercase",
             letterSpacing: "0.08em",

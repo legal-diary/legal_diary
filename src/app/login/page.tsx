@@ -368,6 +368,38 @@ export default function LoginPage() {
               <div style={{
                 textAlign: 'center',
                 marginTop: '1.5rem',
+                padding: '0.75rem',
+                background: '#f9f9f9',
+                borderRadius: '0.5rem',
+              }}>
+                <p style={{
+                  color: '#666',
+                  fontSize: 'clamp(0.75rem, 1.8vw, 0.85rem)',
+                  margin: 0,
+                  lineHeight: 1.5,
+                }}>
+                  By signing in, you agree to our{' '}
+                  <Link href="/terms" style={{
+                    color: 'var(--primary-color)',
+                    fontWeight: '500',
+                    textDecoration: 'underline',
+                  }}>
+                    Terms of Service
+                  </Link>
+                  {' '}and{' '}
+                  <Link href="/privacy-policy" style={{
+                    color: 'var(--primary-color)',
+                    fontWeight: '500',
+                    textDecoration: 'underline',
+                  }}>
+                    Privacy Policy
+                  </Link>
+                </p>
+              </div>
+
+              <div style={{
+                textAlign: 'center',
+                marginTop: '1.5rem',
                 paddingTop: '1.5rem',
                 borderTop: '1px solid var(--border-color)',
               }}>

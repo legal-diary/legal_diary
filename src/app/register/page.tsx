@@ -521,6 +521,38 @@ export default function RegisterPage() {
                 Sign up with Google
               </Button>
 
+              <div style={{
+                textAlign: 'center',
+                marginTop: '1.5rem',
+                padding: '0.75rem',
+                background: '#f9f9f9',
+                borderRadius: '0.5rem',
+              }}>
+                <p style={{
+                  color: '#666',
+                  fontSize: 'clamp(0.75rem, 1.8vw, 0.85rem)',
+                  margin: 0,
+                  lineHeight: 1.5,
+                }}>
+                  By registering, you agree to our{' '}
+                  <Link href="/terms" style={{
+                    color: 'var(--primary-color)',
+                    fontWeight: '500',
+                    textDecoration: 'underline',
+                  }}>
+                    Terms of Service
+                  </Link>
+                  {' '}and{' '}
+                  <Link href="/privacy-policy" style={{
+                    color: 'var(--primary-color)',
+                    fontWeight: '500',
+                    textDecoration: 'underline',
+                  }}>
+                    Privacy Policy
+                  </Link>
+                </p>
+              </div>
+
               <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
                 <p>
                   Already have an account?{' '}
