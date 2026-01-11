@@ -1,0 +1,8 @@
+[Fast Refresh] rebuilding
+forward-logs-shared.ts:95 [Fast Refresh] done in 108ms
+DocumentViewer.tsx:430 Warning: Options prop passed to <Document /> changed, but it's equal to previous one. This might result in unnecessary reloads. Consider memoizing the value passed to "options" prop.
+DocumentViewer.tsx:430 Warning: Options prop passed to <Document /> changed, but it's equal to previous one. This might result in unnecessary reloads. Consider memoizing the value passed to "options" prop.
+DocumentViewer.tsx:430 Warning: Options prop passed to <Document /> changed, but it's equal to previous one. This might result in unnecessary reloads. Consider memoizing the value passed to "options" prop.
+api.js:3023 Uncaught TypeError: Cannot read properties of null (reading 'sendWithPromise')
+    at WorkerTransport.getStructTree (api.js:3023:32)
+    at PDFPageProxy.getStructTree (api.js:1739:28)
