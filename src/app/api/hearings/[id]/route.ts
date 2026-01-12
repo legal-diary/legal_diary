@@ -6,6 +6,7 @@ import {
   deleteCalendarEvent,
   isGoogleCalendarConnected,
 } from '@/lib/googleCalendar';
+import { ActivityLogger } from '@/lib/activityLog';
 
 // GET a specific hearing (role-based access)
 export async function GET(
@@ -124,6 +125,17 @@ export async function PUT(
       },
     });
 
+    // Log the hearing update activity
+    const changes = {
+      ...(hearingDate && { hearingDate }),
+      ...(hearingTime !== undefined && { hearingTime }),
+      ...(hearingType && { hearingType }),
+      ...(courtRoom !== undefined && { courtRoom }),
+      ...(notes !== undefined && { notes: 'updated' }),
+      ...(status && { status }),
+    };
+    ActivityLogger.hearingUpdated(user.id, user.firmId, id, updatedHearing.Case.caseNumber, changes, request);
+
     // Auto-sync to Google Calendar if connected
     try {
       const googleConnected = await isGoogleCalendarConnected(user.id);
@@ -185,6 +197,11 @@ export async function DELETE(
         id,
         Case: caseFilter,
       },
+      include: {
+        Case: {
+          select: { caseNumber: true },
+        },
+      },
     });
 
     if (!existingHearing) {
@@ -205,6 +222,9 @@ export async function DELETE(
     await prisma.hearing.delete({
       where: { id },
     });
+
+    // Log the hearing deletion activity
+    ActivityLogger.hearingDeleted(user.id, user.firmId, id, existingHearing.Case.caseNumber, request);
 
     return NextResponse.json({ message: 'Hearing deleted successfully' });
   } catch (error) {
