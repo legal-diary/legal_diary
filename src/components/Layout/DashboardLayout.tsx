@@ -244,7 +244,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   }), []);
 
   return (
-    <Layout style={{ height: '100vh', background: '#ffffff', overflow: 'hidden' }}>
+    <Layout style={{ height: '100dvh', background: '#ffffff', overflow: 'hidden' }} className="root-layout">
       {/* Desktop Sidebar */}
       <Sider
         theme="dark"
@@ -274,9 +274,10 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
         />
       </Sider>
 
-      <Layout style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <Layout style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} className="main-content-layout">
         {/* Header */}
         <Header
+          className="app-header"
           style={{
             background: '#ffffff',
             padding: '0 clamp(12px, 3vw, 32px)',
@@ -288,6 +289,9 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
             minHeight: '52px',
             borderBottom: '1px solid var(--border-color)',
             flexShrink: 0,
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
           }}
         >
           {/* Desktop Firm Name */}
@@ -409,12 +413,14 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         {/* Main Content */}
         <Content
+          className="main-content"
           style={{
             padding: 'clamp(8px, 3vw, 24px)',
             overflow: 'auto',
             background: '#ffffff',
             flex: 1,
             minHeight: 0,
+            WebkitOverflowScrolling: 'touch',
           }}
         >
           {children}
@@ -445,6 +451,33 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       )}
 
       <style>{`
+        /* Fallback for browsers that don't support dvh */
+        .root-layout {
+          height: 100vh;
+          height: 100dvh;
+        }
+
+        .main-content-layout {
+          height: 100vh;
+          height: 100dvh;
+        }
+
+        /* Fixed header for all viewports */
+        .app-header {
+          position: sticky !important;
+          top: 0 !important;
+          z-index: 100 !important;
+          background: #ffffff !important;
+        }
+
+        /* Main content scrollable area */
+        .main-content {
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
+        }
+
         /* Responsive breakpoints */
         @media (max-width: 992px) {
           .desktop-firm-name {
@@ -456,27 +489,39 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
           .desktop-sidebar {
             display: none !important;
           }
+
+          /* Ensure proper height on mobile */
+          .root-layout,
+          .main-content-layout {
+            height: 100vh;
+            height: 100dvh;
+            height: -webkit-fill-available;
+          }
         }
 
         @media (max-width: 768px) {
-          .ant-layout-header {
+          .app-header {
             padding: 0 12px !important;
             height: 56px !important;
+            min-height: 56px !important;
           }
 
-          .ant-layout-content {
+          .main-content {
             padding: 12px !important;
+            padding-bottom: 24px !important;
           }
         }
 
         @media (max-width: 576px) {
-          .ant-layout-header {
+          .app-header {
             padding: 0 8px !important;
             height: 52px !important;
+            min-height: 52px !important;
           }
 
-          .ant-layout-content {
+          .main-content {
             padding: 8px !important;
+            padding-bottom: 20px !important;
           }
         }
 

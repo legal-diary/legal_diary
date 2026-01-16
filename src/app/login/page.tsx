@@ -395,6 +395,20 @@ export default function LoginPage() {
                     Privacy Policy
                   </Link>
                 </p>
+                <p style={{
+                  color: '#666',
+                  fontSize: 'clamp(0.75rem, 1.8vw, 0.85rem)',
+                  margin: '0.5rem 0 0 0',
+                  lineHeight: 1.5,
+                }}>
+                  <Link href="/about" style={{
+                    color: 'var(--primary-color)',
+                    fontWeight: '500',
+                    textDecoration: 'underline',
+                  }}>
+                    About Us
+                  </Link>
+                </p>
               </div>
 
               <div style={{
