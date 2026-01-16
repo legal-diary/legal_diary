@@ -312,7 +312,10 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
           <div style={{
             display: 'none',
             alignItems: 'center',
-            gap: '0.8rem',
+            gap: '0.5rem',
+            flexShrink: 1,
+            minWidth: 0,
+            overflow: 'hidden',
           }} className="mobile-header">
             <button
               onClick={() => setMobileDrawerOpen(true)}
@@ -320,25 +323,26 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                padding: '0.5rem',
+                padding: '0.4rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#000000',
-                fontSize: '1.3rem',
+                fontSize: '1.2rem',
                 flexShrink: 0,
               }}
               aria-label="Open menu"
             >
               <MenuOutlined />
             </button>
-            <div style={{
-              fontSize: 'clamp(0.85rem, 2vw, 1rem)',
-              fontWeight: '700',
-              color: '#000000',
+            <span className="mobile-firm-name" style={{
+              fontSize: '0.7rem',
+              fontWeight: '600',
+              color: '#333',
+              whiteSpace: 'nowrap',
             }}>
               {firmName}
-            </div>
+            </span>
           </div>
 
           <div style={{ flex: 1 }} />
@@ -468,6 +472,8 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
           top: 0 !important;
           z-index: 100 !important;
           background: #ffffff !important;
+          overflow: hidden !important;
+          flex-wrap: nowrap !important;
         }
 
         /* Main content scrollable area */
@@ -514,14 +520,40 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         @media (max-width: 576px) {
           .app-header {
-            padding: 0 8px !important;
+            padding: 0 6px !important;
             height: 52px !important;
             min-height: 52px !important;
+            max-height: 52px !important;
           }
 
           .main-content {
             padding: 8px !important;
             padding-bottom: 20px !important;
+          }
+
+          /* Reduce gap in user profile dropdown */
+          .app-header .ant-dropdown-trigger {
+            gap: 0.25rem !important;
+            padding: 0.2vh 0.5vw !important;
+          }
+
+          /* Smaller user name on mobile */
+          .app-header .ant-dropdown-trigger span {
+            max-width: 70px !important;
+            font-size: 0.7rem !important;
+          }
+
+          /* Hide avatar on mobile */
+          .app-header .ant-avatar {
+            display: none !important;
+          }
+
+          /* Smaller admin tag on mobile */
+          .app-header .ant-tag {
+            font-size: 0.5rem !important;
+            padding: 0 3px !important;
+            line-height: 12px !important;
+            margin-left: 0 !important;
           }
         }
 
