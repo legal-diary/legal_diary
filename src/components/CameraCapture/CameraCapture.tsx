@@ -291,6 +291,16 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
 
         {/* Camera Preview */}
         <div className={styles.cameraContainer}>
+          {/* Always render video so ref is available for stream attachment */}
+          <video
+            ref={videoRef}
+            className={styles.video}
+            playsInline
+            muted
+            autoPlay
+            style={{ display: cameraReady && !cameraError ? 'block' : 'none' }}
+          />
+
           {cameraError ? (
             <div className={styles.errorContainer}>
               <p className={styles.errorText}>{cameraError}</p>
@@ -307,15 +317,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
               <Spin size="large" />
               <p>Starting camera...</p>
             </div>
-          ) : (
-            <video
-              ref={videoRef}
-              className={styles.video}
-              playsInline
-              muted
-              autoPlay
-            />
-          )}
+          ) : null}
+
           <canvas ref={canvasRef} style={{ display: 'none' }} />
         </div>
 
