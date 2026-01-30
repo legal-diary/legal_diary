@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   Card,
   Form,
@@ -14,11 +14,12 @@ import {
   Col,
   Divider,
 } from 'antd';
-import { UploadOutlined } from '@ant-design/icons';
+import { UploadOutlined, CameraOutlined } from '@ant-design/icons';
 import type { RcFile } from 'antd/es/upload';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import CameraCapture from '@/components/CameraCapture';
 
 export default function CreateCasePage() {
   const { token } = useAuth();
@@ -27,6 +28,22 @@ export default function CreateCasePage() {
   const [loading, setLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLDivElement>(null);
+  const [cameraModalOpen, setCameraModalOpen] = useState(false);
+  const [capturedImages, setCapturedImages] = useState<Blob[]>([]);
+  const [isMobile, setIsMobile] = useState(false);
+  const [createdCaseId, setCreatedCaseId] = useState<string | null>(null);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      );
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      setIsMobile(mobile || hasTouch);
+    };
+    checkMobile();
+  }, []);
 
   const onFinish = async (values: any) => {
     setLoading(true);
@@ -46,8 +63,9 @@ export default function CreateCasePage() {
       }
 
       const caseData = await caseResponse.json();
+      setCreatedCaseId(caseData.id);
 
-      // Upload files if any
+      // Upload regular files if any
       if (uploadedFiles.length > 0) {
         const formData = new FormData();
         uploadedFiles.forEach((file) => {
@@ -65,6 +83,26 @@ export default function CreateCasePage() {
         }
       }
 
+      // Upload captured images (scanned documents) if any
+      if (capturedImages.length > 0) {
+        const imageFormData = new FormData();
+        capturedImages.forEach((blob, index) => {
+          imageFormData.append('images', blob, `scanned-page-${index + 1}.jpg`);
+        });
+
+        const scanResponse = await fetch(`/api/cases/${caseData.id}/upload-images`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: imageFormData,
+        });
+
+        if (!scanResponse.ok) {
+          message.warning('Case created but scanned document upload failed');
+        } else {
+          message.success('Scanned document processed with OCR');
+        }
+      }
+
       message.success('Case created successfully');
       router.push('/cases');
     } catch (error) {
@@ -73,6 +111,18 @@ export default function CreateCasePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle camera capture success (for after case creation)
+  const handleCameraSuccess = () => {
+    setCameraModalOpen(false);
+    message.success('Images captured! They will be uploaded when you create the case.');
+  };
+
+  // Temporary camera capture for storing images before case creation
+  const handleTempCapture = (images: Blob[]) => {
+    setCapturedImages(prev => [...prev, ...images]);
+    setCameraModalOpen(false);
   };
 
   const handleFileUpload = (info: any) => {
@@ -232,18 +282,56 @@ export default function CreateCasePage() {
 
             <Form.Item
               label="Upload Case Documents"
-              extra="You can upload PDF, Word documents, and other relevant files"
+              extra="You can upload PDF, Word documents, or scan documents using your camera"
             >
-              <Upload
-                onChange={handleFileUpload}
-                multiple
-                maxCount={10}
-                beforeUpload={() => false}
-              >
-                <Button icon={<UploadOutlined />}>
-                  Click to upload files (Max 10MB each)
-                </Button>
-              </Upload>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <Upload
+                  onChange={handleFileUpload}
+                  multiple
+                  maxCount={10}
+                  beforeUpload={() => false}
+                  showUploadList={true}
+                >
+                  <Button icon={<UploadOutlined />}>
+                    Upload Files
+                  </Button>
+                </Upload>
+
+                {/* Mobile-only: Scan Document button */}
+                {isMobile && (
+                  <Button
+                    icon={<CameraOutlined />}
+                    onClick={() => setCameraModalOpen(true)}
+                    style={{ background: '#52c41a', borderColor: '#52c41a', color: '#fff' }}
+                  >
+                    Scan Document
+                  </Button>
+                )}
+              </div>
+
+              {/* Show captured images count */}
+              {capturedImages.length > 0 && (
+                <div style={{
+                  marginTop: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  background: '#f6ffed',
+                  border: '1px solid #b7eb8f',
+                  borderRadius: '6px',
+                  fontSize: '0.9rem',
+                  color: '#52c41a',
+                }}>
+                  {capturedImages.length} scanned page{capturedImages.length !== 1 ? 's' : ''} ready to upload
+                  <Button
+                    type="link"
+                    size="small"
+                    danger
+                    onClick={() => setCapturedImages([])}
+                    style={{ marginLeft: '0.5rem' }}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
             </Form.Item>
 
             <Form.Item>
@@ -260,6 +348,19 @@ export default function CreateCasePage() {
           </Form>
         </Spin>
       </Card>
+
+      {/* Camera Capture Modal - Mobile Only */}
+      <CameraCapture
+        visible={cameraModalOpen}
+        onCancel={() => setCameraModalOpen(false)}
+        onSuccess={() => {
+          setCameraModalOpen(false);
+          message.success('Images captured! They will be processed when you create the case.');
+        }}
+        onCaptureComplete={(images) => {
+          setCapturedImages(prev => [...prev, ...images]);
+        }}
+      />
     </DashboardLayout>
   );
 }

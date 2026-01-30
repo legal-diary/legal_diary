@@ -31,12 +31,14 @@ import {
   ThunderboltOutlined,
   DownOutlined,
   EyeOutlined,
+  CameraOutlined,
 } from '@ant-design/icons';
 import { Dropdown, MenuProps } from 'antd';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import AIAnalysisTab from '@/components/Cases/AIAnalysisTab';
 import CaseAssignment from '@/components/Cases/CaseAssignment';
 import DocumentViewer from '@/components/Documents/DocumentViewer';
+import CameraCapture from '@/components/CameraCapture';
 import { useAuth } from '@/context/AuthContext';
 import { useParams, useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
@@ -129,6 +131,20 @@ export default function CaseDetailPage() {
   const [documentsToDelete, setDocumentsToDelete] = useState<string[]>([]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
+  const [cameraModalOpen, setCameraModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      );
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      setIsMobile(mobile || hasTouch);
+    };
+    checkMobile();
+  }, []);
 
   // Fetch case details
   const fetchCaseDetail = useCallback(async () => {
@@ -590,9 +606,20 @@ export default function CaseDetailPage() {
         children: (
           <Card
             extra={
-              <Button type="primary" icon={<UploadOutlined />} onClick={() => setUploadModalOpen(true)}>
-                Upload Document
-              </Button>
+              <Space wrap>
+                <Button type="primary" icon={<UploadOutlined />} onClick={() => setUploadModalOpen(true)}>
+                  Upload
+                </Button>
+                {isMobile && (
+                  <Button
+                    icon={<CameraOutlined />}
+                    onClick={() => setCameraModalOpen(true)}
+                    style={{ background: '#52c41a', borderColor: '#52c41a', color: '#fff' }}
+                  >
+                    Scan
+                  </Button>
+                )}
+              </Space>
             }
           >
             {caseData.FileDocument && caseData.FileDocument.length > 0 ? (
@@ -1161,6 +1188,17 @@ export default function CaseDetailPage() {
         onClose={() => { setViewerOpen(false); setSelectedDocument(null); }}
         document={selectedDocument}
         token={token || ''}
+      />
+
+      {/* Camera Capture Modal - Mobile Only */}
+      <CameraCapture
+        caseId={caseId}
+        visible={cameraModalOpen}
+        onCancel={() => setCameraModalOpen(false)}
+        onSuccess={() => {
+          setCameraModalOpen(false);
+          fetchCaseDetail(); // Refresh to show the new document
+        }}
       />
     </DashboardLayout>
   );
