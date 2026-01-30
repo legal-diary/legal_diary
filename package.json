@@ -24,13 +24,17 @@
     "next-auth": "^4.24.13",
     "openai": "^6.9.0",
     "pdf2json": "^4.0.0",
+    "pdfkit": "^0.17.2",
     "prisma": "^6.19.0",
     "react": "19.2.1",
     "react-dom": "19.2.1",
-    "react-pdf": "^10.3.0"
+    "react-pdf": "^10.3.0",
+    "sharp": "^0.34.5",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/pdfkit": "^0.17.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
