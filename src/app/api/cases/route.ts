@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
-import { analyzeCaseWithAI } from '@/lib/openai';
 import { ActivityLogger } from '@/lib/activityLog';
 
 // GET all cases for a firm (role-based filtering)
@@ -183,26 +182,6 @@ export async function POST(request: NextRequest) {
 
     // Log the case creation activity
     ActivityLogger.caseCreated(user.id, user.firmId, newCase.id, caseNumber, request);
-
-    // Generate AI summary asynchronously
-    try {
-      const analysis = await analyzeCaseWithAI({
-        caseTitle,
-        caseDescription: description || '',
-      });
-
-      await prisma.aISummary.create({
-        data: {
-          caseId: newCase.id,
-          summary: analysis.summary,
-          keyPoints: JSON.stringify(analysis.keyPoints),
-          insights: analysis.insights,
-        },
-      });
-    } catch (aiError) {
-      console.error('Error generating AI summary:', aiError);
-      // Don't fail the case creation if AI fails
-    }
 
     return NextResponse.json(newCase, { status: 201 });
   } catch (error) {

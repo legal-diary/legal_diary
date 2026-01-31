@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Typography, Divider, Card, Space } from 'antd';
-import { SettingOutlined, ApiOutlined, TeamOutlined, LockOutlined, HistoryOutlined } from '@ant-design/icons';
+import { SettingOutlined, ApiOutlined, TeamOutlined, LockOutlined, HistoryOutlined, BankOutlined, CopyOutlined } from '@ant-design/icons';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import GoogleCalendarConnect from '@/components/GoogleCalendar/GoogleCalendarConnect';
@@ -28,6 +28,54 @@ export default function SettingsPage() {
           <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
             Manage your account settings and integrations
           </Text>
+
+          {/* Firm Information - Only visible to Admins */}
+          {isAdmin && user?.firmId && (
+            <>
+              <Divider orientation="left">
+                <Space>
+                  <BankOutlined />
+                  <span>Firm Information</span>
+                </Space>
+              </Divider>
+
+              <Card
+                style={{ marginBottom: 24 }}
+                title="Your Firm"
+                bordered={false}
+                className="integration-card"
+              >
+                <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                  Share the Firm ID with team members so they can join your firm during registration.
+                </Text>
+
+                <div style={{ marginBottom: 12 }}>
+                  <Text strong style={{ display: 'block', marginBottom: 4, fontSize: '0.85rem', color: '#888' }}>
+                    Firm Name
+                  </Text>
+                  <Text style={{ fontSize: '1rem' }}>
+                    {user.firm_name || '—'}
+                  </Text>
+                </div>
+
+                <div>
+                  <Text strong style={{ display: 'block', marginBottom: 4, fontSize: '0.85rem', color: '#888' }}>
+                    Firm ID
+                  </Text>
+                  <Text
+                    copyable={{
+                      icon: [<CopyOutlined key="copy" />, <CopyOutlined key="copied" />],
+                      tooltips: ['Copy Firm ID', 'Copied!'],
+                    }}
+                    code
+                    style={{ fontSize: '0.95rem' }}
+                  >
+                    {user.firmId}
+                  </Text>
+                </div>
+              </Card>
+            </>
+          )}
 
           <Divider orientation="left">
             <Space>
