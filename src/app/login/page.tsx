@@ -327,12 +327,12 @@ export default function LoginPage() {
                   {countdown > 0 ? `Locked (${countdown}s)` : 'Login'}
                 </Button>
               </Form.Item>
-
+{/* 
               <Divider style={{ margin: '1.5rem 0' }}>
                 <span style={{ color: '#999', fontSize: '0.85rem' }}>or</span>
-              </Divider>
+              </Divider> */}
 
-              <Button
+              {/* <Button
                 block
                 size="large"
                 onClick={handleGoogleSignIn}
@@ -363,7 +363,7 @@ export default function LoginPage() {
                 }}
               >
                 Sign in with Google
-              </Button>
+              </Button> */}
 
               <div style={{
                 textAlign: 'center',

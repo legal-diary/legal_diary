@@ -24,7 +24,8 @@
       "mcp__puppeteer__puppeteer_navigate",
       "Bash(npm install:*)",
       "Bash(npx tsc --noEmit)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx next build)"
     ],
     "deny": [],
     "ask": []

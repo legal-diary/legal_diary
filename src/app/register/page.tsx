@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, message, Spin, Row, Col, Select, Divider, Alert } from 'antd';
+import React, { useState } from 'react';
+import { Form, Input, Button, Card, message, Spin, Row, Col, Divider, Alert } from 'antd';
 import {
   LockOutlined,
   UserOutlined,
@@ -14,11 +14,6 @@ import {
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-
-interface Firm {
-  id: string;
-  name: string;
-}
 
 // Error types for different UI treatments
 type ErrorType = 'error' | 'warning' | 'info';
@@ -43,8 +38,6 @@ export default function RegisterPage() {
   const router = useRouter();
   const { isLoading } = useAuth();
   const [form] = Form.useForm();
-  const [firms, setFirms] = useState<Firm[]>([]);
-  const [loadingFirms, setLoadingFirms] = useState(true);
   const [firmChoice, setFirmChoice] = useState<'existing' | 'new' | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [registerError, setRegisterError] = useState<RegisterError | null>(null);
@@ -71,25 +64,6 @@ export default function RegisterPage() {
       setGoogleLoading(false);
     }
   };
-
-  // Fetch existing firms
-  useEffect(() => {
-    const fetchFirms = async () => {
-      try {
-        const response = await fetch('/api/firms');
-        if (response.ok) {
-          const data = await response.json();
-          setFirms(data);
-        }
-      } catch (error) {
-        console.error('Error fetching firms:', error);
-      } finally {
-        setLoadingFirms(false);
-      }
-    };
-
-    fetchFirms();
-  }, []);
 
   // Clear error when user starts typing
   const handleFieldChange = () => {
@@ -159,37 +133,43 @@ export default function RegisterPage() {
     setSubmitting(true);
 
     try {
-      // Determine firm parameter based on choice
-      let firmParam: string | undefined;
-
-      if (firmChoice === 'existing') {
-        firmParam = values.existingFirmId;
-      } else if (firmChoice === 'new') {
-        firmParam = values.newFirmName;
-      }
-
-      if (!firmParam) {
-        setRegisterError({
-          message: 'Please select an existing firm or create a new one to continue.',
-          type: 'warning',
-        });
-        setSubmitting(false);
-        return;
-      }
-
-      // Determine if it's a firm ID (UUID format) or firm name (string)
-      const isUUID = firmParam && /^[a-z0-9]+$/.test(firmParam) && firmParam.length > 20;
-
       const payload: any = {
         email: values.email,
         name: values.name,
         password: values.password,
       };
 
-      if (isUUID) {
-        payload.firmId = firmParam;
+      if (firmChoice === 'existing') {
+        const firmId = values.existingFirmId?.trim();
+        if (!firmId) {
+          setRegisterError({
+            message: 'Please enter a Firm ID to join an existing firm.',
+            type: 'warning',
+            field: 'existingFirmId',
+          });
+          setSubmitting(false);
+          return;
+        }
+        payload.firmId = firmId;
+      } else if (firmChoice === 'new') {
+        const firmName = values.newFirmName?.trim();
+        if (!firmName) {
+          setRegisterError({
+            message: 'Please enter a firm name to create a new firm.',
+            type: 'warning',
+            field: 'newFirmName',
+          });
+          setSubmitting(false);
+          return;
+        }
+        payload.firmName = firmName;
       } else {
-        payload.firmName = firmParam;
+        setRegisterError({
+          message: 'Please join an existing firm or create a new one to continue.',
+          type: 'warning',
+        });
+        setSubmitting(false);
+        return;
       }
 
       // Call register API directly to handle errors
@@ -382,89 +362,81 @@ export default function RegisterPage() {
                 />
               )}
 
-              {loadingFirms ? (
-                <Spin size="small" style={{ display: 'block', marginBottom: '1.6vh' }} />
-              ) : (
-                <>
-                  {firms.length > 0 && (
-                    <Form.Item
-                      name="existingFirmId"
-                      label="Join Existing Firm"
-                      rules={[
-                        {
-                          validator: (_, value) => {
-                            if (firmChoice === 'existing' && !value) {
-                              return Promise.reject(new Error('Please select a firm'));
-                            }
-                            return Promise.resolve();
-                          },
-                        },
-                      ]}
-                      validateStatus={registerError?.field === 'existingFirmId' ? 'error' : undefined}
-                      help={registerError?.field === 'existingFirmId' ? registerError.message : undefined}
-                    >
-                      <Select
-                        placeholder="Select a firm to join"
-                        onChange={() => {
-                          setFirmChoice('existing');
-                          form.setFieldValue('newFirmName', undefined);
-                        }}
-                        disabled={firmChoice === 'new'}
-                        optionLabelProp="label"
-                        allowClear
-                        onClear={() => setFirmChoice(null)}
-                      >
-                        {firms.map((firm) => (
-                          <Select.Option key={firm.id} value={firm.id} label={firm.name}>
-                            {firm.name}
-                          </Select.Option>
-                        ))}
-                      </Select>
-                    </Form.Item>
-                  )}
-
-                  {(firms.length > 0 || firmChoice === 'existing') && (
-                    <div style={{ textAlign: 'center', margin: '1.5vh 0' }}>
-                      <span style={{ color: 'var(--text-secondary)', fontSize: 'clamp(0.8rem, 2vw, 1rem)' }}>— OR —</span>
-                    </div>
-                  )}
-
-                  <Form.Item
-                    name="newFirmName"
-                    label="Create New Firm"
-                    rules={[
-                      {
-                        validator: (_, value) => {
-                          if (firmChoice === 'new' && !value) {
-                            return Promise.reject(new Error('Please enter a firm name'));
-                          }
-                          if (value && (value.length < 2 || value.length > 100)) {
-                            return Promise.reject(new Error('Firm name must be between 2 and 100 characters'));
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                    ]}
-                    validateStatus={registerError?.field === 'newFirmName' ? 'error' : undefined}
-                    help={registerError?.field === 'newFirmName' ? registerError.message : undefined}
-                    extra={
-                      <span style={{ fontSize: '0.8rem', color: '#666' }}>
-                        You will be the admin of this firm
-                      </span>
+              <Form.Item
+                name="existingFirmId"
+                label="Join Existing Firm"
+                rules={[
+                  {
+                    validator: (_, value) => {
+                      if (firmChoice === 'existing' && !value?.trim()) {
+                        return Promise.reject(new Error('Please enter a Firm ID'));
+                      }
+                      return Promise.resolve();
+                    },
+                  },
+                ]}
+                validateStatus={registerError?.field === 'existingFirmId' ? 'error' : undefined}
+                help={registerError?.field === 'existingFirmId' ? registerError.message : undefined}
+                extra={
+                  <span style={{ fontSize: '0.8rem', color: '#666' }}>
+                    Ask your firm admin to share the Firm ID from Settings
+                  </span>
+                }
+              >
+                <Input
+                  prefix={<HomeOutlined />}
+                  placeholder="Enter Firm ID"
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setFirmChoice('existing');
+                      form.setFieldValue('newFirmName', undefined);
+                    } else {
+                      setFirmChoice(null);
                     }
-                  >
-                    <Input
-                      prefix={<HomeOutlined />}
-                      placeholder="Your New Firm Name"
-                      onChange={() => {
-                        setFirmChoice('new');
-                        form.setFieldValue('existingFirmId', undefined);
-                      }}
-                      disabled={firmChoice === 'existing' && form.getFieldValue('existingFirmId')}
-                    />
-                  </Form.Item>
-                </>
-              )}
+                  }}
+                  disabled={firmChoice === 'new' && !!form.getFieldValue('newFirmName')}
+                  allowClear
+                />
+              </Form.Item>
+
+              <div style={{ textAlign: 'center', margin: '1.5vh 0' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 'clamp(0.8rem, 2vw, 1rem)' }}>— OR —</span>
+              </div>
+
+              <Form.Item
+                name="newFirmName"
+                label="Create New Firm"
+                rules={[
+                  {
+                    validator: (_, value) => {
+                      if (firmChoice === 'new' && !value?.trim()) {
+                        return Promise.reject(new Error('Please enter a firm name'));
+                      }
+                      if (value && (value.length < 2 || value.length > 100)) {
+                        return Promise.reject(new Error('Firm name must be between 2 and 100 characters'));
+                      }
+                      return Promise.resolve();
+                    },
+                  },
+                ]}
+                validateStatus={registerError?.field === 'newFirmName' ? 'error' : undefined}
+                help={registerError?.field === 'newFirmName' ? registerError.message : undefined}
+                extra={
+                  <span style={{ fontSize: '0.8rem', color: '#666' }}>
+                    You will be the admin of this firm
+                  </span>
+                }
+              >
+                <Input
+                  prefix={<HomeOutlined />}
+                  placeholder="Your New Firm Name"
+                  onChange={() => {
+                    setFirmChoice('new');
+                    form.setFieldValue('existingFirmId', undefined);
+                  }}
+                  disabled={firmChoice === 'existing' && !!form.getFieldValue('existingFirmId')}
+                />
+              </Form.Item>
 
               <Form.Item style={{ marginTop: '1.5rem' }}>
                 <Button
@@ -484,7 +456,7 @@ export default function RegisterPage() {
                 </Button>
               </Form.Item>
 
-              <Divider style={{ margin: '1rem 0' }}>
+              {/* <Divider style={{ margin: '1rem 0' }}>
                 <span style={{ color: '#999', fontSize: '0.85rem' }}>or</span>
               </Divider>
 
@@ -519,7 +491,7 @@ export default function RegisterPage() {
                 }}
               >
                 Sign up with Google
-              </Button>
+              </Button> */}
 
               <div style={{
                 textAlign: 'center',
