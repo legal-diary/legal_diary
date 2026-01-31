@@ -610,7 +610,7 @@ export default function CaseDetailPage() {
                 <Button type="primary" icon={<UploadOutlined />} onClick={() => setUploadModalOpen(true)}>
                   Upload
                 </Button>
-                {isMobile && (
+                {/* {isMobile && (
                   <Button
                     icon={<CameraOutlined />}
                     onClick={() => setCameraModalOpen(true)}
@@ -618,7 +618,7 @@ export default function CaseDetailPage() {
                   >
                     Scan
                   </Button>
-                )}
+                )} */}
               </Space>
             }
           >
