@@ -17,6 +17,7 @@ import {
   Alert,
 } from 'antd';
 import { ThunderboltOutlined, LoadingOutlined } from '@ant-design/icons';
+import { authHeaders } from '@/lib/apiClient';
 
 interface FileDocument {
   id: string;
@@ -62,10 +63,7 @@ export default function AIAnalysisTab({
     try {
       const response = await fetch(`/api/cases/${caseId}/ai/reanalyze`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {
@@ -93,10 +91,7 @@ export default function AIAnalysisTab({
     try {
       const response = await fetch(`/api/cases/${caseId}/ai/analyze-documents`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({ documentIds: selectedDocuments }),
       });
 
@@ -126,10 +121,7 @@ export default function AIAnalysisTab({
     try {
       const response = await fetch(`/api/cases/${caseId}/ai/custom-analysis`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({
           prompt: customPrompt,
           documentIds: selectedDocuments.length > 0 ? selectedDocuments : undefined,

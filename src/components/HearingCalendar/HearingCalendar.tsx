@@ -5,6 +5,7 @@ import { Calendar, Card, Tag, List, Empty, Form, Input, DatePicker, Select, Butt
 import { CalendarOutlined, FileTextOutlined, CheckCircleOutlined, SyncOutlined, CloudOutlined, GoogleOutlined, ClockCircleOutlined, ExclamationCircleOutlined, LinkOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAuth } from '@/context/AuthContext';
+import { authHeaders } from '@/lib/apiClient';
 import { CalendarSkeleton, shimmerStyles, SectionLoader } from '@/components/Skeletons';
 import { getDayStatus } from '@/data/bangaloreCourtHolidays2026';
 import GoogleCalendarConnect from '@/components/GoogleCalendar/GoogleCalendarConnect';
@@ -148,10 +149,10 @@ export default function HearingCalendar() {
       // Parallel fetch for hearings and cases
       const [hearingsRes, casesRes] = await Promise.all([
         fetch('/api/hearings?calendar=true', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders(token),
         }),
         fetch('/api/cases?minimal=true', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders(token),
         }),
       ]);
 
@@ -177,7 +178,7 @@ export default function HearingCalendar() {
 
     try {
       const response = await fetch('/api/google/status', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {
@@ -198,7 +199,7 @@ export default function HearingCalendar() {
     try {
       const response = await fetch('/api/google/calendar/sync', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {
@@ -228,7 +229,7 @@ export default function HearingCalendar() {
     try {
       const response = await fetch(`/api/google/calendar/sync/${hearingId}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {
@@ -273,10 +274,7 @@ export default function HearingCalendar() {
     try {
       const response = await fetch(`/api/hearings/${editingHearing.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({
           hearingDate: values.hearingDate.toISOString(),
           hearingTime: values.hearingTime,
@@ -314,9 +312,7 @@ export default function HearingCalendar() {
     try {
       const response = await fetch(`/api/hearings/${hearingId}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {
@@ -491,10 +487,7 @@ export default function HearingCalendar() {
       try {
         const response = await fetch('/api/hearings', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: authHeaders(token),
           body: JSON.stringify({
             caseId: selectedCaseId,
             hearingDate: values.hearingDate.toISOString(),

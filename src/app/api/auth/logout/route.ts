@@ -13,9 +13,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Delete session
-    await prisma.session.deleteMany({
+    // Verify session exists before deleting
+    const session = await prisma.session.findUnique({
       where: { token },
+    });
+
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Invalid session' },
+        { status: 401 }
+      );
+    }
+
+    // Delete the verified session
+    await prisma.session.delete({
+      where: { id: session.id },
     });
 
     return NextResponse.json(

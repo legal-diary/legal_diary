@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Input, Select, Button, Divider, Spin, message } from 'antd';
 import { HomeOutlined } from '@ant-design/icons';
+import { authHeaders } from '@/lib/apiClient';
 
 interface Firm {
   id: string;
@@ -26,7 +27,9 @@ export default function FirmSelectionModal({ open, token, onSuccess }: FirmSelec
   useEffect(() => {
     const fetchFirms = async () => {
       try {
-        const response = await fetch('/api/firms');
+        const response = await fetch('/api/firms', {
+          headers: authHeaders(token),
+        });
         if (response.ok) {
           const data = await response.json();
           setFirms(data);
@@ -62,10 +65,7 @@ export default function FirmSelectionModal({ open, token, onSuccess }: FirmSelec
 
       const response = await fetch('/api/auth/setup-firm', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify(firmParam),
       });
 

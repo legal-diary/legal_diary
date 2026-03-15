@@ -14,6 +14,7 @@ import {
   ZoomInOutlined,
   ZoomOutOutlined,
 } from '@ant-design/icons';
+import { authHeaders } from '@/lib/apiClient';
 import mammoth from 'mammoth';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -97,7 +98,7 @@ export default function DocumentViewer({
   const fetchSignedUrl = async (docId: string): Promise<string | null> => {
     try {
       const response = await fetch(`/api/documents/${docId}/url`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
       const data = await response.json();
       if (data.url) {
@@ -187,7 +188,7 @@ export default function DocumentViewer({
       try {
         if (category === 'text') {
           const response = await fetch(`/api/documents/${document.id}/content`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: authHeaders(token),
           });
           const data = await response.json();
           if (data.content) {

@@ -20,6 +20,7 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
+import { authHeaders } from '@/lib/apiClient';
 
 interface Advocate {
   id: string;
@@ -67,7 +68,7 @@ export default function CaseAssignment({
     setLoading(true);
     try {
       const response = await fetch('/api/firms/advocates', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
       if (response.ok) {
         const data = await response.json();
@@ -103,10 +104,7 @@ export default function CaseAssignment({
     try {
       const response = await fetch(`/api/cases/${caseId}/assign`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({ userIds: selectedAdvocates }),
       });
 
@@ -131,10 +129,7 @@ export default function CaseAssignment({
     try {
       const response = await fetch(`/api/cases/${caseId}/assign`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({ userIds: [userId] }),
       });
 

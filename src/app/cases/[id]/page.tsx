@@ -40,6 +40,7 @@ import CaseAssignment from '@/components/Cases/CaseAssignment';
 import DocumentViewer from '@/components/Documents/DocumentViewer';
 import CameraCapture from '@/components/CameraCapture';
 import { useAuth } from '@/context/AuthContext';
+import { apiHeaders, authHeaders } from '@/lib/apiClient';
 import { useParams, useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import Link from 'next/link';
@@ -153,7 +154,7 @@ export default function CaseDetailPage() {
     setLoading(true);
     try {
       const response = await fetch(`/api/cases/${caseId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
       if (response.ok) {
         const data = await response.json();
@@ -182,10 +183,7 @@ export default function CaseDetailPage() {
     try {
       const response = await fetch(`/api/cases/${caseId}/ai/reanalyze`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {
@@ -211,7 +209,7 @@ export default function CaseDetailPage() {
   const handleDownloadDocument = useCallback(async (doc: any) => {
     try {
       const response = await fetch(`/api/documents/${doc.id}/url`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
       const data = await response.json();
 
@@ -248,7 +246,7 @@ export default function CaseDetailPage() {
 
       const response = await fetch(`/api/cases/${caseId}/upload`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { ...apiHeaders(), Authorization: `Bearer ${token}` },
         body: formData,
       });
 
@@ -273,10 +271,7 @@ export default function CaseDetailPage() {
     try {
       const response = await fetch('/api/hearings', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({
           caseId,
           hearingDate: values.hearingDate.toISOString(),
@@ -319,10 +314,7 @@ export default function CaseDetailPage() {
     try {
       const response = await fetch(`/api/cases/${caseId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({
           ...values,
           documentsToDelete: documentsToDelete,
@@ -353,7 +345,7 @@ export default function CaseDetailPage() {
     try {
       const response = await fetch(`/api/cases/${caseId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {

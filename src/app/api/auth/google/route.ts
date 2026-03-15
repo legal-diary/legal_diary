@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import crypto from 'crypto';
+import { isIpRateLimited, recordIpAttempt, getClientIp } from '@/lib/rateLimit';
 
 // Google OAuth2 configuration for login
 // Use GOOGLE_AUTH_REDIRECT_URI if set, otherwise fall back to /auth/google/callback
@@ -32,8 +33,18 @@ const LOGIN_SCOPES = [
  * No authentication required (user is logging in)
  * Returns redirect URL to Google consent screen
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // IP-based rate limiting
+    const ip = getClientIp(request);
+    if (isIpRateLimited(ip)) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      );
+    }
+    recordIpAttempt(ip);
+
     // Create state parameter for CSRF protection
     // For login, we don't have userId yet, just timestamp + nonce
     const stateData = {

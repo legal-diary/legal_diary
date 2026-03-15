@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import FirmSelectionModal from '@/components/Auth/FirmSelectionModal';
 import SetPasswordModal from '@/components/Auth/SetPasswordModal';
+import { apiHeaders, authHeaders } from '@/lib/apiClient';
 
 interface User {
   id: string;
@@ -106,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ email, password }),
       });
 
@@ -144,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const response = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
 
@@ -165,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await fetch('/api/auth/logout', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token || ''),
       });
 
       setUser(null);

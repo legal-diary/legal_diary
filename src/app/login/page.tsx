@@ -13,6 +13,7 @@ import {
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { apiHeaders } from '@/lib/apiClient';
 
 // Error types for different UI treatments
 type ErrorType = 'error' | 'warning' | 'info' | 'rate_limit';
@@ -128,7 +129,7 @@ export default function LoginPage() {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(values),
       });
 
@@ -160,7 +161,9 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      const response = await fetch('/api/auth/google');
+      const response = await fetch('/api/auth/google', {
+        headers: apiHeaders(),
+      });
       const data = await response.json();
 
       if (!response.ok) {

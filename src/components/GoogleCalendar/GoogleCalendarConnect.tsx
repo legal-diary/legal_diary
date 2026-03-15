@@ -10,6 +10,7 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/context/AuthContext';
+import { authHeaders } from '@/lib/apiClient';
 
 interface GoogleCalendarStatus {
   connected: boolean;
@@ -39,7 +40,7 @@ export default function GoogleCalendarConnect({
 
     try {
       const response = await fetch('/api/google/status', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {
@@ -81,7 +82,7 @@ export default function GoogleCalendarConnect({
     setConnecting(true);
     try {
       const response = await fetch('/api/google/auth', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {
@@ -105,7 +106,7 @@ export default function GoogleCalendarConnect({
     try {
       const response = await fetch('/api/google/disconnect', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {
@@ -128,7 +129,7 @@ export default function GoogleCalendarConnect({
     try {
       const response = await fetch('/api/google/calendar/sync', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {

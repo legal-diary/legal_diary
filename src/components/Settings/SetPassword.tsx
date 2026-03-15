@@ -15,6 +15,7 @@ import {
   CheckCircleOutlined,
   GoogleOutlined,
 } from '@ant-design/icons';
+import { authHeaders } from '@/lib/apiClient';
 
 interface SetPasswordProps {
   token: string;
@@ -31,7 +32,7 @@ export default function SetPassword({ token }: SetPasswordProps) {
     const checkPasswordStatus = async () => {
       try {
         const response = await fetch('/api/auth/set-password', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders(token),
         });
 
         if (response.ok) {
@@ -54,10 +55,7 @@ export default function SetPassword({ token }: SetPasswordProps) {
     try {
       const response = await fetch('/api/auth/set-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({
           currentPassword: values.currentPassword,
           newPassword: values.newPassword,
