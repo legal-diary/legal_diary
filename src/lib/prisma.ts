@@ -1,14 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const globalForPrisma = global as unknown as { prisma?: PrismaClient };
 
-// Log database connection info (without exposing password)
-if (process.env.DATABASE_URL) {
-  const dbUrl = process.env.DATABASE_URL;
-  const host = dbUrl.match(/\/\/([^:]+):([^@]+)@([^\/]+)/)?.[3] || 'unknown';
-  console.log('[Prisma] Database host:', host);
-  console.log('[Prisma] Environment:', process.env.NODE_ENV);
-} else {
+if (!process.env.DATABASE_URL) {
   console.error('[Prisma] DATABASE_URL is not set!');
 }
 
@@ -25,6 +19,33 @@ export const prisma =
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
+}
+
+/**
+ * Execute database operations within a firm-scoped RLS context.
+ *
+ * Sets `app.current_firm_id` via SET LOCAL (transaction-scoped) before
+ * running the callback. This ensures Supabase RLS policies enforce
+ * firm isolation at the database level.
+ *
+ * Uses SET LOCAL so the variable is automatically cleared when the
+ * transaction ends — safe with PgBouncer's transaction pooling mode.
+ *
+ * Usage:
+ *   const cases = await withFirmContext(user.firmId, (tx) =>
+ *     tx.case.findMany({ where: { status: 'ACTIVE' } })
+ *   );
+ */
+export async function withFirmContext<T>(
+  firmId: string,
+  callback: (tx: Prisma.TransactionClient) => Promise<T>
+): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    // SET LOCAL scopes the variable to this transaction only
+    // Safe with PgBouncer — won't leak to other connections
+    await tx.$executeRaw`SELECT set_config('app.current_firm_id', ${firmId}, true)`;
+    return callback(tx);
+  });
 }
 
 // Helper function to retry database operations (useful for Render free tier wake-up)
