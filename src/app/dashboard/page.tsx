@@ -36,6 +36,7 @@ import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import { authHeaders } from '@/lib/apiClient';
 import dayjs from 'dayjs';
 import {
   HeaderSkeleton,
@@ -511,10 +512,7 @@ export default function DashboardPage() {
 
     try {
       const response = await fetch('/api/dashboard', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache',
-        },
+        headers: authHeaders(token, { 'Cache-Control': 'no-cache' }),
       });
 
       if (response.ok) {
@@ -583,7 +581,7 @@ export default function DashboardPage() {
       try {
         const response = await fetch(`/api/hearings/${hearingId}`, {
           method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders(token),
         });
         if (response.ok) {
           message.success('Hearing deleted successfully');
@@ -619,10 +617,7 @@ export default function DashboardPage() {
 
         const response = await fetch(url, {
           method,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: authHeaders(token),
           body: JSON.stringify(payload),
         });
 

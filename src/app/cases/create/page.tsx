@@ -18,6 +18,7 @@ import { UploadOutlined, CameraOutlined } from '@ant-design/icons';
 import type { RcFile } from 'antd/es/upload';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
+import { apiHeaders, authHeaders } from '@/lib/apiClient';
 import { useRouter } from 'next/navigation';
 import CameraCapture from '@/components/CameraCapture';
 
@@ -51,10 +52,7 @@ export default function CreateCasePage() {
       // Create case
       const caseResponse = await fetch('/api/cases', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify(values),
       });
 
@@ -74,7 +72,7 @@ export default function CreateCasePage() {
 
         const uploadResponse = await fetch(`/api/cases/${caseData.id}/upload`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { ...apiHeaders(), Authorization: `Bearer ${token}` },
           body: formData,
         });
 
@@ -92,7 +90,7 @@ export default function CreateCasePage() {
 
         const scanResponse = await fetch(`/api/cases/${caseData.id}/upload-images`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { ...apiHeaders(), Authorization: `Bearer ${token}` },
           body: imageFormData,
         });
 

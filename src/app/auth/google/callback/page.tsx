@@ -4,6 +4,7 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Spin, Result, Button } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
+import { apiHeaders } from '@/lib/apiClient';
 
 function GoogleCallbackContent() {
   const router = useRouter();
@@ -38,7 +39,7 @@ function GoogleCallbackContent() {
         // Exchange code for tokens via our API
         const response = await fetch('/api/auth/google/callback', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: apiHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ code, state }),
         });
 

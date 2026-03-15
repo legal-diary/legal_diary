@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import { prisma, withRetry } from '@/lib/prisma';
 import { generateSessionToken } from '@/lib/auth';
 import { encrypt } from '@/lib/encryption';
+import { isIpRateLimited, recordIpAttempt, getClientIp } from '@/lib/rateLimit';
 
 // Google OAuth2 configuration for login
 // Use GOOGLE_AUTH_REDIRECT_URI if set, otherwise fall back to /auth/google/callback
@@ -40,6 +41,16 @@ interface GoogleUserInfo {
  */
 export async function POST(request: NextRequest) {
   try {
+    // IP-based rate limiting
+    const ip = getClientIp(request);
+    if (isIpRateLimited(ip)) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      );
+    }
+    recordIpAttempt(ip);
+
     const body = await request.json();
     const { code, state } = body;
 

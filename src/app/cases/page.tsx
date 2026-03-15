@@ -16,6 +16,7 @@ import Link from 'next/link';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/context/AuthContext';
+import { authHeaders } from '@/lib/apiClient';
 import dayjs from 'dayjs';
 import { CasesPageSkeleton, SectionLoader, shimmerStyles } from '@/components/Skeletons';
 
@@ -135,7 +136,7 @@ export default function CasesPage() {
     setLoading(true);
     try {
       const response = await fetch('/api/cases?minimal=true', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
       if (response.ok) {
         const data = await response.json();

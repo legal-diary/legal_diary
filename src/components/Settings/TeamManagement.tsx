@@ -21,6 +21,7 @@ import {
   TeamOutlined,
   ExclamationCircleOutlined,
 } from '@ant-design/icons';
+import { authHeaders } from '@/lib/apiClient';
 import type { ColumnsType } from 'antd/es/table';
 
 interface Member {
@@ -54,7 +55,7 @@ export default function TeamManagement({ token }: TeamManagementProps) {
     setLoading(true);
     try {
       const response = await fetch('/api/firms/members', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {
@@ -110,10 +111,7 @@ export default function TeamManagement({ token }: TeamManagementProps) {
         try {
           const response = await fetch(`/api/firms/members/${userId}`, {
             method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
+            headers: authHeaders(token),
             body: JSON.stringify({ role: newRole }),
           });
 
@@ -163,9 +161,7 @@ export default function TeamManagement({ token }: TeamManagementProps) {
         try {
           const response = await fetch(`/api/firms/members/${userId}`, {
             method: 'DELETE',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: authHeaders(token),
           });
 
           if (response.ok) {

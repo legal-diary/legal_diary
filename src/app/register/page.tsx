@@ -14,6 +14,7 @@ import {
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { apiHeaders } from '@/lib/apiClient';
 
 // Error types for different UI treatments
 type ErrorType = 'error' | 'warning' | 'info';
@@ -47,7 +48,9 @@ export default function RegisterPage() {
     setGoogleLoading(true);
     setRegisterError(null);
     try {
-      const response = await fetch('/api/auth/google');
+      const response = await fetch('/api/auth/google', {
+        headers: apiHeaders(),
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -175,7 +178,7 @@ export default function RegisterPage() {
       // Call register API directly to handle errors
       const response = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
 
@@ -189,7 +192,7 @@ export default function RegisterPage() {
       // Registration successful - now login
       const loginResponse = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ email: values.email, password: values.password }),
       });
 

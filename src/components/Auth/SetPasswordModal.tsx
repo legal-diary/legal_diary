@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input, Button, message, Alert } from 'antd';
 import { LockOutlined, GoogleOutlined } from '@ant-design/icons';
+import { authHeaders } from '@/lib/apiClient';
 
 interface SetPasswordModalProps {
   open: boolean;
@@ -25,10 +26,7 @@ export default function SetPasswordModal({
     try {
       const response = await fetch('/api/auth/set-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({
           newPassword: values.newPassword,
           confirmPassword: values.confirmPassword,

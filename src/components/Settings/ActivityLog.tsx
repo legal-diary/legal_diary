@@ -28,6 +28,7 @@ import {
   FilterOutlined,
   EyeOutlined,
 } from '@ant-design/icons';
+import { authHeaders } from '@/lib/apiClient';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -154,7 +155,7 @@ export default function ActivityLog({ token }: ActivityLogProps) {
       if (dateRange?.[1]) params.append('endDate', dateRange[1].toISOString());
 
       const response = await fetch(`/api/activity-logs?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
 
       if (response.ok) {
@@ -181,10 +182,7 @@ export default function ActivityLog({ token }: ActivityLogProps) {
     try {
       const response = await fetch('/api/activity-logs', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({ days: 7 }),
       });
 
