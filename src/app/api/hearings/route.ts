@@ -48,7 +48,8 @@ export async function GET(request: NextRequest) {
             select: {
               caseNumber: true,
               caseTitle: true,
-              clientName: true,
+              petitionerName: true,
+              respondentName: true,
             },
           },
           CalendarSync: {
@@ -83,7 +84,8 @@ export async function GET(request: NextRequest) {
             id: true,
             caseNumber: true,
             caseTitle: true,
-            clientName: true,
+            petitionerName: true,
+            respondentName: true,
             status: true,
           },
         },
@@ -189,7 +191,6 @@ export async function POST(request: NextRequest) {
           hearingId: hearing.id,
           caseNumber: caseRecord.caseNumber,
           caseTitle: caseRecord.caseTitle,
-          clientName: caseRecord.clientName,
           hearingDate: new Date(hearingDate),
           hearingType: hearingType || 'ARGUMENTS',
           courtHall,

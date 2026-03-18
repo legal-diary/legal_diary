@@ -73,7 +73,8 @@ interface Case {
   id: string;
   caseNumber: string;
   caseTitle: string;
-  clientName: string;
+  petitionerName: string;
+  respondentName: string;
 }
 
 interface UpcomingHearing {
@@ -87,7 +88,8 @@ interface UpcomingHearing {
   Case: {
     caseNumber: string;
     caseTitle: string;
-    clientName: string;
+    petitionerName: string;
+    respondentName: string;
   };
 }
 
@@ -657,7 +659,7 @@ export default function DashboardPage() {
             </Link>
             <div className="hide-xs">
               <Text type="secondary" style={{ fontSize: '0.65rem' }}>
-                {record.Case?.clientName || 'Unknown'}
+                {record.Case?.caseTitle || 'Unknown'}
               </Text>
             </div>
           </div>
@@ -717,7 +719,7 @@ export default function DashboardPage() {
     () =>
       cases.map((c) => (
         <Option key={c.id} value={c.id}>
-          {c.caseNumber} - {c.clientName} ({c.caseTitle})
+          {c.caseNumber} - {c.caseTitle}
         </Option>
       )),
     [cases]

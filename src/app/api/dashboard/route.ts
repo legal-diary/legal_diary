@@ -52,8 +52,9 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               caseNumber: true,
-              clientName: true,
               caseTitle: true,
+              petitionerName: true,
+              respondentName: true,
               status: true,
               courtName: true,
             },
@@ -82,12 +83,13 @@ export async function GET(request: NextRequest) {
             select: {
               caseNumber: true,
               caseTitle: true,
-              clientName: true,
+              petitionerName: true,
+              respondentName: true,
             },
           },
         },
         orderBy: { hearingDate: 'asc' },
-        take: 15, // Take a few extra to account for today's items
+        take: 15,
       }),
 
       // Minimal case data for dropdown (only active cases user has access to)
@@ -102,7 +104,8 @@ export async function GET(request: NextRequest) {
           id: true,
           caseNumber: true,
           caseTitle: true,
-          clientName: true,
+          petitionerName: true,
+          respondentName: true,
         },
         orderBy: { caseNumber: 'asc' },
       }),
@@ -146,7 +149,9 @@ export async function GET(request: NextRequest) {
         id: hearing.id,
         caseId: hearing.Case.id,
         caseNumber: hearing.Case.caseNumber,
-        partyName: hearing.Case.clientName,
+        partyName: hearing.Case.caseTitle,
+        petitionerName: hearing.Case.petitionerName,
+        respondentName: hearing.Case.respondentName,
         caseTitle: hearing.Case.caseTitle,
         stage: hearing.Case.status,
         courtName: hearing.Case.courtName,

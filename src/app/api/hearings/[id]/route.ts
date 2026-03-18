@@ -116,7 +116,8 @@ export async function PUT(
           select: {
             caseNumber: true,
             caseTitle: true,
-            clientName: true,
+            petitionerName: true,
+            respondentName: true,
           },
         },
         Reminder: true,
@@ -140,7 +141,6 @@ export async function PUT(
           hearingId: updatedHearing.id,
           caseNumber: updatedHearing.Case.caseNumber,
           caseTitle: updatedHearing.Case.caseTitle,
-          clientName: updatedHearing.Case.clientName,
           hearingDate: updatedHearing.hearingDate,
           hearingType: updatedHearing.hearingType,
           courtHall: updatedHearing.courtHall,

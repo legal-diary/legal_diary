@@ -32,7 +32,8 @@ interface Hearing {
   Case: {
     caseNumber: string;
     caseTitle: string;
-    clientName: string;
+    petitionerName: string;
+    respondentName: string;
   };
 }
 
@@ -764,7 +765,7 @@ export default function HearingCalendar() {
                     }
                     description={
                       <div style={{ fontSize: 'clamp(0.75rem, 1.8vw, 0.95rem)' }}>
-                        <p style={{ marginBottom: '4px' }}>Client: {hearing.Case?.clientName || 'Unknown'}</p>
+                        <p style={{ marginBottom: '4px' }}>{hearing.Case?.caseTitle || 'Unknown'}</p>
                         <p style={{ marginBottom: '4px' }}>
                           Stage:{' '}
                           <Tag color={HEARING_TYPE_COLORS[hearing.hearingType] || 'default'}>
@@ -841,7 +842,7 @@ export default function HearingCalendar() {
                   {selectedHearing.Case?.caseTitle || 'Unknown Case'}
                 </p>
                 <p style={{ color: '#666', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
-                  <strong>Client:</strong> {selectedHearing.Case?.clientName || 'Unknown'}
+                  <strong>Parties:</strong> {selectedHearing.Case?.caseTitle || 'Unknown'}
                 </p>
               </div>
 
@@ -1159,7 +1160,7 @@ export default function HearingCalendar() {
                           </div>
 
                           <div className="timeline-card-meta">
-                            <span>Client: {hearing.Case?.clientName || 'Unknown'}</span>
+                            <span>{hearing.Case?.caseTitle || 'Unknown'}</span>
                             <span>• Court Hall: {hearing.courtHall}</span>
                           </div>
 

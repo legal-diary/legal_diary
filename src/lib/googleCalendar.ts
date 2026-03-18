@@ -208,7 +208,6 @@ interface HearingEventData {
   hearingId: string;
   caseNumber: string;
   caseTitle: string;
-  clientName: string;
   hearingDate: Date;
   hearingType: string;
   courtHall?: string;
@@ -238,7 +237,6 @@ export async function createCalendarEvent(
       summary: `${hearing.caseNumber} - ${hearing.hearingType.replace(/_/g, ' ')}`,
       description: [
         `Case: ${hearing.caseTitle}`,
-        `Client: ${hearing.clientName}`,
         hearing.courtHall ? `Court Hall: ${hearing.courtHall}` : '',
         hearing.notes ? `\nNotes: ${hearing.notes}` : '',
         '\n---',
@@ -324,7 +322,6 @@ export async function updateCalendarEvent(
       summary: `${hearing.caseNumber} - ${hearing.hearingType.replace(/_/g, ' ')}`,
       description: [
         `Case: ${hearing.caseTitle}`,
-        `Client: ${hearing.clientName}`,
         hearing.courtHall ? `Court Hall: ${hearing.courtHall}` : '',
         hearing.notes ? `\nNotes: ${hearing.notes}` : '',
         '\n---',
@@ -442,7 +439,6 @@ export async function syncAllHearings(
         select: {
           caseNumber: true,
           caseTitle: true,
-          clientName: true,
         },
       },
       CalendarSync: true,
@@ -458,7 +454,6 @@ export async function syncAllHearings(
       hearingId: hearing.id,
       caseNumber: hearing.Case.caseNumber,
       caseTitle: hearing.Case.caseTitle,
-      clientName: hearing.Case.clientName,
       hearingDate: hearing.hearingDate,
       hearingType: hearing.hearingType,
       courtHall: hearing.courtHall,

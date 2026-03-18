@@ -52,7 +52,6 @@ export async function POST(
           select: {
             caseNumber: true,
             caseTitle: true,
-            clientName: true,
           },
         },
         CalendarSync: true,
@@ -67,7 +66,6 @@ export async function POST(
       hearingId: hearing.id,
       caseNumber: hearing.Case.caseNumber,
       caseTitle: hearing.Case.caseTitle,
-      clientName: hearing.Case.clientName,
       hearingDate: hearing.hearingDate,
       hearingType: hearing.hearingType,
       courtHall: hearing.courtHall,

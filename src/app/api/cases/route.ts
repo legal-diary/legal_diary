@@ -32,14 +32,14 @@ export async function GET(request: NextRequest) {
     const minimal = url.searchParams.get('minimal') === 'true';
 
     if (minimal) {
-      // Optimized query for list view - only essential fields
       const cases = await prisma.case.findMany({
         where: caseFilter,
         select: {
           id: true,
           caseNumber: true,
           caseTitle: true,
-          clientName: true,
+          petitionerName: true,
+          respondentName: true,
           status: true,
           priority: true,
           courtName: true,
@@ -104,62 +104,75 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    console.log('[POST /api/cases] Authorization header:', authHeader?.substring(0, 30));
-
     const token = authHeader?.replace('Bearer ', '');
-    console.log('[POST /api/cases] Extracted token (first 20 chars):', token?.substring(0, 20));
-    console.log('[POST /api/cases] Token length:', token?.length);
 
     if (!token) {
-      console.log('[POST /api/cases] No token provided');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await verifyToken(token);
-    console.log('[POST /api/cases] User after verification:', user?.email);
 
     if (!user || !user.firmId) {
-      console.log('[POST /api/cases] User verification failed or no firmId');
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const {
       caseNumber,
-      clientName,
-      clientEmail,
-      clientPhone,
-      caseTitle,
+      petitionerName,
+      petitionerPhone,
+      respondentName,
+      respondentPhone,
+      clientParty,
+      vakalat,
       description,
-      opponents,
-      courtName,
+      courtTypeId,
+      courtHall,
       judgeAssigned,
       priority,
     } = await request.json();
 
-    // Validation
-    if (!caseNumber || !clientName || !caseTitle) {
+    if (!caseNumber || !petitionerName || !respondentName || !description) {
       return NextResponse.json(
-        { error: 'caseNumber, clientName, and caseTitle are required' },
+        { error: 'caseNumber, petitionerName, respondentName, and description are required' },
         { status: 400 }
       );
     }
 
-    // Create case with auto-assignment to creator
+    const party = clientParty || 'PETITIONER';
+    if (party === 'PETITIONER' && !petitionerPhone) {
+      return NextResponse.json({ error: 'Petitioner phone is required when petitioner is the client' }, { status: 400 });
+    }
+    if (party === 'RESPONDENT' && !respondentPhone) {
+      return NextResponse.json({ error: 'Respondent phone is required when respondent is the client' }, { status: 400 });
+    }
+
+    const caseTitle = `${petitionerName} vs. ${respondentName}`;
+
+    // Resolve courtName from courtTypeId for display compatibility
+    let courtName: string | null = null;
+    if (courtTypeId) {
+      const courtType = await prisma.courtType.findUnique({ where: { id: courtTypeId } });
+      if (courtType) courtName = courtType.name;
+    }
+
     const newCase = await prisma.case.create({
       data: {
         caseNumber,
-        clientName,
-        clientEmail,
-        clientPhone,
         caseTitle,
+        petitionerName,
+        petitionerPhone,
+        respondentName,
+        respondentPhone,
+        clientParty: clientParty || 'PETITIONER',
+        vakalat,
         description,
-        opponents,
+        courtTypeId,
         courtName,
+        courtHall,
         judgeAssigned,
         priority: priority || 'MEDIUM',
         createdById: user.id,
         firmId: user.firmId,
-        // Auto-assign the creator to the case
         assignments: {
           create: {
             userId: user.id,
@@ -170,6 +183,7 @@ export async function POST(request: NextRequest) {
         User: true,
         Hearing: true,
         FileDocument: true,
+        CourtType: true,
         assignments: {
           include: {
             user: {
@@ -180,7 +194,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Log the case creation activity
     ActivityLogger.caseCreated(user.id, user.firmId, newCase.id, caseNumber, request);
 
     return NextResponse.json(newCase, { status: 201 });
