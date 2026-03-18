@@ -69,9 +69,8 @@ export async function POST(
       caseTitle: hearing.Case.caseTitle,
       clientName: hearing.Case.clientName,
       hearingDate: hearing.hearingDate,
-      hearingTime: hearing.hearingTime,
       hearingType: hearing.hearingType,
-      courtRoom: hearing.courtRoom,
+      courtHall: hearing.courtHall,
       notes: hearing.notes,
     };
 

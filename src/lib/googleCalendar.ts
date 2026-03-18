@@ -210,9 +210,8 @@ interface HearingEventData {
   caseTitle: string;
   clientName: string;
   hearingDate: Date;
-  hearingTime?: string | null;
   hearingType: string;
-  courtRoom?: string | null;
+  courtHall?: string;
   notes?: string | null;
 }
 
@@ -229,28 +228,23 @@ export async function createCalendarEvent(
   }
 
   try {
-    // Parse hearing time or default to 10:00 AM
-    const [hours, minutes] = hearing.hearingTime
-      ? hearing.hearingTime.split(':').map(Number)
-      : [10, 0];
-
     const startTime = new Date(hearing.hearingDate);
-    startTime.setHours(hours, minutes, 0, 0);
+    startTime.setHours(10, 0, 0, 0);
 
     const endTime = new Date(startTime);
-    endTime.setHours(endTime.getHours() + 1); // Default 1 hour duration
+    endTime.setHours(endTime.getHours() + 1);
 
     const event: calendar_v3.Schema$Event = {
       summary: `${hearing.caseNumber} - ${hearing.hearingType.replace(/_/g, ' ')}`,
       description: [
         `Case: ${hearing.caseTitle}`,
         `Client: ${hearing.clientName}`,
-        hearing.courtRoom ? `Court Room: ${hearing.courtRoom}` : '',
+        hearing.courtHall ? `Court Hall: ${hearing.courtHall}` : '',
         hearing.notes ? `\nNotes: ${hearing.notes}` : '',
         '\n---',
         'Created by Legal Diary',
       ].filter(Boolean).join('\n'),
-      location: hearing.courtRoom || undefined,
+      location: hearing.courtHall || undefined,
       start: {
         dateTime: startTime.toISOString(),
         timeZone: 'Asia/Kolkata',
@@ -263,8 +257,8 @@ export async function createCalendarEvent(
       reminders: {
         useDefault: false,
         overrides: [
-          { method: 'popup', minutes: 1440 }, // 1 day before
-          { method: 'popup', minutes: 60 },   // 1 hour before
+          { method: 'popup', minutes: 1440 },
+          { method: 'popup', minutes: 60 },
         ],
       },
     };
@@ -320,12 +314,8 @@ export async function updateCalendarEvent(
   }
 
   try {
-    const [hours, minutes] = hearing.hearingTime
-      ? hearing.hearingTime.split(':').map(Number)
-      : [10, 0];
-
     const startTime = new Date(hearing.hearingDate);
-    startTime.setHours(hours, minutes, 0, 0);
+    startTime.setHours(10, 0, 0, 0);
 
     const endTime = new Date(startTime);
     endTime.setHours(endTime.getHours() + 1);
@@ -335,12 +325,12 @@ export async function updateCalendarEvent(
       description: [
         `Case: ${hearing.caseTitle}`,
         `Client: ${hearing.clientName}`,
-        hearing.courtRoom ? `Court Room: ${hearing.courtRoom}` : '',
+        hearing.courtHall ? `Court Hall: ${hearing.courtHall}` : '',
         hearing.notes ? `\nNotes: ${hearing.notes}` : '',
         '\n---',
         'Created by Legal Diary',
       ].filter(Boolean).join('\n'),
-      location: hearing.courtRoom || undefined,
+      location: hearing.courtHall || undefined,
       start: {
         dateTime: startTime.toISOString(),
         timeZone: 'Asia/Kolkata',
@@ -470,9 +460,8 @@ export async function syncAllHearings(
       caseTitle: hearing.Case.caseTitle,
       clientName: hearing.Case.clientName,
       hearingDate: hearing.hearingDate,
-      hearingTime: hearing.hearingTime,
       hearingType: hearing.hearingType,
-      courtRoom: hearing.courtRoom,
+      courtHall: hearing.courtHall,
       notes: hearing.notes,
     };
 

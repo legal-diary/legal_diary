@@ -96,9 +96,8 @@ export async function PUT(
 
     const {
       hearingDate,
-      hearingTime,
       hearingType,
-      courtRoom,
+      courtHall,
       notes,
       status,
     } = await request.json();
@@ -107,9 +106,8 @@ export async function PUT(
       where: { id },
       data: {
         ...(hearingDate && { hearingDate: new Date(hearingDate) }),
-        ...(hearingTime !== undefined && { hearingTime }),
         ...(hearingType && { hearingType }),
-        ...(courtRoom !== undefined && { courtRoom }),
+        ...(courtHall !== undefined && { courtHall }),
         ...(notes !== undefined && { notes }),
         ...(status && { status }),
       },
@@ -125,12 +123,10 @@ export async function PUT(
       },
     });
 
-    // Log the hearing update activity
     const changes = {
       ...(hearingDate && { hearingDate }),
-      ...(hearingTime !== undefined && { hearingTime }),
       ...(hearingType && { hearingType }),
-      ...(courtRoom !== undefined && { courtRoom }),
+      ...(courtHall !== undefined && { courtHall }),
       ...(notes !== undefined && { notes: 'updated' }),
       ...(status && { status }),
     };
@@ -146,9 +142,8 @@ export async function PUT(
           caseTitle: updatedHearing.Case.caseTitle,
           clientName: updatedHearing.Case.clientName,
           hearingDate: updatedHearing.hearingDate,
-          hearingTime: updatedHearing.hearingTime,
           hearingType: updatedHearing.hearingType,
-          courtRoom: updatedHearing.courtRoom,
+          courtHall: updatedHearing.courtHall,
           notes: updatedHearing.notes,
         });
         console.log('[Hearings] Updated Google Calendar event:', updatedHearing.id);

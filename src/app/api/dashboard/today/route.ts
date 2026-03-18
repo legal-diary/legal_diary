@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
         stage: hearing.Case.status,
         courtName: hearing.Case.courtName,
         hearingType: hearing.hearingType,
-        courtRoom: hearing.courtRoom,
+        courtHall: hearing.courtHall,
         notes: hearing.notes,
         previousDate: previousHearing?.hearingDate || null,
         currentDate: hearing.hearingDate,

@@ -44,9 +44,8 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           hearingDate: true,
-          hearingTime: true,
           hearingType: true,
-          courtRoom: true,
+          courtHall: true,
           notes: true,
           status: true,
           Case: {
@@ -75,9 +74,8 @@ export async function GET(request: NextRequest) {
           id: true,
           caseId: true,
           hearingDate: true,
-          hearingTime: true,
           hearingType: true,
-          courtRoom: true,
+          courtHall: true,
           notes: true,
           status: true,
           Case: {
@@ -153,7 +151,7 @@ export async function GET(request: NextRequest) {
         stage: hearing.Case.status,
         courtName: hearing.Case.courtName,
         hearingType: hearing.hearingType,
-        courtRoom: hearing.courtRoom,
+        courtHall: hearing.courtHall,
         notes: hearing.notes,
         previousDate: previousHearing?.hearingDate || null,
         currentDate: hearing.hearingDate,

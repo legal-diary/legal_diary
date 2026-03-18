@@ -44,6 +44,7 @@ model Case {
   FileDocument  FileDocument[]
   Hearing       Hearing[]
   assignments   CaseAssignment[]
+  Todo          Todo[]
 
   @@index([caseNumber])
   @@index([createdById])
@@ -89,6 +90,7 @@ model Firm {
   Case                    Case[]
   User_Firm_ownerIdToUser User     @relation("Firm_ownerIdToUser", fields: [ownerId], references: [id])
   User_User_firmIdToFirm  User[]   @relation("User_firmIdToFirm")
+  Todo                    Todo[]
 
   @@index([ownerId])
 }
@@ -97,9 +99,8 @@ model Hearing {
   id           String         @id @default(cuid())
   caseId       String
   hearingDate  DateTime
-  hearingTime  String?
-  hearingType  HearingType    @default(ARGUMENTS)
-  courtRoom    String?
+  hearingType  String         @default("ARGUMENTS")
+  courtHall    String
   notes        String?
   status       HearingStatus  @default(SCHEDULED)
   createdAt    DateTime       @default(now())
@@ -181,6 +182,8 @@ model User {
   GoogleCalendarToken     GoogleCalendarToken?
   caseAssignments         CaseAssignment[]
   activityLogs            ActivityLog[]
+  todosAssigned           Todo[]           @relation("TodoAssignee")
+  todosCreated            Todo[]           @relation("TodoCreator")
 
   @@index([email])
   @@index([firmId])
@@ -202,14 +205,9 @@ enum HearingStatus {
   CANCELLED
 }
 
-enum HearingType {
-  ARGUMENTS
-  EVIDENCE_RECORDING
-  FINAL_HEARING
-  INTERIM_HEARING
-  JUDGMENT_DELIVERY
-  PRE_HEARING
-  OTHER
+enum TodoStatus {
+  PENDING
+  COMPLETED
 }
 
 enum Priority {
@@ -236,6 +234,27 @@ enum UserRole {
   ADVOCATE
   ADMIN
   SUPPORT_STAFF
+}
+
+model Todo {
+  id           String     @id @default(cuid())
+  firmId       String
+  caseId       String?
+  description  String
+  assignedTo   String?
+  status       TodoStatus @default(PENDING)
+  createdById  String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  firm         Firm       @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  case         Case?      @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  assignedUser User?      @relation("TodoAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  createdBy    User       @relation("TodoCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
+  @@index([caseId])
+  @@index([assignedTo])
 }
 
 // Activity Log for tracking all actions in the system
