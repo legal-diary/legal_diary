@@ -11,6 +11,7 @@ import {
   CloseOutlined,
   MenuOutlined,
   DownOutlined,
+  CheckSquareOutlined,
 } from '@ant-design/icons';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -49,6 +50,11 @@ const createDesktopNavigationItems = () => [
     key: 'calendar',
     icon: <CalendarOutlined style={{ fontSize: '1.2rem' }} />,
     label: <Link href="/calendar" style={{ textDecoration: 'none', color: 'inherit' }}>Hearing Calendar</Link>,
+  },
+  {
+    key: 'todos',
+    icon: <CheckSquareOutlined style={{ fontSize: '1.2rem' }} />,
+    label: <Link href="/todos" style={{ textDecoration: 'none', color: 'inherit' }}>To-Do</Link>,
   },
   {
     key: 'settings',
@@ -143,6 +149,14 @@ const MobileMenuContent = memo<{
       </div>
 
       <div
+        onClick={() => handleMenuClick('/todos')}
+        className={`mobile-menu-item ${getSelectedKey() === 'todos' ? 'active' : ''}`}
+      >
+        <CheckSquareOutlined style={{ fontSize: '1.2rem' }} />
+        <span>To-Do</span>
+      </div>
+
+      <div
         onClick={() => handleMenuClick('/settings')}
         className={`mobile-menu-item ${getSelectedKey() === 'settings' ? 'active' : ''}`}
       >
@@ -191,6 +205,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const getSelectedKey = useCallback(() => {
     if (pathname.includes('/cases')) return 'cases';
     if (pathname.includes('/calendar')) return 'calendar';
+    if (pathname.includes('/todos')) return 'todos';
     if (pathname.includes('/settings')) return 'settings';
     return 'dashboard';
   }, [pathname]);

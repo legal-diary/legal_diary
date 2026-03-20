@@ -14,7 +14,6 @@ import {
   Form,
   Input,
   DatePicker,
-  TimePicker,
   Select,
   Row,
   Col,
@@ -44,6 +43,7 @@ import {
   UpcomingHearingsSkeleton,
   SectionLoader,
 } from '@/components/Dashboard/DashboardSkeleton';
+import { STAGE_OPTIONS, STAGE_LABEL_MAP, HEARING_STATUS_OPTIONS } from '@/lib/constants';
 
 // Lazy load the Modal to reduce initial bundle size
 const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
@@ -62,7 +62,7 @@ interface TodayHearing {
   stage: string;
   courtName: string | null;
   hearingType: string;
-  courtRoom: string | null;
+  courtHall: string;
   notes: string | null;
   previousDate: string | null;
   currentDate: string;
@@ -73,22 +73,23 @@ interface Case {
   id: string;
   caseNumber: string;
   caseTitle: string;
-  clientName: string;
+  petitionerName: string;
+  respondentName: string;
 }
 
 interface UpcomingHearing {
   id: string;
   caseId: string;
   hearingDate: string;
-  hearingTime: string | null;
   hearingType: string;
-  courtRoom: string | null;
+  courtHall: string;
   notes: string | null;
   status: string;
   Case: {
     caseNumber: string;
     caseTitle: string;
-    clientName: string;
+    petitionerName: string;
+    respondentName: string;
   };
 }
 
@@ -102,23 +103,6 @@ interface DashboardResponse {
   cases: Case[];
 }
 
-// Static data - moved outside component to prevent recreation
-const HEARING_TYPES = [
-  { value: 'ARGUMENTS', label: 'Arguments' },
-  { value: 'EVIDENCE_RECORDING', label: 'Evidence Recording' },
-  { value: 'FINAL_HEARING', label: 'Final Hearing' },
-  { value: 'INTERIM_HEARING', label: 'Interim Hearing' },
-  { value: 'JUDGMENT_DELIVERY', label: 'Judgment Delivery' },
-  { value: 'PRE_HEARING', label: 'Pre-Hearing' },
-  { value: 'OTHER', label: 'Other' },
-] as const;
-
-const HEARING_STATUSES = [
-  { value: 'SCHEDULED', label: 'Scheduled' },
-  { value: 'POSTPONED', label: 'Postponed' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-] as const;
 
 const STAGE_COLORS: Record<string, string> = {
   ACTIVE: 'processing',
@@ -375,7 +359,7 @@ const TodayScheduleTable = React.memo<{
             {record.hearingType && (
               <div className="hide-on-mobile">
                 <Text type="secondary" style={{ fontSize: '0.7rem' }}>
-                  {record.hearingType.replace(/_/g, ' ')}
+                  {STAGE_LABEL_MAP[record.hearingType] || record.hearingType.replace(/_/g, ' ')}
                 </Text>
               </div>
             )}
@@ -403,10 +387,10 @@ const TodayScheduleTable = React.memo<{
         render: (court: string | null, record: TodayHearing) => (
           <div>
             <Text style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>{court || '-'}</Text>
-            {record.courtRoom && (
+            {record.courtHall && (
               <div>
                 <Text type="secondary" style={{ fontSize: '0.7rem' }}>
-                  {record.courtRoom}
+                  Hall: {record.courtHall}
                 </Text>
               </div>
             )}
@@ -437,7 +421,7 @@ const TodayScheduleTable = React.memo<{
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <ClockCircleOutlined style={{ color: '#1890ff' }} />
-          <span>Today&apos;s Schedule</span>
+          <span>Schedule</span>
           {totalCount > 0 && (
             <Tag color="blue">
               {totalCount} matter{totalCount > 1 ? 's' : ''}
@@ -565,9 +549,8 @@ export default function DashboardPage() {
       form.setFieldsValue({
         caseId: hearing.caseId,
         hearingDate: dayjs(hearing.hearingDate),
-        hearingTime: hearing.hearingTime ? dayjs(hearing.hearingTime, 'HH:mm') : null,
         hearingType: hearing.hearingType,
-        courtRoom: hearing.courtRoom,
+        courtHall: hearing.courtHall,
         notes: hearing.notes,
         status: hearing.status,
       });
@@ -605,9 +588,8 @@ export default function DashboardPage() {
         const payload = {
           caseId: values.caseId,
           hearingDate: values.hearingDate.toISOString(),
-          hearingTime: values.hearingTime ? values.hearingTime.format('HH:mm') : null,
           hearingType: values.hearingType,
-          courtRoom: values.courtRoom || null,
+          courtHall: values.courtHall,
           notes: values.notes || null,
           status: values.status || 'SCHEDULED',
         };
@@ -656,21 +638,12 @@ export default function DashboardPage() {
         key: 'hearingDate',
         width: 85,
         fixed: 'left' as const,
-        render: (date: string, record: UpcomingHearing) => {
+        render: (date: string) => {
           const isToday = dayjs(date).isSame(dayjs(), 'day');
           return (
-            <div>
-              <Text strong={isToday} style={{ color: isToday ? '#1890ff' : undefined, fontSize: 'clamp(0.7rem, 2vw, 0.85rem)' }}>
-                {dayjs(date).format('DD/MM')}
-              </Text>
-              {record.hearingTime && (
-                <div className="hide-xs">
-                  <Text type="secondary" style={{ fontSize: '0.65rem' }}>
-                    {record.hearingTime}
-                  </Text>
-                </div>
-              )}
-            </div>
+            <Text strong={isToday} style={{ color: isToday ? '#1890ff' : undefined, fontSize: 'clamp(0.7rem, 2vw, 0.85rem)' }}>
+              {dayjs(date).format('DD/MM')}
+            </Text>
           );
         },
       },
@@ -686,21 +659,21 @@ export default function DashboardPage() {
             </Link>
             <div className="hide-xs">
               <Text type="secondary" style={{ fontSize: '0.65rem' }}>
-                {record.Case?.clientName || 'Unknown'}
+                {record.Case?.caseTitle || 'Unknown'}
               </Text>
             </div>
           </div>
         ),
       },
       {
-        title: 'Type',
+        title: 'Stage',
         dataIndex: 'hearingType',
         key: 'hearingType',
         width: 100,
         className: 'hide-sm',
         render: (type: string) => (
           <Tag color="blue" style={{ fontSize: '0.65rem', padding: '1px 4px' }}>
-            {type.replace(/_/g, ' ')}
+            {STAGE_LABEL_MAP[type] || type.replace(/_/g, ' ')}
           </Tag>
         ),
       },
@@ -746,7 +719,7 @@ export default function DashboardPage() {
     () =>
       cases.map((c) => (
         <Option key={c.id} value={c.id}>
-          {c.caseNumber} - {c.clientName} ({c.caseTitle})
+          {c.caseNumber} - {c.caseTitle}
         </Option>
       )),
     [cases]
@@ -842,32 +815,23 @@ export default function DashboardPage() {
                   </Select>
                 </Form.Item>
 
-                <Row gutter={[12, 0]}>
-                  <Col xs={24} sm={12}>
-                    <Form.Item
-                      name="hearingDate"
-                      label="Hearing Date"
-                      rules={[{ required: true, message: 'Please select a date' }]}
-                    >
-                      <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} sm={12}>
-                    <Form.Item name="hearingTime" label="Hearing Time">
-                      <TimePicker style={{ width: '100%' }} format="HH:mm" />
-                    </Form.Item>
-                  </Col>
-                </Row>
+                <Form.Item
+                  name="hearingDate"
+                  label="Hearing Date"
+                  rules={[{ required: true, message: 'Please select a date' }]}
+                >
+                  <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+                </Form.Item>
 
                 <Row gutter={[12, 0]}>
                   <Col xs={24} sm={12}>
                     <Form.Item
                       name="hearingType"
-                      label="Hearing Type"
-                      rules={[{ required: true, message: 'Please select hearing type' }]}
+                      label="Stage"
+                      rules={[{ required: true, message: 'Please select a stage' }]}
                     >
-                      <Select>
-                        {HEARING_TYPES.map((type) => (
+                      <Select showSearch optionFilterProp="children" placeholder="Select a stage">
+                        {STAGE_OPTIONS.map((type) => (
                           <Option key={type.value} value={type.value}>
                             {type.label}
                           </Option>
@@ -878,7 +842,7 @@ export default function DashboardPage() {
                   <Col xs={24} sm={12}>
                     <Form.Item name="status" label="Status">
                       <Select>
-                        {HEARING_STATUSES.map((status) => (
+                        {HEARING_STATUS_OPTIONS.map((status) => (
                           <Option key={status.value} value={status.value}>
                             {status.label}
                           </Option>
@@ -888,8 +852,12 @@ export default function DashboardPage() {
                   </Col>
                 </Row>
 
-                <Form.Item name="courtRoom" label="Court Room">
-                  <Input placeholder="e.g., Court Room 5, High Court" />
+                <Form.Item
+                  name="courtHall"
+                  label="Court Hall"
+                  rules={[{ required: true, message: 'Please enter court hall' }]}
+                >
+                  <Input placeholder="e.g., Court Hall 5" />
                 </Form.Item>
 
                 <Form.Item name="notes" label="Notes">
@@ -899,7 +867,7 @@ export default function DashboardPage() {
                 <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
                   <Space>
                     <Button onClick={handleModalClose}>Cancel</Button>
-                    <Button type="primary" htmlType="submit" loading={submitting}>
+                    <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
                       {editingHearing ? 'Update Hearing' : 'Add Hearing'}
                     </Button>
                   </Space>

@@ -42,14 +42,14 @@ export async function GET(request: NextRequest) {
           id: true,
           caseId: true,
           hearingDate: true,
-          hearingTime: true,
           hearingType: true,
-          courtRoom: true,
+          courtHall: true,
           Case: {
             select: {
               caseNumber: true,
               caseTitle: true,
-              clientName: true,
+              petitionerName: true,
+              respondentName: true,
             },
           },
           CalendarSync: {
@@ -84,7 +84,8 @@ export async function GET(request: NextRequest) {
             id: true,
             caseNumber: true,
             caseTitle: true,
-            clientName: true,
+            petitionerName: true,
+            respondentName: true,
             status: true,
           },
         },
@@ -128,16 +129,14 @@ export async function POST(request: NextRequest) {
     const {
       caseId,
       hearingDate,
-      hearingTime,
       hearingType,
-      courtRoom,
+      courtHall,
       notes,
     } = await request.json();
 
-    // Validation
-    if (!caseId || !hearingDate) {
+    if (!caseId || !hearingDate || !courtHall) {
       return NextResponse.json(
-        { error: 'caseId and hearingDate are required' },
+        { error: 'caseId, hearingDate, and courtHall are required' },
         { status: 400 }
       );
     }
@@ -158,14 +157,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    // Create hearing
     const hearing = await prisma.hearing.create({
       data: {
         caseId,
         hearingDate: new Date(hearingDate),
-        hearingTime,
         hearingType: hearingType || 'ARGUMENTS',
-        courtRoom,
+        courtHall,
         notes,
       },
       include: {
@@ -194,11 +191,9 @@ export async function POST(request: NextRequest) {
           hearingId: hearing.id,
           caseNumber: caseRecord.caseNumber,
           caseTitle: caseRecord.caseTitle,
-          clientName: caseRecord.clientName,
           hearingDate: new Date(hearingDate),
-          hearingTime,
           hearingType: hearingType || 'ARGUMENTS',
-          courtRoom,
+          courtHall,
           notes,
         });
         console.log('[Hearings] Auto-synced to Google Calendar:', hearing.id);

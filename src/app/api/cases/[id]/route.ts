@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import { deleteFile, deleteFiles } from '@/lib/supabase';
 import { ActivityLogger } from '@/lib/activityLog';
 
-// Allowed fields for case updates (whitelist approach)
 const ALLOWED_UPDATE_FIELDS = [
-  'caseTitle',
+  'petitionerName',
+  'petitionerPhone',
+  'respondentName',
+  'respondentPhone',
+  'clientParty',
+  'vakalat',
   'description',
-  'clientName',
-  'clientEmail',
-  'clientPhone',
   'status',
   'priority',
+  'courtTypeId',
+  'courtHall',
   'courtName',
   'judgeAssigned',
-  'opponents',
 ] as const;
 
 // GET a single case (role-based access)
@@ -56,6 +57,7 @@ export async function GET(
         Hearing: true,
         FileDocument: true,
         AISummary: true,
+        CourtType: true,
         assignments: {
           include: {
             user: {
@@ -178,22 +180,24 @@ export async function PUT(
       }
     }
 
-    // Validate email format if provided
-    if ('clientEmail' in validatedUpdates && validatedUpdates.clientEmail) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(validatedUpdates.clientEmail)) {
-        return NextResponse.json(
-          { error: 'Invalid email format' },
-          { status: 400 }
-        );
-      }
-    }
-
     if (Object.keys(validatedUpdates).length === 0) {
       return NextResponse.json(
         { error: 'No valid fields provided for update' },
         { status: 400 }
       );
+    }
+
+    // Re-compute caseTitle if party names changed
+    if ('petitionerName' in validatedUpdates || 'respondentName' in validatedUpdates) {
+      const pet = validatedUpdates.petitionerName || caseRecord.petitionerName;
+      const res = validatedUpdates.respondentName || caseRecord.respondentName;
+      validatedUpdates.caseTitle = `${pet} vs. ${res}`;
+    }
+
+    // Resolve courtName from courtTypeId
+    if ('courtTypeId' in validatedUpdates && validatedUpdates.courtTypeId) {
+      const courtType = await prisma.courtType.findUnique({ where: { id: validatedUpdates.courtTypeId } });
+      if (courtType) validatedUpdates.courtName = courtType.name;
     }
 
     const updatedCase = await prisma.case.update({
@@ -204,6 +208,7 @@ export async function PUT(
         Hearing: true,
         FileDocument: true,
         AISummary: true,
+        CourtType: true,
       },
     });
 

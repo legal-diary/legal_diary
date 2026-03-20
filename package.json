@@ -32,6 +32,9 @@
     "sharp": "^0.34.5",
     "tesseract.js": "^7.0.0"
   },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
+  },
   "devDependencies": {
     "@types/node": "^20",
     "@types/pdfkit": "^0.17.4",

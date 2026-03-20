@@ -22,28 +22,34 @@ model AISummary {
 }
 
 model Case {
-  id            String           @id @default(cuid())
-  caseNumber    String           @unique
-  clientName    String
-  clientEmail   String?
-  clientPhone   String?
-  caseTitle     String
-  description   String?
-  status        CaseStatus       @default(ACTIVE)
-  priority      Priority         @default(MEDIUM)
-  createdById   String
-  firmId        String
-  opponents     String?
-  courtName     String?
-  judgeAssigned String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  AISummary     AISummary?
-  User          User             @relation(fields: [createdById], references: [id])
-  Firm          Firm             @relation(fields: [firmId], references: [id], onDelete: Cascade)
-  FileDocument  FileDocument[]
-  Hearing       Hearing[]
-  assignments   CaseAssignment[]
+  id              String           @id @default(cuid())
+  caseNumber      String           @unique
+  caseTitle       String
+  petitionerName  String
+  petitionerPhone String?
+  respondentName  String
+  respondentPhone String?
+  clientParty     ClientParty      @default(PETITIONER)
+  vakalat         String?
+  description     String
+  status          CaseStatus       @default(ACTIVE)
+  priority        Priority         @default(MEDIUM)
+  createdById     String
+  firmId          String
+  courtName       String?
+  courtHall       String?
+  courtTypeId     String?
+  judgeAssigned   String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  AISummary       AISummary?
+  User            User             @relation(fields: [createdById], references: [id])
+  Firm            Firm             @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  CourtType       CourtType?       @relation(fields: [courtTypeId], references: [id])
+  FileDocument    FileDocument[]
+  Hearing         Hearing[]
+  assignments     CaseAssignment[]
+  Todo            Todo[]
 
   @@index([caseNumber])
   @@index([createdById])
@@ -78,28 +84,42 @@ model FileDocument {
 }
 
 model Firm {
-  id                      String   @id @default(cuid())
+  id                      String      @id @default(cuid())
   name                    String
   address                 String?
   phone                   String?
   email                   String?
-  ownerId                 String   @unique
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  ownerId                 String      @unique
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
   Case                    Case[]
-  User_Firm_ownerIdToUser User     @relation("Firm_ownerIdToUser", fields: [ownerId], references: [id])
-  User_User_firmIdToFirm  User[]   @relation("User_firmIdToFirm")
+  User_Firm_ownerIdToUser User        @relation("Firm_ownerIdToUser", fields: [ownerId], references: [id])
+  User_User_firmIdToFirm  User[]      @relation("User_firmIdToFirm")
+  Todo                    Todo[]
+  CourtType               CourtType[]
 
   @@index([ownerId])
+}
+
+model CourtType {
+  id        String   @id @default(cuid())
+  name      String
+  firmId    String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  firm      Firm?    @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  cases     Case[]
+
+  @@unique([name, firmId])
+  @@index([firmId])
 }
 
 model Hearing {
   id           String         @id @default(cuid())
   caseId       String
   hearingDate  DateTime
-  hearingTime  String?
-  hearingType  HearingType    @default(ARGUMENTS)
-  courtRoom    String?
+  hearingType  String         @default("ARGUMENTS")
+  courtHall    String
   notes        String?
   status       HearingStatus  @default(SCHEDULED)
   createdAt    DateTime       @default(now())
@@ -181,6 +201,8 @@ model User {
   GoogleCalendarToken     GoogleCalendarToken?
   caseAssignments         CaseAssignment[]
   activityLogs            ActivityLog[]
+  todosAssigned           Todo[]           @relation("TodoAssignee")
+  todosCreated            Todo[]           @relation("TodoCreator")
 
   @@index([email])
   @@index([firmId])
@@ -195,6 +217,11 @@ enum CaseStatus {
   DISMISSED
 }
 
+enum ClientParty {
+  PETITIONER
+  RESPONDENT
+}
+
 enum HearingStatus {
   SCHEDULED
   POSTPONED
@@ -202,14 +229,9 @@ enum HearingStatus {
   CANCELLED
 }
 
-enum HearingType {
-  ARGUMENTS
-  EVIDENCE_RECORDING
-  FINAL_HEARING
-  INTERIM_HEARING
-  JUDGMENT_DELIVERY
-  PRE_HEARING
-  OTHER
+enum TodoStatus {
+  PENDING
+  COMPLETED
 }
 
 enum Priority {
@@ -236,6 +258,27 @@ enum UserRole {
   ADVOCATE
   ADMIN
   SUPPORT_STAFF
+}
+
+model Todo {
+  id           String     @id @default(cuid())
+  firmId       String
+  caseId       String?
+  description  String
+  assignedTo   String?
+  status       TodoStatus @default(PENDING)
+  createdById  String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  firm         Firm       @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  case         Case?      @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  assignedUser User?      @relation("TodoAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  createdBy    User       @relation("TodoCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
+  @@index([caseId])
+  @@index([assignedTo])
 }
 
 // Activity Log for tracking all actions in the system

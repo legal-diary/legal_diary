@@ -20,12 +20,12 @@ import { authHeaders } from '@/lib/apiClient';
 import dayjs from 'dayjs';
 import { CasesPageSkeleton, SectionLoader, shimmerStyles } from '@/components/Skeletons';
 
-// Types
 interface Case {
   id: string;
   caseNumber: string;
   caseTitle: string;
-  clientName: string;
+  petitionerName: string;
+  respondentName: string;
   status: string;
   priority: string;
   courtName?: string;
@@ -94,7 +94,10 @@ const CaseCard = React.memo<{ caseData: Case }>(({ caseData }) => (
 
     <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.85rem)', color: '#666', marginBottom: '0.5rem' }}>
       <div style={{ marginBottom: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        <strong>Client:</strong> {caseData.clientName}
+        <strong>Petitioner:</strong> {caseData.petitionerName}
+      </div>
+      <div style={{ marginBottom: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <strong>Respondent:</strong> {caseData.respondentName}
       </div>
       {caseData.courtName && (
         <div style={{ marginBottom: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className="hide-xs">
@@ -167,7 +170,8 @@ export default function CasesPage() {
         (c) =>
           c.caseNumber.toLowerCase().includes(search) ||
           c.caseTitle.toLowerCase().includes(search) ||
-          c.clientName.toLowerCase().includes(search)
+          c.petitionerName.toLowerCase().includes(search) ||
+          c.respondentName.toLowerCase().includes(search)
       );
     }
 
@@ -219,7 +223,7 @@ export default function CasesPage() {
                       Search
                     </label>
                     <Input
-                      placeholder="Case number, title, or client..."
+                      placeholder="Case number, petitioner, or respondent..."
                       prefix={<SearchOutlined />}
                       value={searchText}
                       onChange={handleSearchChange}

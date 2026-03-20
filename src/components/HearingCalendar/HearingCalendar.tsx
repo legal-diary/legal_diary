@@ -9,6 +9,7 @@ import { authHeaders } from '@/lib/apiClient';
 import { CalendarSkeleton, shimmerStyles, SectionLoader } from '@/components/Skeletons';
 import { getDayStatus } from '@/data/bangaloreCourtHolidays2026';
 import GoogleCalendarConnect from '@/components/GoogleCalendar/GoogleCalendarConnect';
+import { STAGE_OPTIONS, STAGE_LABEL_MAP } from '@/lib/constants';
 
 // Lazy load Modal
 const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
@@ -25,14 +26,14 @@ interface Hearing {
   id: string;
   caseId: string;
   hearingDate: string;
-  hearingTime?: string;
   hearingType: string;
-  courtRoom?: string;
+  courtHall: string;
   CalendarSync?: CalendarSyncInfo[];
   Case: {
     caseNumber: string;
     caseTitle: string;
-    clientName: string;
+    petitionerName: string;
+    respondentName: string;
   };
 }
 
@@ -64,15 +65,6 @@ const HEARING_PILL_COLORS: Record<string, string> = {
   OTHER: '#5f6368',            // Gray
 };
 
-const HEARING_TYPES = [
-  { value: 'ARGUMENTS', label: 'Arguments' },
-  { value: 'EVIDENCE_RECORDING', label: 'Evidence Recording' },
-  { value: 'FINAL_HEARING', label: 'Final Hearing' },
-  { value: 'INTERIM_HEARING', label: 'Interim Hearing' },
-  { value: 'JUDGMENT_DELIVERY', label: 'Judgment Delivery' },
-  { value: 'PRE_HEARING', label: 'Pre Hearing' },
-  { value: 'OTHER', label: 'Other' },
-] as const;
 
 // Calendar Legend Component - Court Days only with matching cell colors
 const CalendarLegend = () => (
@@ -258,9 +250,8 @@ export default function HearingCalendar() {
     form.setFieldsValue({
       caseId: hearing.caseId,
       hearingDate: dayjs(hearing.hearingDate),
-      hearingTime: hearing.hearingTime || '',
       hearingType: hearing.hearingType,
-      courtRoom: hearing.courtRoom || '',
+      courtHall: hearing.courtHall || '',
     });
     setHearingDetailsModalOpen(false);
     setModalOpen(true);
@@ -277,9 +268,8 @@ export default function HearingCalendar() {
         headers: authHeaders(token),
         body: JSON.stringify({
           hearingDate: values.hearingDate.toISOString(),
-          hearingTime: values.hearingTime,
           hearingType: values.hearingType,
-          courtRoom: values.courtRoom,
+          courtHall: values.courtHall,
           notes: values.notes,
         }),
       });
@@ -368,15 +358,8 @@ export default function HearingCalendar() {
     [selectedDate, getHearingsForDate]
   );
 
-  // Sorted hearings by time for timeline view
   const sortedSelectedDateHearings = useMemo(() => {
-    return [...selectedDateHearings].sort((a, b) => {
-      // Hearings without time go to the end
-      if (!a.hearingTime && !b.hearingTime) return 0;
-      if (!a.hearingTime) return 1;
-      if (!b.hearingTime) return -1;
-      return a.hearingTime.localeCompare(b.hearingTime);
-    });
+    return [...selectedDateHearings];
   }, [selectedDateHearings]);
 
   // Get day status for selected date
@@ -491,9 +474,8 @@ export default function HearingCalendar() {
           body: JSON.stringify({
             caseId: selectedCaseId,
             hearingDate: values.hearingDate.toISOString(),
-            hearingTime: values.hearingTime,
             hearingType: values.hearingType,
-            courtRoom: values.courtRoom,
+            courtHall: values.courtHall,
             notes: values.notes,
           }),
         });
@@ -783,15 +765,14 @@ export default function HearingCalendar() {
                     }
                     description={
                       <div style={{ fontSize: 'clamp(0.75rem, 1.8vw, 0.95rem)' }}>
-                        <p style={{ marginBottom: '4px' }}>Client: {hearing.Case?.clientName || 'Unknown'}</p>
+                        <p style={{ marginBottom: '4px' }}>{hearing.Case?.caseTitle || 'Unknown'}</p>
                         <p style={{ marginBottom: '4px' }}>
-                          Type:{' '}
+                          Stage:{' '}
                           <Tag color={HEARING_TYPE_COLORS[hearing.hearingType] || 'default'}>
-                            {hearing.hearingType.replace(/_/g, ' ')}
+                            {STAGE_LABEL_MAP[hearing.hearingType] || hearing.hearingType.replace(/_/g, ' ')}
                           </Tag>
                         </p>
-                        {hearing.hearingTime && <p style={{ marginBottom: '4px' }}>Time: {hearing.hearingTime}</p>}
-                        {hearing.courtRoom && <p style={{ marginBottom: '4px' }}>Court Room: {hearing.courtRoom}</p>}
+                        {hearing.courtHall && <p style={{ marginBottom: '4px' }}>Court Hall: {hearing.courtHall}</p>}
                       </div>
                     }
                   />
@@ -861,7 +842,7 @@ export default function HearingCalendar() {
                   {selectedHearing.Case?.caseTitle || 'Unknown Case'}
                 </p>
                 <p style={{ color: '#666', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
-                  <strong>Client:</strong> {selectedHearing.Case?.clientName || 'Unknown'}
+                  <strong>Parties:</strong> {selectedHearing.Case?.caseTitle || 'Unknown'}
                 </p>
               </div>
 
@@ -873,24 +854,16 @@ export default function HearingCalendar() {
                   </span>
                 </p>
 
-                {selectedHearing.hearingTime && (
-                  <p style={{ marginBottom: '12px', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
-                    <strong>Hearing Time:</strong> {selectedHearing.hearingTime}
-                  </p>
-                )}
-
                 <p style={{ marginBottom: '12px', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
-                  <strong>Hearing Type:</strong>{' '}
+                  <strong>Stage:</strong>{' '}
                   <Tag color={HEARING_TYPE_COLORS[selectedHearing.hearingType] || 'default'}>
-                    {selectedHearing.hearingType.replace(/_/g, ' ')}
+                    {STAGE_LABEL_MAP[selectedHearing.hearingType] || selectedHearing.hearingType.replace(/_/g, ' ')}
                   </Tag>
                 </p>
 
-                {selectedHearing.courtRoom && (
-                  <p style={{ marginBottom: '12px', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
-                    <strong>Court Room:</strong> {selectedHearing.courtRoom}
-                  </p>
-                )}
+                <p style={{ marginBottom: '12px', fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)' }}>
+                  <strong>Court Hall:</strong> {selectedHearing.courtHall}
+                </p>
               </div>
 
               {/* Google Calendar Sync Section */}
@@ -1001,17 +974,13 @@ export default function HearingCalendar() {
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
 
-              <Form.Item name="hearingTime" label="Hearing Time">
-                <Input type="time" />
-              </Form.Item>
-
               <Form.Item
                 name="hearingType"
-                label="Hearing Type"
-                rules={[{ required: true, message: 'Please select hearing type' }]}
+                label="Stage"
+                rules={[{ required: true, message: 'Please select a stage' }]}
               >
-                <Select>
-                  {HEARING_TYPES.map((type) => (
+                <Select showSearch optionFilterProp="children" placeholder="Select a stage">
+                  {STAGE_OPTIONS.map((type) => (
                     <Select.Option key={type.value} value={type.value}>
                       {type.label}
                     </Select.Option>
@@ -1019,8 +988,12 @@ export default function HearingCalendar() {
                 </Select>
               </Form.Item>
 
-              <Form.Item name="courtRoom" label="Court Room">
-                <Input placeholder="e.g., Court Room 5" />
+              <Form.Item
+                name="courtHall"
+                label="Court Hall"
+                rules={[{ required: true, message: 'Please enter court hall' }]}
+              >
+                <Input placeholder="e.g., Court Hall 5" />
               </Form.Item>
 
               <Form.Item name="notes" label="Notes">
@@ -1034,7 +1007,7 @@ export default function HearingCalendar() {
                 loading={submitting}
                 icon={submitSuccess ? <CheckCircleOutlined /> : undefined}
                 style={submitSuccess ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
-                disabled={submitSuccess}
+                disabled={submitting || submitSuccess}
               >
                 {submitSuccess
                   ? "Success!"
@@ -1148,10 +1121,10 @@ export default function HearingCalendar() {
 
                     return (
                       <div key={hearing.id} className="timeline-item">
-                        {/* Time Column */}
+                        {/* Connector Column */}
                         <div className="timeline-time">
                           <span className="time-text">
-                            {hearing.hearingTime || 'No time set'}
+                            #{index + 1}
                           </span>
                           {index < sortedSelectedDateHearings.length - 1 && (
                             <div className="timeline-connector" />
@@ -1178,7 +1151,7 @@ export default function HearingCalendar() {
                               color={HEARING_TYPE_COLORS[hearing.hearingType] || 'default'}
                               style={{ margin: 0, fontSize: '0.75rem' }}
                             >
-                              {hearing.hearingType.replace(/_/g, ' ')}
+                              {STAGE_LABEL_MAP[hearing.hearingType] || hearing.hearingType.replace(/_/g, ' ')}
                             </Tag>
                           </div>
 
@@ -1187,10 +1160,8 @@ export default function HearingCalendar() {
                           </div>
 
                           <div className="timeline-card-meta">
-                            <span>Client: {hearing.Case?.clientName || 'Unknown'}</span>
-                            {hearing.courtRoom && (
-                              <span>• Court: {hearing.courtRoom}</span>
-                            )}
+                            <span>{hearing.Case?.caseTitle || 'Unknown'}</span>
+                            <span>• Court Hall: {hearing.courtHall}</span>
                           </div>
 
                           {/* Action Buttons */}

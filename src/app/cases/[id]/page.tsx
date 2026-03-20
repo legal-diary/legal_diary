@@ -19,6 +19,8 @@ import {
   Select,
   Upload,
   Checkbox,
+  Popconfirm,
+  Divider,
 } from 'antd';
 import {
   FileTextOutlined,
@@ -32,6 +34,8 @@ import {
   DownOutlined,
   EyeOutlined,
   CameraOutlined,
+  UserOutlined,
+  CheckCircleFilled,
 } from '@ant-design/icons';
 import { Dropdown, MenuProps } from 'antd';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
@@ -45,6 +49,7 @@ import { useParams, useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import Link from 'next/link';
 import { CaseDetailSkeleton, shimmerStyles, SectionLoader } from '@/components/Skeletons';
+import { STAGE_OPTIONS, STAGE_LABEL_MAP } from '@/lib/constants';
 
 // Lazy load Modal to reduce initial bundle
 const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
@@ -62,19 +67,29 @@ interface CaseAssignmentData {
   };
 }
 
+interface CourtTypeOption {
+  id: string;
+  name: string;
+}
+
 interface Case {
   id: string;
   caseNumber: string;
   caseTitle: string;
-  clientName: string;
-  clientEmail?: string;
-  clientPhone?: string;
+  petitionerName: string;
+  petitionerPhone: string;
+  respondentName: string;
+  respondentPhone: string;
+  clientParty?: string;
+  vakalat?: string;
   status: string;
   priority: string;
   description?: string;
   courtName?: string;
+  courtHall?: string;
+  courtTypeId?: string;
+  CourtType?: { id: string; name: string } | null;
   judgeAssigned?: string;
-  opponents?: string;
   createdAt: string;
   Hearing: any[];
   FileDocument: any[];
@@ -98,14 +113,6 @@ const PRIORITY_COLORS: Record<string, string> = {
   URGENT: 'red',
 };
 
-const HEARING_TYPES = [
-  { value: 'ARGUMENTS', label: 'Arguments' },
-  { value: 'EVIDENCE_RECORDING', label: 'Evidence Recording' },
-  { value: 'FINAL_HEARING', label: 'Final Hearing' },
-  { value: 'INTERIM_HEARING', label: 'Interim Hearing' },
-  { value: 'JUDGMENT_DELIVERY', label: 'Judgment Delivery' },
-  { value: 'PRE_HEARING', label: 'Pre Hearing' },
-] as const;
 
 export default function CaseDetailPage() {
   const { token, user } = useAuth();
@@ -134,6 +141,13 @@ export default function CaseDetailPage() {
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [cameraModalOpen, setCameraModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [hearingSubmitting, setHearingSubmitting] = useState(false);
+  const [editingHearingId, setEditingHearingId] = useState<string | null>(null);
+  const [hearingDeleting, setHearingDeleting] = useState(false);
+  const [courtTypes, setCourtTypes] = useState<CourtTypeOption[]>([]);
+  const [newCourtName, setNewCourtName] = useState('');
+  const [addingCourtType, setAddingCourtType] = useState(false);
+  const [editClientParty, setEditClientParty] = useState<'PETITIONER' | 'RESPONDENT'>('PETITIONER');
 
   // Detect mobile device
   useEffect(() => {
@@ -169,9 +183,42 @@ export default function CaseDetailPage() {
     }
   }, [token, caseId]);
 
+  const fetchCourtTypes = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/court-types', { headers: authHeaders(token) });
+      if (res.ok) setCourtTypes(await res.json());
+    } catch { /* silent */ }
+  }, [token]);
+
+  const handleAddCourtType = useCallback(async () => {
+    const name = newCourtName.trim();
+    if (!name) return;
+    setAddingCourtType(true);
+    try {
+      const res = await fetch('/api/court-types', {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        const ct = await res.json();
+        setCourtTypes((prev) => [...prev, ct].sort((a, b) => a.name.localeCompare(b.name)));
+        editForm.setFieldsValue({ courtTypeId: ct.id });
+        setNewCourtName('');
+        message.success('Court type added');
+      }
+    } catch {
+      message.error('Failed to add court type');
+    } finally {
+      setAddingCourtType(false);
+    }
+  }, [token, newCourtName, editForm]);
+
   useEffect(() => {
     if (token && caseId) {
       fetchCaseDetail();
+      fetchCourtTypes();
     }
   }, [token, caseId, fetchCaseDetail]);
 
@@ -268,42 +315,93 @@ export default function CaseDetailPage() {
   }, [uploadedFiles, caseId, token, fetchCaseDetail]);
 
   const handleHearingSubmit = useCallback(async (values: any) => {
+    setHearingSubmitting(true);
     try {
-      const response = await fetch('/api/hearings', {
-        method: 'POST',
+      const isEditing = !!editingHearingId;
+      const url = isEditing ? `/api/hearings/${editingHearingId}` : '/api/hearings';
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const payload: any = {
+        hearingDate: values.hearingDate.toISOString(),
+        hearingType: values.hearingType,
+        courtHall: values.courtHall,
+      };
+      if (!isEditing) payload.caseId = caseId;
+
+      const response = await fetch(url, {
+        method,
         headers: authHeaders(token),
-        body: JSON.stringify({
-          caseId,
-          hearingDate: values.hearingDate.toISOString(),
-          hearingTime: values.hearingTime,
-          hearingType: values.hearingType,
-          courtRoom: values.courtRoom,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        message.success('Hearing scheduled');
+        message.success(isEditing ? 'Hearing updated' : 'Hearing scheduled');
         setHearingModalOpen(false);
+        setEditingHearingId(null);
         form.resetFields();
         fetchCaseDetail();
+      } else {
+        const error = await response.json();
+        message.error(error.error || 'Failed to save hearing');
       }
     } catch {
-      message.error('Failed to schedule hearing');
+      message.error('Failed to save hearing');
+    } finally {
+      setHearingSubmitting(false);
     }
-  }, [caseId, token, form, fetchCaseDetail]);
+  }, [caseId, token, form, fetchCaseDetail, editingHearingId]);
+
+  const handleEditHearingInCase = useCallback((hearing: any) => {
+    setEditingHearingId(hearing.id);
+    form.setFieldsValue({
+      hearingDate: dayjs(hearing.hearingDate),
+      hearingType: hearing.hearingType,
+      courtHall: hearing.courtHall || '',
+    });
+    setHearingModalOpen(true);
+  }, [form]);
+
+  const handleDeleteHearingInCase = useCallback(async (hearingId: string) => {
+    setHearingDeleting(true);
+    try {
+      const response = await fetch(`/api/hearings/${hearingId}`, {
+        method: 'DELETE',
+        headers: authHeaders(token),
+      });
+      if (response.ok) {
+        message.success('Hearing deleted');
+        fetchCaseDetail();
+      } else {
+        message.error('Failed to delete hearing');
+      }
+    } catch {
+      message.error('Failed to delete hearing');
+    } finally {
+      setHearingDeleting(false);
+    }
+  }, [token, fetchCaseDetail]);
+
+  const handleEditSelectParty = useCallback((party: 'PETITIONER' | 'RESPONDENT') => {
+    setEditClientParty(party);
+    editForm.setFieldsValue({ clientParty: party });
+  }, [editForm]);
 
   const handleEditOpen = useCallback(() => {
     if (caseData) {
+      const party = (caseData.clientParty as 'PETITIONER' | 'RESPONDENT') || 'PETITIONER';
+      setEditClientParty(party);
       editForm.setFieldsValue({
-        caseTitle: caseData.caseTitle,
+        petitionerName: caseData.petitionerName,
+        petitionerPhone: caseData.petitionerPhone,
+        respondentName: caseData.respondentName,
+        respondentPhone: caseData.respondentPhone,
+        clientParty: party,
+        vakalat: caseData.vakalat,
         status: caseData.status,
         priority: caseData.priority,
-        clientName: caseData.clientName,
-        clientEmail: caseData.clientEmail,
-        clientPhone: caseData.clientPhone,
-        courtName: caseData.courtName,
+        courtTypeId: caseData.courtTypeId || undefined,
+        courtHall: caseData.courtHall,
         judgeAssigned: caseData.judgeAssigned,
-        opponents: caseData.opponents,
         description: caseData.description,
       });
       setEditModalOpen(true);
@@ -369,18 +467,18 @@ export default function CaseDetailPage() {
       title: 'Date',
       dataIndex: 'hearingDate',
       key: 'hearingDate',
-      render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm'),
+      render: (date: string) => dayjs(date).format('DD/MM/YYYY'),
     },
     {
-      title: 'Type',
+      title: 'Stage',
       dataIndex: 'hearingType',
       key: 'hearingType',
-      render: (type: string) => <Tag color="blue">{type.replace(/_/g, ' ')}</Tag>,
+      render: (type: string) => <Tag color="blue">{STAGE_LABEL_MAP[type] || type.replace(/_/g, ' ')}</Tag>,
     },
     {
-      title: 'Court Room',
-      dataIndex: 'courtRoom',
-      key: 'courtRoom',
+      title: 'Court Hall',
+      dataIndex: 'courtHall',
+      key: 'courtHall',
     },
     {
       title: 'Status',
@@ -388,7 +486,31 @@ export default function CaseDetailPage() {
       key: 'status',
       render: (status: string) => <Tag color="green">{status}</Tag>,
     },
-  ], []);
+    ...(isAdmin ? [{
+      title: '',
+      key: 'actions',
+      width: 80,
+      render: (_: any, record: any) => (
+        <Space size={2}>
+          <Button
+            type="text"
+            size="small"
+            icon={<EditOutlined style={{ fontSize: '14px' }} />}
+            onClick={() => handleEditHearingInCase(record)}
+          />
+          <Popconfirm
+            title="Delete this hearing?"
+            onConfirm={() => handleDeleteHearingInCase(record.id)}
+            okText="Yes"
+            cancelText="No"
+            okButtonProps={{ danger: true, size: 'small' }}
+          >
+            <Button type="text" size="small" danger icon={<DeleteOutlined style={{ fontSize: '14px' }} />} />
+          </Popconfirm>
+        </Space>
+      ),
+    }] : []),
+  ], [isAdmin, handleEditHearingInCase, handleDeleteHearingInCase]);
 
   const fileColumns = useMemo(() => [
     {
@@ -488,26 +610,46 @@ export default function CaseDetailPage() {
                 </Col>
                 <Col xs={12} sm={12} md={12} lg={6}>
                   <div className="detail-item">
-                    <div className="detail-label">Client Name</div>
-                    <div className="detail-value">{caseData.clientName}</div>
+                    <div className="detail-label">Petitioner</div>
+                    <div className="detail-value">{caseData.petitionerName}</div>
                   </div>
                 </Col>
                 <Col xs={12} sm={12} md={12} lg={6}>
                   <div className="detail-item">
-                    <div className="detail-label">Client Email</div>
-                    <div className="detail-value">{caseData.clientEmail || 'N/A'}</div>
+                    <div className="detail-label">Petitioner Phone</div>
+                    <div className="detail-value">{caseData.petitionerPhone || 'N/A'}</div>
                   </div>
                 </Col>
                 <Col xs={12} sm={12} md={12} lg={6}>
                   <div className="detail-item">
-                    <div className="detail-label">Client Phone</div>
-                    <div className="detail-value">{caseData.clientPhone || 'N/A'}</div>
+                    <div className="detail-label">Respondent</div>
+                    <div className="detail-value">{caseData.respondentName}</div>
                   </div>
                 </Col>
                 <Col xs={12} sm={12} md={12} lg={6}>
                   <div className="detail-item">
-                    <div className="detail-label">Court Name</div>
-                    <div className="detail-value">{caseData.courtName || 'N/A'}</div>
+                    <div className="detail-label">Respondent Phone</div>
+                    <div className="detail-value">{caseData.respondentPhone || 'N/A'}</div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Our Client</div>
+                    <div className="detail-value">
+                      <Tag color="blue">{caseData.clientParty === 'RESPONDENT' ? 'Respondent' : 'Petitioner'}</Tag>
+                    </div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Court Type</div>
+                    <div className="detail-value">{caseData.CourtType?.name || caseData.courtName || 'N/A'}</div>
+                  </div>
+                </Col>
+                <Col xs={12} sm={12} md={12} lg={6}>
+                  <div className="detail-item">
+                    <div className="detail-label">Court Hall</div>
+                    <div className="detail-value">{caseData.courtHall || 'N/A'}</div>
                   </div>
                 </Col>
                 <Col xs={12} sm={12} md={12} lg={6}>
@@ -518,8 +660,8 @@ export default function CaseDetailPage() {
                 </Col>
                 <Col xs={12} sm={12} md={12} lg={6}>
                   <div className="detail-item">
-                    <div className="detail-label">Opponents</div>
-                    <div className="detail-value">{caseData.opponents || 'N/A'}</div>
+                    <div className="detail-label">Vakalat</div>
+                    <div className="detail-value">{caseData.vakalat || 'N/A'}</div>
                   </div>
                 </Col>
                 <Col xs={12} sm={12} md={12} lg={6}>
@@ -974,6 +1116,110 @@ export default function CaseDetailPage() {
               padding: 16px;
             }
           }
+
+          /* Party card styles for edit modal */
+          .party-card {
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            padding: clamp(14px, 3vw, 20px);
+            cursor: pointer;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            background: #fff;
+            min-height: 100px;
+          }
+
+          .party-card:hover {
+            border-color: #b0c4d8;
+            box-shadow: 0 2px 12px rgba(26, 58, 82, 0.08);
+          }
+
+          .party-card.selected {
+            border-color: #1a3a52;
+            box-shadow: 0 4px 20px rgba(26, 58, 82, 0.15);
+            background: linear-gradient(135deg, #f8fafb 0%, #eef3f7 100%);
+          }
+
+          .party-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+          }
+
+          .party-card-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: clamp(0.85rem, 2.5vw, 1rem);
+            color: #333;
+            transition: color 0.3s ease;
+          }
+
+          .party-card.selected .party-card-title {
+            color: #1a3a52;
+          }
+
+          .client-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            transform: scale(0.8);
+          }
+
+          .client-badge.visible {
+            opacity: 1;
+            transform: scale(1);
+            background: #1a3a52;
+            color: #fff;
+          }
+
+          .phone-reveal {
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.3s ease 0.1s,
+                        margin-top 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-top: 0;
+          }
+
+          .phone-reveal.open {
+            max-height: 120px;
+            opacity: 1;
+            margin-top: 8px;
+          }
+
+          .party-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: #f0f0f0;
+            color: #999;
+          }
+
+          .party-card.selected .party-icon {
+            background: #1a3a52;
+            color: #fff;
+          }
+
+          .party-card .ant-form-item {
+            margin-bottom: 0;
+          }
         `}</style>
       </div>
 
@@ -1025,25 +1271,39 @@ export default function CaseDetailPage() {
 
       {hearingModalOpen && (
         <Suspense fallback={null}>
-          <Modal title="Schedule Hearing" open={hearingModalOpen} onCancel={() => setHearingModalOpen(false)} footer={null} destroyOnClose>
+          <Modal
+            title={editingHearingId ? "Edit Hearing" : "Schedule Hearing"}
+            open={hearingModalOpen}
+            onCancel={() => { setHearingModalOpen(false); setEditingHearingId(null); form.resetFields(); }}
+            footer={null}
+            destroyOnClose
+          >
             <Form form={form} onFinish={handleHearingSubmit} layout="vertical">
               <Form.Item name="hearingDate" label="Hearing Date" rules={[{ required: true }]}>
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
-              <Form.Item name="hearingTime" label="Time">
-                <Input type="time" />
-              </Form.Item>
-              <Form.Item name="hearingType" label="Hearing Type" rules={[{ required: true }]}>
-                <Select>
-                  {HEARING_TYPES.map((type) => (
+              <Form.Item name="hearingType" label="Stage" rules={[{ required: true, message: 'Please select a stage' }]}>
+                <Select showSearch optionFilterProp="children" placeholder="Select a stage">
+                  {STAGE_OPTIONS.map((type) => (
                     <Select.Option key={type.value} value={type.value}>{type.label}</Select.Option>
                   ))}
                 </Select>
               </Form.Item>
-              <Form.Item name="courtRoom" label="Court Room">
-                <Input />
+              <Form.Item name="courtHall" label="Court Hall" rules={[{ required: true, message: 'Please enter court hall' }]}>
+                <Input placeholder="e.g., Court Hall 5" />
               </Form.Item>
-              <Button type="primary" htmlType="submit" block>Schedule</Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                block
+                loading={hearingSubmitting}
+                disabled={hearingSubmitting}
+              >
+                {hearingSubmitting
+                  ? (editingHearingId ? 'Updating...' : 'Scheduling...')
+                  : (editingHearingId ? 'Update Hearing' : 'Schedule Hearing')
+                }
+              </Button>
             </Form>
           </Modal>
         </Suspense>
@@ -1053,10 +1313,6 @@ export default function CaseDetailPage() {
         <Suspense fallback={null}>
           <Modal title="Edit Case" open={editModalOpen} onCancel={() => setEditModalOpen(false)} footer={null} width="min(800px, 95vw)" destroyOnClose centered>
             <Form form={editForm} onFinish={handleEditSubmit} layout="vertical">
-              <Form.Item name="caseTitle" label="Case Title" rules={[{ required: true, message: 'Please enter case title' }]}>
-                <Input />
-              </Form.Item>
-
               <Row gutter={[16, 0]}>
                 <Col xs={24} md={12}>
                   <Form.Item name="status" label="Status" rules={[{ required: true }]}>
@@ -1081,41 +1337,123 @@ export default function CaseDetailPage() {
                 </Col>
               </Row>
 
-              <Form.Item name="clientName" label="Client Name" rules={[{ required: true, message: 'Please enter client name' }]}>
+              <Divider orientation="left" plain>Party Information</Divider>
+              <p style={{ textAlign: 'center', color: '#888', fontSize: '0.8rem', marginTop: '-4px', marginBottom: '12px' }}>
+                Click on a party to mark them as your client
+              </p>
+
+              <Form.Item name="clientParty" hidden>
                 <Input />
               </Form.Item>
 
-              <Row gutter={[16, 0]}>
+              <Row gutter={[12, 12]}>
                 <Col xs={24} md={12}>
-                  <Form.Item name="clientEmail" label="Client Email" rules={[{ type: 'email', message: 'Invalid email' }]}>
-                    <Input type="email" />
-                  </Form.Item>
+                  <div
+                    className={`party-card ${editClientParty === 'PETITIONER' ? 'selected' : ''}`}
+                    onClick={() => handleEditSelectParty('PETITIONER')}
+                  >
+                    <div className="party-card-header">
+                      <div className="party-card-title">
+                        <div className="party-icon"><UserOutlined /></div>
+                        Petitioner
+                      </div>
+                      <span className={`client-badge ${editClientParty === 'PETITIONER' ? 'visible' : ''}`}>
+                        <CheckCircleFilled /> Our Client
+                      </span>
+                    </div>
+                    <Form.Item name="petitionerName" rules={[{ required: true, message: 'Please enter petitioner name' }]} style={{ marginBottom: 0 }}>
+                      <Input onClick={(e) => e.stopPropagation()} />
+                    </Form.Item>
+                    <div className={`phone-reveal ${editClientParty === 'PETITIONER' ? 'open' : ''}`}>
+                      <Form.Item name="petitionerPhone" rules={[{ required: editClientParty === 'PETITIONER', message: 'Please enter petitioner phone' }]} style={{ marginBottom: 0 }}>
+                        <Input placeholder="+91 98765 43210" onClick={(e) => e.stopPropagation()} />
+                      </Form.Item>
+                    </div>
+                  </div>
                 </Col>
                 <Col xs={24} md={12}>
-                  <Form.Item name="clientPhone" label="Client Phone">
-                    <Input />
+                  <div
+                    className={`party-card ${editClientParty === 'RESPONDENT' ? 'selected' : ''}`}
+                    onClick={() => handleEditSelectParty('RESPONDENT')}
+                  >
+                    <div className="party-card-header">
+                      <div className="party-card-title">
+                        <div className="party-icon"><UserOutlined /></div>
+                        Respondent
+                      </div>
+                      <span className={`client-badge ${editClientParty === 'RESPONDENT' ? 'visible' : ''}`}>
+                        <CheckCircleFilled /> Our Client
+                      </span>
+                    </div>
+                    <Form.Item name="respondentName" rules={[{ required: true, message: 'Please enter respondent name' }]} style={{ marginBottom: 0 }}>
+                      <Input onClick={(e) => e.stopPropagation()} />
+                    </Form.Item>
+                    <div className={`phone-reveal ${editClientParty === 'RESPONDENT' ? 'open' : ''}`}>
+                      <Form.Item name="respondentPhone" rules={[{ required: editClientParty === 'RESPONDENT', message: 'Please enter respondent phone' }]} style={{ marginBottom: 0 }}>
+                        <Input placeholder="+91 98765 43210" onClick={(e) => e.stopPropagation()} />
+                      </Form.Item>
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+
+              <Divider orientation="left" plain>Court & Case Details</Divider>
+
+              <Row gutter={[16, 0]}>
+                <Col xs={24} md={8}>
+                  <Form.Item name="courtHall" label="Court Hall">
+                    <Input placeholder="___Addl." />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={16}>
+                  <Form.Item name="courtTypeId" label="Court Type">
+                    <Select
+                      showSearch
+                      allowClear
+                      placeholder="Select or search court type"
+                      optionFilterProp="label"
+                      options={courtTypes.map((ct) => ({ value: ct.id, label: ct.name }))}
+                      dropdownRender={(menu) => (
+                        <>
+                          {menu}
+                          <Divider style={{ margin: '8px 0' }} />
+                          <div style={{ display: 'flex', gap: 8, padding: '0 8px 8px' }}>
+                            <Input
+                              placeholder="New court type name"
+                              value={newCourtName}
+                              onChange={(e) => setNewCourtName(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            />
+                            <Button
+                              type="text"
+                              icon={<PlusOutlined />}
+                              loading={addingCourtType}
+                              onClick={handleAddCourtType}
+                            >
+                              Add
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    />
                   </Form.Item>
                 </Col>
               </Row>
 
               <Row gutter={[16, 0]}>
-                <Col xs={24} md={12}>
-                  <Form.Item name="courtName" label="Court Name">
-                    <Input />
-                  </Form.Item>
-                </Col>
                 <Col xs={24} md={12}>
                   <Form.Item name="judgeAssigned" label="Judge Assigned">
                     <Input />
                   </Form.Item>
                 </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item name="vakalat" label="Case Field / Vakalat">
+                    <Input />
+                  </Form.Item>
+                </Col>
               </Row>
 
-              <Form.Item name="opponents" label="Opponents">
-                <Input placeholder="Comma-separated list" />
-              </Form.Item>
-
-              <Form.Item name="description" label="Case Description">
+              <Form.Item name="description" label="Case Description" rules={[{ required: true, message: 'Please enter description' }]}>
                 <Input.TextArea rows={4} />
               </Form.Item>
 
