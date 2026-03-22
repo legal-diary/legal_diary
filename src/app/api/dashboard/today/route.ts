@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const IST = 'Asia/Kolkata';
 
 // GET today's hearings for the legal referencer dashboard (role-based filtering)
 export async function GET(request: NextRequest) {
@@ -26,9 +33,9 @@ export async function GET(request: NextRequest) {
       ? { firmId: user.firmId }
       : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
 
-    // Get today's date range (start and end of day)
-    const todayStart = dayjs().startOf('day').toDate();
-    const todayEnd = dayjs().endOf('day').toDate();
+    // Use IST explicitly so Vercel (UTC) and local (IST) produce the same boundaries
+    const todayStart = dayjs().tz(IST).startOf('day').toDate();
+    const todayEnd = dayjs().tz(IST).endOf('day').toDate();
 
     // Fetch today's hearings with case details
     const todaysHearings = await prisma.hearing.findMany({

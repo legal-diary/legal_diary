@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const IST = 'Asia/Kolkata';
 
 // Optimized dashboard endpoint - returns all data in ONE call
 // with minimal fields for maximum performance
@@ -19,8 +26,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const todayStart = dayjs().startOf('day').toDate();
-    const todayEnd = dayjs().endOf('day').toDate();
+    // Use IST explicitly so Vercel (UTC) and local (IST) produce the same boundaries
+    const todayStart = dayjs().tz(IST).startOf('day').toDate();
+    const todayEnd = dayjs().tz(IST).endOf('day').toDate();
 
     // Role-based filtering:
     // - ADMIN sees data from all cases in their firm
