@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import {
   Card,
   Table,
@@ -37,6 +37,7 @@ import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { authHeaders } from '@/lib/apiClient';
 import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   HeaderSkeleton,
   TodayScheduleSkeleton,
@@ -44,6 +45,9 @@ import {
   SectionLoader,
 } from '@/components/Dashboard/DashboardSkeleton';
 import { STAGE_OPTIONS, STAGE_LABEL_MAP, HEARING_STATUS_OPTIONS } from '@/lib/constants';
+import { useDashboardSWR } from '@/hooks/useDashboardSWR';
+
+dayjs.extend(relativeTime);
 
 // Lazy load the Modal to reduce initial bundle size
 const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
@@ -137,9 +141,20 @@ const formatDate = (date: string | null): string => {
 const DashboardHeader = React.memo<{
   totalCount: number;
   loading: boolean;
-}>(({ totalCount, loading }) => {
+  lastUpdated: Date | null;
+  isPolling: boolean;
+  isValidating: boolean;
+}>(({ totalCount, loading, lastUpdated, isPolling, isValidating }) => {
   const todayFormatted = useMemo(() => dayjs().format('dddd, DD MMMM YYYY'), []);
   const todayFormattedMobile = useMemo(() => dayjs().format('ddd, DD MMM'), []);
+
+  // Update "X seconds ago" every 10s
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!isPolling) return;
+    const interval = setInterval(() => setTick(t => t + 1), 10_000);
+    return () => clearInterval(interval);
+  }, [isPolling]);
 
   if (loading) return <HeaderSkeleton />;
 
@@ -161,18 +176,29 @@ const DashboardHeader = React.memo<{
           </div>
         </div>
 
-        <div className="dashboard-header-stats">
-          <div className="dashboard-stat-item">
-            <div className="dashboard-stat-icon">
-              <FileTextOutlined />
+        <div className="dashboard-header-right">
+          <div className="dashboard-header-stats">
+            <div className="dashboard-stat-item">
+              <div className="dashboard-stat-icon">
+                <FileTextOutlined />
+              </div>
+              <Text className="dashboard-stat-value">
+                {totalCount}
+              </Text>
+              <Text className="dashboard-stat-label">
+                Today&apos;s Matters
+              </Text>
             </div>
-            <Text className="dashboard-stat-value">
-              {totalCount}
-            </Text>
-            <Text className="dashboard-stat-label">
-              Today&apos;s Matters
-            </Text>
           </div>
+
+          {isPolling && lastUpdated && (
+            <div className="live-indicator">
+              <span className={`live-dot${isValidating ? ' pulsing' : ''}`} />
+              <Text className="live-text">
+                {isValidating ? 'Updating...' : `Updated ${dayjs(lastUpdated).fromNow()}`}
+              </Text>
+            </div>
+          )}
         </div>
       </div>
 
@@ -226,9 +252,45 @@ const DashboardHeader = React.memo<{
           font-size: 1.1rem !important;
         }
 
+        .dashboard-header-right {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 8px;
+        }
+
         .dashboard-header-stats {
           display: flex;
           gap: 24px;
+        }
+
+        .live-indicator {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .live-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #52c41a;
+          display: inline-block;
+          flex-shrink: 0;
+        }
+
+        .live-dot.pulsing {
+          animation: pulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(0.8); }
+        }
+
+        :global(.live-text) {
+          color: #a0aec0;
+          font-size: clamp(10px, 1.5vw, 12px);
         }
 
         .dashboard-stat-item {
@@ -274,12 +336,17 @@ const DashboardHeader = React.memo<{
             align-items: flex-start;
           }
 
-          .dashboard-header-stats {
+          .dashboard-header-right {
             width: 100%;
-            justify-content: flex-start;
+            align-items: flex-start;
             margin-top: 12px;
             padding-top: 12px;
             border-top: 1px solid rgba(255,255,255,0.1);
+          }
+
+          .dashboard-header-stats {
+            width: 100%;
+            justify-content: flex-start;
           }
 
           :global(.desktop-date) {
@@ -473,68 +540,45 @@ TodayScheduleTable.displayName = 'TodayScheduleTable';
 export default function DashboardPage() {
   const { token, user } = useAuth();
 
-  // Separate loading states for incremental loading
-  const [headerLoading, setHeaderLoading] = useState(true);
-  const [todayLoading, setTodayLoading] = useState(true);
-  const [upcomingLoading, setUpcomingLoading] = useState(true);
+  // SWR-powered data fetching with auto-polling for admins
+  const { data: dashboardData, error: swrError, isLoading: swrLoading, isValidating, refresh, isPolling } = useDashboardSWR();
 
-  // Data states
-  const [todayHearings, setTodayHearings] = useState<TodayHearing[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [cases, setCases] = useState<Case[]>([]);
-  const [upcomingHearings, setUpcomingHearings] = useState<UpcomingHearing[]>([]);
+  // Track when data was last successfully fetched
+  const lastUpdatedRef = useRef<Date | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Update lastUpdated when fresh data arrives
+  useEffect(() => {
+    if (dashboardData && !isValidating) {
+      const now = new Date();
+      lastUpdatedRef.current = now;
+      setLastUpdated(now);
+    }
+  }, [dashboardData, isValidating]);
+
+  // Show error only on initial load failure
+  useEffect(() => {
+    if (swrError && !dashboardData) {
+      message.error('Failed to load dashboard data');
+    }
+  }, [swrError, dashboardData]);
+
+  // Derive data from SWR response (cached data renders instantly)
+  const todayHearings = dashboardData?.todayHearings?.hearings ?? [];
+  const totalCount = dashboardData?.todayHearings?.totalCount ?? 0;
+  const cases = dashboardData?.cases ?? [];
+  const upcomingHearings = dashboardData?.upcomingHearings ?? [];
+
+  // Loading states: only true on first load (SWR shows cached data after that)
+  const headerLoading = swrLoading;
+  const todayLoading = swrLoading;
+  const upcomingLoading = swrLoading;
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHearing, setEditingHearing] = useState<UpcomingHearing | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
-
-  // Fetch all dashboard data with a single optimized API call
-  const fetchDashboardData = useCallback(async () => {
-    if (!token) return;
-
-    try {
-      const response = await fetch('/api/dashboard', {
-        headers: authHeaders(token, { 'Cache-Control': 'no-cache' }),
-      });
-
-      if (response.ok) {
-        const data: DashboardResponse = await response.json();
-
-        // Update header immediately
-        setTotalCount(data.todayHearings.totalCount);
-        setHeaderLoading(false);
-
-        // Update today's hearings with slight delay for visual effect
-        requestAnimationFrame(() => {
-          setTodayHearings(data.todayHearings.hearings);
-          setTodayLoading(false);
-        });
-
-        // Update upcoming hearings and cases
-        requestAnimationFrame(() => {
-          setUpcomingHearings(data.upcomingHearings);
-          setCases(data.cases);
-          setUpcomingLoading(false);
-        });
-      } else {
-        throw new Error('Failed to fetch dashboard data');
-      }
-    } catch (error) {
-      message.error('Failed to load dashboard data');
-      setHeaderLoading(false);
-      setTodayLoading(false);
-      setUpcomingLoading(false);
-    }
-  }, [token]);
-
-  // Initial data fetch
-  useEffect(() => {
-    if (token && user) {
-      fetchDashboardData();
-    }
-  }, [token, user, fetchDashboardData]);
 
   // Memoized handlers
   const handleAddHearing = useCallback(() => {
@@ -568,9 +612,7 @@ export default function DashboardPage() {
         });
         if (response.ok) {
           message.success('Hearing deleted successfully');
-          // Refresh only upcoming section
-          setUpcomingLoading(true);
-          fetchDashboardData();
+          refresh();
         } else {
           message.error('Failed to delete hearing');
         }
@@ -578,7 +620,7 @@ export default function DashboardPage() {
         message.error('Failed to delete hearing');
       }
     },
-    [token, fetchDashboardData]
+    [token, refresh]
   );
 
   const handleSubmit = useCallback(
@@ -607,10 +649,7 @@ export default function DashboardPage() {
           message.success(editingHearing ? 'Hearing updated successfully' : 'Hearing added successfully');
           setIsModalOpen(false);
           form.resetFields();
-          // Refresh data
-          setTodayLoading(true);
-          setUpcomingLoading(true);
-          fetchDashboardData();
+          refresh();
         } else {
           const error = await response.json();
           message.error(error.error || 'Failed to save hearing');
@@ -621,7 +660,7 @@ export default function DashboardPage() {
         setSubmitting(false);
       }
     },
-    [editingHearing, token, form, fetchDashboardData]
+    [editingHearing, token, form, refresh]
   );
 
   const handleModalClose = useCallback(() => {
@@ -729,7 +768,13 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <DashboardLayout>
         {/* Header Section */}
-        <DashboardHeader totalCount={totalCount} loading={headerLoading} />
+        <DashboardHeader
+          totalCount={totalCount}
+          loading={headerLoading}
+          lastUpdated={lastUpdated}
+          isPolling={isPolling}
+          isValidating={isValidating}
+        />
 
         {/* Today's Schedule */}
         <TodayScheduleTable hearings={todayHearings} totalCount={totalCount} loading={todayLoading} />
