@@ -157,6 +157,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
+    // Prevent scheduling hearings for closed cases
+    if (caseRecord.status === 'CLOSED') {
+      return NextResponse.json(
+        { error: 'Cannot schedule hearings for a closed case' },
+        { status: 403 }
+      );
+    }
+
     const hearing = await prisma.hearing.create({
       data: {
         caseId,

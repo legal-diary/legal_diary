@@ -88,10 +88,21 @@ export async function PUT(
         id,
         Case: caseFilter,
       },
+      include: {
+        Case: { select: { status: true } },
+      },
     });
 
     if (!existingHearing) {
       return NextResponse.json({ error: 'Hearing not found' }, { status: 404 });
+    }
+
+    // Prevent editing hearings for closed cases
+    if (existingHearing.Case.status === 'CLOSED') {
+      return NextResponse.json(
+        { error: 'Cannot modify hearings for a closed case' },
+        { status: 403 }
+      );
     }
 
     const {

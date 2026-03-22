@@ -170,8 +170,8 @@ export async function GET(request: NextRequest) {
                    !todaysHearings.some(th => th.id === h.id))
       .slice(0, 10);
 
-    // Return all data in a single response
-    const response = NextResponse.json({
+    // Build response payload
+    const payload = {
       date: dayjs().format('YYYY-MM-DD'),
       todayHearings: {
         hearings: processedTodayHearings,
@@ -179,10 +179,33 @@ export async function GET(request: NextRequest) {
       },
       upcomingHearings: filteredUpcoming,
       cases: casesMinimal,
-    });
+    };
 
-    // Add cache headers for performance
-    response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    // Generate ETag from response content for conditional requests
+    // Using a simple hash of the stringified payload
+    const payloadString = JSON.stringify(payload);
+    const encoder = new TextEncoder();
+    const data = encoder.encode(payloadString);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const etag = `"${hashArray.slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('')}"`;
+
+    // Check If-None-Match header — return 304 if data unchanged
+    const ifNoneMatch = request.headers.get('if-none-match');
+    if (ifNoneMatch === etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          'ETag': etag,
+          'Cache-Control': 'private, max-age=15, stale-while-revalidate=30',
+        },
+      });
+    }
+
+    // Return full response with ETag
+    const response = NextResponse.json(payload);
+    response.headers.set('ETag', etag);
+    response.headers.set('Cache-Control', 'private, max-age=15, stale-while-revalidate=30');
 
     return response;
   } catch (error) {

@@ -120,6 +120,14 @@ export async function PUT(
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
+    // Prevent editing closed cases
+    if (caseRecord.status === 'CLOSED') {
+      return NextResponse.json(
+        { error: 'Cannot edit a closed case. Re-open it first.' },
+        { status: 403 }
+      );
+    }
+
     const updates = await request.json();
 
     // Extract document IDs to delete (not part of case update)
@@ -161,6 +169,13 @@ export async function PUT(
 
     // Additional validation for specific fields
     if ('status' in validatedUpdates) {
+      // CLOSED status must go through the dedicated /close endpoint
+      if (validatedUpdates.status === 'CLOSED') {
+        return NextResponse.json(
+          { error: 'Use the Close Case feature to close a case (requires final order document)' },
+          { status: 400 }
+        );
+      }
       const validStatuses = ['ACTIVE', 'PENDING_JUDGMENT', 'CONCLUDED', 'APPEAL', 'DISMISSED'];
       if (!validStatuses.includes(validatedUpdates.status)) {
         return NextResponse.json(

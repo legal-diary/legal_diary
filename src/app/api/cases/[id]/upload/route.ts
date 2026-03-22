@@ -67,6 +67,14 @@ export async function POST(
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
+    // Prevent uploads to closed cases
+    if (caseRecord.status === 'CLOSED') {
+      return NextResponse.json(
+        { error: 'Cannot upload documents to a closed case' },
+        { status: 403 }
+      );
+    }
+
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
 
