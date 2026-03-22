@@ -7,13 +7,13 @@ export async function POST(request: NextRequest) {
   try {
     // IP-based rate limiting
     const ip = getClientIp(request);
-    if (isIpRateLimited(ip)) {
+    if (await isIpRateLimited(ip)) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
         { status: 429 }
       );
     }
-    recordIpAttempt(ip);
+    await recordIpAttempt(ip);
 
     let body;
     try {

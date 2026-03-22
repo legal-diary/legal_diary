@@ -37,13 +37,13 @@ export async function GET(request: NextRequest) {
   try {
     // IP-based rate limiting
     const ip = getClientIp(request);
-    if (isIpRateLimited(ip)) {
+    if (await isIpRateLimited(ip)) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
         { status: 429 }
       );
     }
-    recordIpAttempt(ip);
+    await recordIpAttempt(ip);
 
     // Create state parameter for CSRF protection
     // For login, we don't have userId yet, just timestamp + nonce

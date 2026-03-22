@@ -33,10 +33,18 @@ export async function GET(request: NextRequest) {
     const calendarMode = url.searchParams.get('calendar') === 'true';
 
     if (calendarMode) {
+      // Date-range filtering for calendar (limits data to visible range)
+      const startDate = url.searchParams.get('startDate');
+      const endDate = url.searchParams.get('endDate');
+      const dateFilter = (startDate && endDate)
+        ? { gte: new Date(startDate), lte: new Date(endDate) }
+        : undefined;
+
       // Optimized query for calendar - only necessary fields
       const hearings = await prisma.hearing.findMany({
         where: {
           Case: caseFilter,
+          ...(dateFilter ? { hearingDate: dateFilter } : {}),
         },
         select: {
           id: true,

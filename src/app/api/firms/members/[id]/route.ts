@@ -179,13 +179,52 @@ export async function DELETE(
       );
     }
 
-    // Remove user from firm (set firmId to null)
-    await prisma.user.update({
-      where: { id: targetUserId },
-      data: {
-        firmId: null,
-        role: 'ADVOCATE', // Reset role
-      },
+    // Remove user from firm with full cleanup in a transaction
+    await prisma.$transaction(async (tx) => {
+      // 1. Reassign their case assignments to the requesting admin
+      await tx.caseAssignment.updateMany({
+        where: { userId: targetUserId },
+        data: { userId: user.id },
+      });
+
+      // 2. Delete duplicate assignments (admin may already be assigned)
+      // Find cases where admin now has duplicate assignments
+      const adminAssignments = await tx.caseAssignment.findMany({
+        where: { userId: user.id },
+        select: { caseId: true, id: true },
+      });
+      const seen = new Set<string>();
+      const duplicateIds: string[] = [];
+      for (const a of adminAssignments) {
+        if (seen.has(a.caseId)) {
+          duplicateIds.push(a.id);
+        }
+        seen.add(a.caseId);
+      }
+      if (duplicateIds.length > 0) {
+        await tx.caseAssignment.deleteMany({
+          where: { id: { in: duplicateIds } },
+        });
+      }
+
+      // 3. Delete their active sessions (force logout)
+      await tx.session.deleteMany({
+        where: { userId: targetUserId },
+      });
+
+      // 4. Delete their Google Calendar tokens
+      await tx.googleCalendarToken.deleteMany({
+        where: { userId: targetUserId },
+      });
+
+      // 5. Remove user from firm
+      await tx.user.update({
+        where: { id: targetUserId },
+        data: {
+          firmId: null,
+          role: 'ADVOCATE',
+        },
+      });
     });
 
     // Log the member removal activity

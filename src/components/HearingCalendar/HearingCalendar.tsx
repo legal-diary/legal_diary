@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { Calendar, Card, Tag, List, Empty, Form, Input, DatePicker, Select, Button, message, Tooltip, Space, Badge, Progress, Statistic, Row, Col, Divider, Popconfirm } from 'antd';
+import { Calendar, Card, Tag, List, Empty, Select, Button, message, Tooltip, Space, Badge, Progress, Statistic, Row, Col, Divider, Popconfirm } from 'antd';
 import { CalendarOutlined, FileTextOutlined, CheckCircleOutlined, SyncOutlined, CloudOutlined, GoogleOutlined, ClockCircleOutlined, ExclamationCircleOutlined, LinkOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAuth } from '@/context/AuthContext';
@@ -9,6 +9,7 @@ import { authHeaders } from '@/lib/apiClient';
 import { CalendarSkeleton, shimmerStyles, SectionLoader } from '@/components/Skeletons';
 import { getDayStatus } from '@/data/bangaloreCourtHolidays2026';
 import GoogleCalendarConnect from '@/components/GoogleCalendar/GoogleCalendarConnect';
+import HearingFormModal from '@/components/HearingFormModal/HearingFormModal';
 import { STAGE_OPTIONS, STAGE_LABEL_MAP } from '@/lib/constants';
 
 // Lazy load Modal
@@ -112,7 +113,7 @@ export default function HearingCalendar() {
   const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs>(dayjs());
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState('');
-  const [form] = Form.useForm();
+  const [modalInitialDate, setModalInitialDate] = useState<dayjs.Dayjs | undefined>(undefined);
   const [hearingDetailsModalOpen, setHearingDetailsModalOpen] = useState(false);
   const [selectedHearing, setSelectedHearing] = useState<Hearing | null>(null);
   const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
@@ -123,8 +124,6 @@ export default function HearingCalendar() {
   const [editingHearing, setEditingHearing] = useState<Hearing | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [dateDetailsModalOpen, setDateDetailsModalOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   // Helper to check if a hearing is synced to Google Calendar
   const isSyncedToGoogle = useCallback((hearing: Hearing): boolean => {
@@ -138,9 +137,13 @@ export default function HearingCalendar() {
 
     setLoading(true);
     try {
+      // Date range: ±1 month buffer from the selected month for smooth navigation
+      const rangeStart = selectedDate.subtract(1, 'month').startOf('month').format('YYYY-MM-DD');
+      const rangeEnd = selectedDate.add(1, 'month').endOf('month').format('YYYY-MM-DD');
+
       // Parallel fetch for hearings and cases
       const [hearingsRes, casesRes] = await Promise.all([
-        fetch('/api/hearings?calendar=true', {
+        fetch(`/api/hearings?calendar=true&startDate=${rangeStart}&endDate=${rangeEnd}`, {
           headers: authHeaders(token),
         }),
         fetch('/api/cases?minimal=true', {
@@ -162,7 +165,7 @@ export default function HearingCalendar() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, selectedDate]);
 
   // Fetch Google Calendar status
   const fetchGoogleStatus = useCallback(async () => {
@@ -245,56 +248,9 @@ export default function HearingCalendar() {
     setEditingHearing(hearing);
     setIsEditMode(true);
     setSelectedCaseId(hearing.caseId);
-    setSubmitSuccess(false); // Reset success state when entering edit mode
-    setSubmitting(false); // Reset submitting state
-    form.setFieldsValue({
-      caseId: hearing.caseId,
-      hearingDate: dayjs(hearing.hearingDate),
-      hearingType: hearing.hearingType,
-      courtHall: hearing.courtHall || '',
-    });
     setHearingDetailsModalOpen(false);
     setModalOpen(true);
-  }, [form]);
-
-  // Handle update hearing
-  const handleUpdateHearing = useCallback(async (values: any) => {
-    if (!editingHearing) return;
-
-    setSubmitting(true);
-    try {
-      const response = await fetch(`/api/hearings/${editingHearing.id}`, {
-        method: 'PUT',
-        headers: authHeaders(token),
-        body: JSON.stringify({
-          hearingDate: values.hearingDate.toISOString(),
-          hearingType: values.hearingType,
-          courtHall: values.courtHall,
-          notes: values.notes,
-        }),
-      });
-
-      if (response.ok) {
-        await fetchCalendarData();
-        setSubmitSuccess(true);
-        message.success('Hearing updated successfully');
-
-        setTimeout(() => {
-          setModalOpen(false);
-          setIsEditMode(false);
-          setEditingHearing(null);
-          form.resetFields();
-          setSubmitSuccess(false);
-        }, 1500);
-      } else {
-        message.error('Failed to update hearing');
-      }
-    } catch {
-      message.error('Error updating hearing');
-    } finally {
-      setSubmitting(false);
-    }
-  }, [token, editingHearing, form, fetchCalendarData]);
+  }, []);
 
   // Handle delete hearing
   const handleDeleteHearing = useCallback(async (hearingId: string) => {
@@ -463,61 +419,31 @@ export default function HearingCalendar() {
     [getHearingsForDate, isSyncedToGoogle, googleCalendarConnected]
   );
 
-  // Handle form submission
-  const onFinish = useCallback(
-    async (values: any) => {
-      setSubmitting(true);
-      try {
-        const response = await fetch('/api/hearings', {
-          method: 'POST',
-          headers: authHeaders(token),
-          body: JSON.stringify({
-            caseId: selectedCaseId,
-            hearingDate: values.hearingDate.toISOString(),
-            hearingType: values.hearingType,
-            courtHall: values.courtHall,
-            notes: values.notes,
-          }),
-        });
-
-        if (response.ok) {
-          await fetchCalendarData();
-          setSubmitSuccess(true);
-          message.success('Hearing scheduled successfully');
-
-          setTimeout(() => {
-            setModalOpen(false);
-            form.resetFields();
-            setSubmitSuccess(false);
-          }, 1500);
-        } else {
-          message.error('Failed to schedule hearing');
-        }
-      } catch {
-        message.error('Error scheduling hearing');
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [token, selectedCaseId, form, fetchCalendarData]
-  );
-
   // Handle modal open with pre-filled date
   const openScheduleModal = useCallback(
     (date?: dayjs.Dayjs) => {
-      // Reset edit mode for new hearing creation
       setIsEditMode(false);
       setEditingHearing(null);
-      setSubmitSuccess(false); // Reset success state
-      setSubmitting(false); // Reset submitting state
-      form.resetFields();
+      setModalInitialDate(date);
       setModalOpen(true);
-      if (date) {
-        form.setFieldsValue({ hearingDate: date });
-      }
     },
-    [form]
+    []
   );
+
+  const handleModalClose = useCallback(() => {
+    setModalOpen(false);
+    setIsEditMode(false);
+    setEditingHearing(null);
+    setModalInitialDate(undefined);
+  }, []);
+
+  const handleModalSuccess = useCallback(async () => {
+    setModalOpen(false);
+    setIsEditMode(false);
+    setEditingHearing(null);
+    setModalInitialDate(undefined);
+    await fetchCalendarData();
+  }, [fetchCalendarData]);
 
   // Handle date selection (from header dropdowns)
   const handleDateChange = useCallback(
@@ -535,17 +461,6 @@ export default function HearingCalendar() {
       setDateDetailsModalOpen(true);
     },
     []
-  );
-
-  // Memoized case options
-  const caseOptions = useMemo(
-    () =>
-      cases.map((c) => (
-        <Select.Option key={c.id} value={c.id}>
-          {c.caseNumber} - {c.caseTitle}
-        </Select.Option>
-      )),
-    [cases]
   );
 
   // Calculate sync statistics
@@ -930,96 +845,18 @@ export default function HearingCalendar() {
         </Suspense>
       )}
 
-      {/* Schedule/Edit Hearing Modal */}
-      {modalOpen && (
-        <Suspense fallback={null}>
-          <Modal
-            title={isEditMode ? "Edit Hearing" : "Schedule Hearing"}
-            open={modalOpen}
-            onCancel={() => {
-              setModalOpen(false);
-              setIsEditMode(false);
-              setEditingHearing(null);
-              form.resetFields();
-            }}
-            footer={null}
-            destroyOnClose
-            width="min(520px, 95vw)"
-            centered
-          >
-            <Form
-              form={form}
-              onFinish={isEditMode ? handleUpdateHearing : onFinish}
-              layout="vertical"
-            >
-              <Form.Item
-                name="caseId"
-                label="Select Case"
-                rules={[{ required: true, message: 'Please select a case' }]}
-              >
-                <Select
-                  placeholder="Select a case"
-                  onChange={(value) => setSelectedCaseId(value)}
-                  disabled={isEditMode}
-                >
-                  {caseOptions}
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                name="hearingDate"
-                label="Hearing Date"
-                rules={[{ required: true, message: 'Please select a date' }]}
-              >
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Form.Item
-                name="hearingType"
-                label="Stage"
-                rules={[{ required: true, message: 'Please select a stage' }]}
-              >
-                <Select showSearch optionFilterProp="children" placeholder="Select a stage">
-                  {STAGE_OPTIONS.map((type) => (
-                    <Select.Option key={type.value} value={type.value}>
-                      {type.label}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                name="courtHall"
-                label="Court Hall"
-                rules={[{ required: true, message: 'Please enter court hall' }]}
-              >
-                <Input placeholder="e.g., Court Hall 5" />
-              </Form.Item>
-
-              <Form.Item name="notes" label="Notes">
-                <Input.TextArea rows={3} placeholder="Additional notes" />
-              </Form.Item>
-
-              <Button
-                type="primary"
-                htmlType="submit"
-                block
-                loading={submitting}
-                icon={submitSuccess ? <CheckCircleOutlined /> : undefined}
-                style={submitSuccess ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
-                disabled={submitting || submitSuccess}
-              >
-                {submitSuccess
-                  ? "Success!"
-                  : submitting
-                    ? (isEditMode ? "Updating..." : "Scheduling...")
-                    : (isEditMode ? "Update Hearing" : "Schedule Hearing")
-                }
-              </Button>
-            </Form>
-          </Modal>
-        </Suspense>
-      )}
+      {/* Schedule/Edit Hearing Modal - Shared component */}
+      <HearingFormModal
+        open={modalOpen}
+        onClose={handleModalClose}
+        onSuccess={handleModalSuccess}
+        cases={cases}
+        token={token}
+        editingHearing={isEditMode ? editingHearing : null}
+        initialDate={modalInitialDate}
+        showSuccessAnimation={true}
+        onCaseChange={(caseId) => setSelectedCaseId(caseId)}
+      />
 
       {/* Date Details Modal - Google Calendar Style */}
       {dateDetailsModalOpen && (
