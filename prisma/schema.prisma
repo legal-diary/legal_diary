@@ -40,6 +40,8 @@ model Case {
   courtHall       String?
   courtTypeId     String?
   judgeAssigned   String?
+  closedAt        DateTime?
+  closedById      String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   AISummary       AISummary?
@@ -76,8 +78,9 @@ model FileDocument {
   fileName   String
   fileUrl    String
   fileType   String
-  fileSize   Int
-  uploadedAt DateTime @default(now())
+  fileSize     Int
+  isFinalOrder Boolean  @default(false)
+  uploadedAt   DateTime @default(now())
   Case       Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
   @@index([caseId])
@@ -215,6 +218,7 @@ enum CaseStatus {
   CONCLUDED
   APPEAL
   DISMISSED
+  CLOSED
 }
 
 enum ClientParty {
@@ -311,6 +315,9 @@ enum ActivityAction {
   CASE_DELETED
   CASE_ASSIGNED
   CASE_UNASSIGNED
+
+  CASE_CLOSED
+  CASE_REOPENED
 
   // Hearing actions
   HEARING_CREATED

@@ -36,11 +36,14 @@ import {
   CameraOutlined,
   UserOutlined,
   CheckCircleFilled,
+  LockOutlined,
+  UnlockOutlined,
 } from '@ant-design/icons';
 import { Dropdown, MenuProps } from 'antd';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import AIAnalysisTab from '@/components/Cases/AIAnalysisTab';
 import CaseAssignment from '@/components/Cases/CaseAssignment';
+import CloseCaseModal from '@/components/Cases/CloseCaseModal';
 import DocumentViewer from '@/components/Documents/DocumentViewer';
 import CameraCapture from '@/components/CameraCapture';
 import { useAuth } from '@/context/AuthContext';
@@ -104,6 +107,7 @@ const STATUS_COLORS: Record<string, string> = {
   CONCLUDED: 'green',
   APPEAL: 'red',
   DISMISSED: 'default',
+  CLOSED: '#8c8c8c',
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -148,6 +152,8 @@ export default function CaseDetailPage() {
   const [newCourtName, setNewCourtName] = useState('');
   const [addingCourtType, setAddingCourtType] = useState(false);
   const [editClientParty, setEditClientParty] = useState<'PETITIONER' | 'RESPONDENT'>('PETITIONER');
+  const [closeModalOpen, setCloseModalOpen] = useState(false);
+  const [reopening, setReopening] = useState(false);
 
   // Detect mobile device
   useEffect(() => {
@@ -461,6 +467,27 @@ export default function CaseDetailPage() {
     }
   }, [caseId, token, router]);
 
+  const handleReopenCase = useCallback(async () => {
+    setReopening(true);
+    try {
+      const response = await fetch(`/api/cases/${caseId}/reopen`, {
+        method: 'POST',
+        headers: authHeaders(token),
+      });
+      if (response.ok) {
+        message.success('Case re-opened successfully');
+        fetchCaseDetail();
+      } else {
+        const data = await response.json();
+        message.error(data.error || 'Failed to re-open case');
+      }
+    } catch {
+      message.error('Failed to re-open case');
+    } finally {
+      setReopening(false);
+    }
+  }, [caseId, token, fetchCaseDetail]);
+
   // Memoized table columns
   const hearingColumns = useMemo(() => [
     {
@@ -486,7 +513,7 @@ export default function CaseDetailPage() {
       key: 'status',
       render: (status: string) => <Tag color="green">{status}</Tag>,
     },
-    ...(isAdmin ? [{
+    ...(isAdmin && caseData?.status !== 'CLOSED' ? [{
       title: '',
       key: 'actions',
       width: 80,
@@ -510,13 +537,19 @@ export default function CaseDetailPage() {
         </Space>
       ),
     }] : []),
-  ], [isAdmin, handleEditHearingInCase, handleDeleteHearingInCase]);
+  ], [isAdmin, caseData?.status, handleEditHearingInCase, handleDeleteHearingInCase]);
 
   const fileColumns = useMemo(() => [
     {
       title: 'File Name',
       dataIndex: 'fileName',
       key: 'fileName',
+      render: (name: string, record: any) => (
+        <span>
+          {name}
+          {record.isFinalOrder && <Tag color="gold" style={{ marginLeft: 8 }}>Final Order</Tag>}
+        </span>
+      ),
     },
     {
       title: 'Type',
@@ -721,9 +754,11 @@ export default function CaseDetailPage() {
         children: (
           <Card
             extra={
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => setHearingModalOpen(true)}>
-                Schedule Hearing
-              </Button>
+              caseData.status !== 'CLOSED' ? (
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => setHearingModalOpen(true)}>
+                  Schedule Hearing
+                </Button>
+              ) : null
             }
           >
             {caseData.Hearing && caseData.Hearing.length > 0 ? (
@@ -740,20 +775,13 @@ export default function CaseDetailPage() {
         children: (
           <Card
             extra={
-              <Space wrap>
-                <Button type="primary" icon={<UploadOutlined />} onClick={() => setUploadModalOpen(true)}>
-                  Upload
-                </Button>
-                {/* {isMobile && (
-                  <Button
-                    icon={<CameraOutlined />}
-                    onClick={() => setCameraModalOpen(true)}
-                    style={{ background: '#52c41a', borderColor: '#52c41a', color: '#fff' }}
-                  >
-                    Scan
+              caseData.status !== 'CLOSED' ? (
+                <Space wrap>
+                  <Button type="primary" icon={<UploadOutlined />} onClick={() => setUploadModalOpen(true)}>
+                    Upload
                   </Button>
-                )} */}
-              </Space>
+                </Space>
+              ) : null
             }
           >
             {caseData.FileDocument && caseData.FileDocument.length > 0 ? (
@@ -790,6 +818,7 @@ export default function CaseDetailPage() {
                                 whiteSpace: 'nowrap'
                               }}>
                                 {doc.fileName}
+                                {doc.isFinalOrder && <Tag color="gold" style={{ marginLeft: 6, fontSize: '0.65rem' }}>Final Order</Tag>}
                               </div>
                               <div style={{ fontSize: 'clamp(0.7rem, 2vw, 0.8rem)', color: '#666', marginBottom: '8px' }}>
                                 <span>{doc.fileType}</span>
@@ -870,6 +899,42 @@ export default function CaseDetailPage() {
       {/* Header */}
       <div className="case-detail-header">
         <Card>
+          {caseData.status === 'CLOSED' && (
+            <div style={{
+              background: '#f5f5f5',
+              border: '1px solid #d9d9d9',
+              borderRadius: '8px',
+              padding: '10px 16px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              flexWrap: 'wrap',
+            }}>
+              <LockOutlined style={{ fontSize: '18px', color: '#8c8c8c' }} />
+              <span style={{ fontWeight: 600, color: '#595959', fontSize: 'clamp(0.8rem, 2vw, 0.95rem)', flex: 1 }}>
+                This case is closed. No edits, hearings, or uploads are allowed.
+              </span>
+              {isAdmin && (
+                <Popconfirm
+                  title="Re-open this case?"
+                  description="The case will return to Active status. All existing data will be preserved."
+                  onConfirm={handleReopenCase}
+                  okText="Re-open"
+                  cancelText="Cancel"
+                >
+                  <Button
+                    type="link"
+                    icon={<UnlockOutlined />}
+                    loading={reopening}
+                    style={{ padding: 0 }}
+                  >
+                    Re-open Case
+                  </Button>
+                </Popconfirm>
+              )}
+            </div>
+          )}
           <div className="case-header-content">
             <div className="case-header-info">
               <h2 style={{ margin: 0, fontSize: 'clamp(1rem, 4vw, 1.8rem)' }}>{caseData.caseTitle}</h2>
@@ -884,9 +949,21 @@ export default function CaseDetailPage() {
                     <span className="btn-text">AI</span> <DownOutlined />
                   </Button>
                 </Dropdown>
-                <Button icon={<EditOutlined />} onClick={handleEditOpen} size="middle">
-                  <span className="btn-text">Edit</span>
-                </Button>
+                {caseData.status !== 'CLOSED' && (
+                  <Button icon={<EditOutlined />} onClick={handleEditOpen} size="middle">
+                    <span className="btn-text">Edit</span>
+                  </Button>
+                )}
+                {isAdmin && caseData.status !== 'CLOSED' && (
+                  <Button
+                    icon={<LockOutlined />}
+                    onClick={() => setCloseModalOpen(true)}
+                    size="middle"
+                    style={{ background: '#8c8c8c', borderColor: '#8c8c8c', color: '#fff' }}
+                  >
+                    <span className="btn-text">Close</span>
+                  </Button>
+                )}
                 {isAdmin && (
                   <Button icon={<DeleteOutlined />} onClick={handleDelete} danger loading={deleting} size="middle">
                     <span className="btn-text">Delete</span>
@@ -1512,6 +1589,18 @@ export default function CaseDetailPage() {
           </Modal>
         </Suspense>
       )}
+
+      <CloseCaseModal
+        open={closeModalOpen}
+        caseId={caseId}
+        caseNumber={caseData.caseNumber}
+        token={token || ''}
+        onClose={() => setCloseModalOpen(false)}
+        onSuccess={() => {
+          setCloseModalOpen(false);
+          fetchCaseDetail();
+        }}
+      />
 
       <DocumentViewer
         visible={viewerOpen}

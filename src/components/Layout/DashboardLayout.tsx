@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, memo, lazy, Suspense } from 'react';
-import { Layout, Menu, Button, Avatar, Tag } from 'antd';
+import React, { useState, useEffect, useMemo, useCallback, memo, lazy, Suspense } from 'react';
+import { Layout, Menu, Button, Avatar, Tag, Tooltip } from 'antd';
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -12,8 +12,11 @@ import {
   MenuOutlined,
   DownOutlined,
   CheckSquareOutlined,
+  LeftOutlined,
+  RightOutlined,
 } from '@ant-design/icons';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { usePathname } from 'next/navigation';
@@ -63,26 +66,50 @@ const createDesktopNavigationItems = () => [
   },
 ];
 
-// Memoized sidebar header
-const SidebarHeader = memo(() => (
-  <div style={{
-    padding: '2.5vh 2vw',
-    textAlign: 'center',
-    borderBottom: 'none',
-    background: 'transparent',
-  }}>
-    <div style={{
-      fontSize: 'clamp(1.3rem, 5vw, 1.8rem)',
-      fontWeight: '800',
-      color: '#fff',
-      letterSpacing: '0.3px',
-      textShadow: 'none',
-    }}>
-      Legal Diary
-    </div>
+// Sidebar logo toggle — click to collapse/expand
+const SidebarLogoToggle = memo<{ collapsed: boolean; onClick: () => void }>(({ collapsed, onClick }) => (
+  <div
+    onClick={onClick}
+    className="sidebar-logo-toggle"
+    style={{
+      padding: collapsed ? '16px 0' : '16px 20px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      cursor: 'pointer',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+      transition: 'all 0.3s cubic-bezier(0.2, 0, 0, 1)',
+      justifyContent: collapsed ? 'center' : 'flex-start',
+      userSelect: 'none',
+      flexShrink: 0,
+    }}
+  >
+    <Image
+      src="/icon.png"
+      alt="Legal Diary"
+      width={collapsed ? 36 : 40}
+      height={collapsed ? 36 : 40}
+      style={{
+        filter: 'invert(1) brightness(2)',
+        transition: 'all 0.3s cubic-bezier(0.2, 0, 0, 1)',
+        flexShrink: 0,
+      }}
+    />
+    {!collapsed && (
+      <span style={{
+        fontSize: '1.3rem',
+        fontWeight: '800',
+        color: '#fff',
+        letterSpacing: '0.3px',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+      }}>
+        Legal Diary
+      </span>
+    )}
   </div>
 ));
-SidebarHeader.displayName = 'SidebarHeader';
+SidebarLogoToggle.displayName = 'SidebarLogoToggle';
 
 // Mobile menu component
 const MobileMenuContent = memo<{
@@ -195,6 +222,23 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // default collapsed
+
+  // Persist sidebar state in localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('sidebar-collapsed');
+    if (saved !== null) {
+      setSidebarCollapsed(saved === 'true');
+    }
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebar-collapsed', String(next));
+      return next;
+    });
+  }, []);
 
   // Memoized handlers
   const handleLogout = useCallback(async () => {
@@ -264,26 +308,36 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       <Sider
         theme="dark"
         width={260}
+        collapsedWidth={80}
+        collapsed={sidebarCollapsed}
         breakpoint="lg"
-        collapsedWidth={0}
+        onBreakpoint={(broken) => {
+          // On mobile breakpoint, don't show the sider at all
+          if (broken) setSidebarCollapsed(true);
+        }}
         style={{
           background: '#1a1a1a',
           borderRight: 'none',
           position: 'relative',
-          overflow: 'hidden',
           height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'width 0.3s cubic-bezier(0.2, 0, 0, 1), min-width 0.3s cubic-bezier(0.2, 0, 0, 1)',
+          overflow: 'hidden',
         }}
         className="desktop-sidebar"
       >
-        <SidebarHeader />
+        <SidebarLogoToggle collapsed={sidebarCollapsed} onClick={toggleSidebar} />
         <Menu
           mode="inline"
           selectedKeys={[getSelectedKey()]}
           items={desktopNavigationItems}
+          inlineCollapsed={sidebarCollapsed}
           style={{
             background: 'transparent',
             border: 'none',
-            marginTop: '1.5vh',
+            marginTop: '0.5vh',
+            flex: 1,
           }}
           theme="dark"
         />
@@ -695,6 +749,62 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
         .desktop-sidebar .ant-menu-dark .ant-menu-submenu-title a {
           color: rgba(255, 255, 255, 0.85) !important;
           font-size: clamp(0.9rem, 2vw, 1rem) !important;
+        }
+
+        /* Sidebar logo toggle hover */
+        .sidebar-logo-toggle:hover {
+          background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Sidebar collapse/expand transitions */
+        .desktop-sidebar {
+          transition: width 0.3s cubic-bezier(0.2, 0, 0, 1),
+                      min-width 0.3s cubic-bezier(0.2, 0, 0, 1) !important;
+        }
+
+        .desktop-sidebar .ant-layout-sider-children {
+          display: flex !important;
+          flex-direction: column !important;
+          height: 100% !important;
+          overflow: hidden !important;
+        }
+
+        .desktop-sidebar .ant-menu {
+          transition: width 0.3s cubic-bezier(0.2, 0, 0, 1) !important;
+          flex: 1 !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+        }
+
+        .desktop-sidebar .ant-menu-item,
+        .desktop-sidebar .ant-menu-submenu-title {
+          transition: padding 0.3s cubic-bezier(0.2, 0, 0, 1),
+                      width 0.3s cubic-bezier(0.2, 0, 0, 1) !important;
+        }
+
+        .desktop-sidebar .ant-menu-inline-collapsed .ant-menu-item,
+        .desktop-sidebar .ant-menu-inline-collapsed .ant-menu-submenu-title {
+          padding-inline: calc(50% - 1.2rem / 2 - 4px) !important;
+          text-align: center;
+        }
+
+        .desktop-sidebar .ant-menu-inline-collapsed .ant-menu-item .ant-menu-title-content,
+        .desktop-sidebar .ant-menu-inline-collapsed .ant-menu-submenu-title .ant-menu-title-content {
+          opacity: 0;
+          width: 0;
+          display: inline-block;
+          transition: opacity 0.15s ease, width 0.3s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        .desktop-sidebar .ant-menu:not(.ant-menu-inline-collapsed) .ant-menu-item .ant-menu-title-content,
+        .desktop-sidebar .ant-menu:not(.ant-menu-inline-collapsed) .ant-menu-submenu-title .ant-menu-title-content {
+          opacity: 1;
+          transition: opacity 0.2s ease 0.15s;
+        }
+
+        /* Smooth content area transition */
+        .main-content-layout {
+          transition: margin-left 0.3s cubic-bezier(0.2, 0, 0, 1) !important;
         }
       `}</style>
     </Layout>

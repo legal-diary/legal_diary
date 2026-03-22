@@ -124,6 +124,32 @@ export const ActivityLogger = {
     });
   },
 
+  caseClosed: (userId: string, firmId: string, caseId: string, caseNumber: string, request?: Request) => {
+    const reqInfo = request ? getRequestInfo(request) : {};
+    return logActivity({
+      userId,
+      firmId,
+      action: 'CASE_CLOSED',
+      entityType: 'CASE',
+      entityId: caseId,
+      entityName: caseNumber,
+      ...reqInfo,
+    });
+  },
+
+  caseReopened: (userId: string, firmId: string, caseId: string, caseNumber: string, request?: Request) => {
+    const reqInfo = request ? getRequestInfo(request) : {};
+    return logActivity({
+      userId,
+      firmId,
+      action: 'CASE_REOPENED',
+      entityType: 'CASE',
+      entityId: caseId,
+      entityName: caseNumber,
+      ...reqInfo,
+    });
+  },
+
   // Hearing activities
   hearingCreated: (userId: string, firmId: string, hearingId: string, caseNumber: string, hearingDate: string, request?: Request) => {
     const reqInfo = request ? getRequestInfo(request) : {};
