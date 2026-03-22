@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if email is rate limited
-    if (isRateLimited(email)) {
-      const resetTime = getResetTime(email);
+    if (await isRateLimited(email)) {
+      const resetTime = await getResetTime(email);
       return NextResponse.json(
         {
           error: `Too many login attempts. Please try again in ${resetTime} seconds.`,
@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       // Record failed attempt
-      const attempts = recordFailedAttempt(email);
-      const remaining = getRemainingAttempts(email);
+      const attempts = await recordFailedAttempt(email);
+      const remaining = await getRemainingAttempts(email);
 
       return NextResponse.json(
         {
@@ -95,8 +95,8 @@ export async function POST(request: NextRequest) {
     const passwordValid = await verifyPassword(password, user.password);
     if (!passwordValid) {
       // Record failed attempt
-      recordFailedAttempt(email);
-      const remaining = getRemainingAttempts(email);
+      await recordFailedAttempt(email);
+      const remaining = await getRemainingAttempts(email);
 
       return NextResponse.json(
         {
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Clear rate limit on successful login
-    clearRateLimit(email);
+    await clearRateLimit(email);
 
     // Create session token
     const token = generateSessionToken();

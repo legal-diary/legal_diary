@@ -228,7 +228,10 @@ export async function createCalendarEvent(
 
   try {
     const startTime = new Date(hearing.hearingDate);
-    startTime.setHours(10, 0, 0, 0);
+    // Use the actual hearing time if set; default to 10:00 AM if midnight (no time provided)
+    if (startTime.getHours() === 0 && startTime.getMinutes() === 0) {
+      startTime.setHours(10, 0, 0, 0);
+    }
 
     const endTime = new Date(startTime);
     endTime.setHours(endTime.getHours() + 1);
@@ -313,7 +316,10 @@ export async function updateCalendarEvent(
 
   try {
     const startTime = new Date(hearing.hearingDate);
-    startTime.setHours(10, 0, 0, 0);
+    // Use the actual hearing time if set; default to 10:00 AM if midnight (no time provided)
+    if (startTime.getHours() === 0 && startTime.getMinutes() === 0) {
+      startTime.setHours(10, 0, 0, 0);
+    }
 
     const endTime = new Date(startTime);
     endTime.setHours(endTime.getHours() + 1);

@@ -285,6 +285,20 @@ model Todo {
   @@index([assignedTo])
 }
 
+// Rate limiting records (persisted for serverless environments)
+model RateLimit {
+  id        String   @id @default(cuid())
+  key       String   @unique // email or IP address
+  attempts  Int      @default(0)
+  resetAt   DateTime // window expiry
+  lockedUntil DateTime? // lockout expiry (null = not locked)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@index([resetAt])
+}
+
 // Activity Log for tracking all actions in the system
 model ActivityLog {
   id          String       @id @default(cuid())

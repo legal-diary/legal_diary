@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   Card,
   Table,
@@ -11,12 +11,6 @@ import {
   Badge,
   Tooltip,
   Button,
-  Form,
-  Input,
-  DatePicker,
-  Select,
-  Row,
-  Col,
   Divider,
   Space,
   Popconfirm,
@@ -46,15 +40,11 @@ import {
 } from '@/components/Dashboard/DashboardSkeleton';
 import { STAGE_OPTIONS, STAGE_LABEL_MAP, HEARING_STATUS_OPTIONS } from '@/lib/constants';
 import { useDashboardSWR } from '@/hooks/useDashboardSWR';
+import HearingFormModal from '@/components/HearingFormModal/HearingFormModal';
 
 dayjs.extend(relativeTime);
 
-// Lazy load the Modal to reduce initial bundle size
-const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
-
 const { Title, Text } = Typography;
-const { TextArea } = Input;
-const { Option } = Select;
 
 // Types
 interface TodayHearing {
@@ -577,30 +567,19 @@ export default function DashboardPage() {
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHearing, setEditingHearing] = useState<UpcomingHearing | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [form] = Form.useForm();
 
   // Memoized handlers
   const handleAddHearing = useCallback(() => {
     setEditingHearing(null);
-    form.resetFields();
     setIsModalOpen(true);
-  }, [form]);
+  }, []);
 
   const handleEditHearing = useCallback(
     (hearing: UpcomingHearing) => {
       setEditingHearing(hearing);
-      form.setFieldsValue({
-        caseId: hearing.caseId,
-        hearingDate: dayjs(hearing.hearingDate),
-        hearingType: hearing.hearingType,
-        courtHall: hearing.courtHall,
-        notes: hearing.notes,
-        status: hearing.status,
-      });
       setIsModalOpen(true);
     },
-    [form]
+    []
   );
 
   const handleDeleteHearing = useCallback(
@@ -623,50 +602,16 @@ export default function DashboardPage() {
     [token, refresh]
   );
 
-  const handleSubmit = useCallback(
-    async (values: any) => {
-      setSubmitting(true);
-      try {
-        const payload = {
-          caseId: values.caseId,
-          hearingDate: values.hearingDate.toISOString(),
-          hearingType: values.hearingType,
-          courtHall: values.courtHall,
-          notes: values.notes || null,
-          status: values.status || 'SCHEDULED',
-        };
-
-        const url = editingHearing ? `/api/hearings/${editingHearing.id}` : '/api/hearings';
-        const method = editingHearing ? 'PUT' : 'POST';
-
-        const response = await fetch(url, {
-          method,
-          headers: authHeaders(token),
-          body: JSON.stringify(payload),
-        });
-
-        if (response.ok) {
-          message.success(editingHearing ? 'Hearing updated successfully' : 'Hearing added successfully');
-          setIsModalOpen(false);
-          form.resetFields();
-          refresh();
-        } else {
-          const error = await response.json();
-          message.error(error.error || 'Failed to save hearing');
-        }
-      } catch {
-        message.error('Failed to save hearing');
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [editingHearing, token, form, refresh]
-  );
-
   const handleModalClose = useCallback(() => {
     setIsModalOpen(false);
-    form.resetFields();
-  }, [form]);
+    setEditingHearing(null);
+  }, []);
+
+  const handleModalSuccess = useCallback(() => {
+    setIsModalOpen(false);
+    setEditingHearing(null);
+    refresh();
+  }, [refresh]);
 
   // Memoized upcoming columns
   const upcomingColumns = useMemo(
@@ -753,17 +698,6 @@ export default function DashboardPage() {
     [handleEditHearing, handleDeleteHearing]
   );
 
-  // Memoized case options for Select
-  const caseOptions = useMemo(
-    () =>
-      cases.map((c) => (
-        <Option key={c.id} value={c.id}>
-          {c.caseNumber} - {c.caseTitle}
-        </Option>
-      )),
-    [cases]
-  );
-
   return (
     <ProtectedRoute>
       <DashboardLayout>
@@ -827,100 +761,16 @@ export default function DashboardPage() {
           </Card>
         </SectionLoader>
 
-        {/* Add/Edit Hearing Modal - Lazy loaded */}
-        {isModalOpen && (
-          <Suspense fallback={null}>
-            <Modal
-              title={
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {editingHearing ? <EditOutlined /> : <PlusOutlined />}
-                  <span style={{ fontSize: 'clamp(0.9rem, 3vw, 1.1rem)' }}>{editingHearing ? 'Edit Hearing' : 'Add New Hearing'}</span>
-                </div>
-              }
-              open={isModalOpen}
-              onCancel={handleModalClose}
-              footer={null}
-              width="min(600px, 95vw)"
-              destroyOnClose
-              centered
-              className="responsive-modal"
-            >
-              <Form
-                form={form}
-                layout="vertical"
-                onFinish={handleSubmit}
-                initialValues={{
-                  hearingType: 'ARGUMENTS',
-                  status: 'SCHEDULED',
-                }}
-              >
-                <Form.Item name="caseId" label="Select Case" rules={[{ required: true, message: 'Please select a case' }]}>
-                  <Select placeholder="Select a case" showSearch optionFilterProp="children" disabled={!!editingHearing}>
-                    {caseOptions}
-                  </Select>
-                </Form.Item>
-
-                <Form.Item
-                  name="hearingDate"
-                  label="Hearing Date"
-                  rules={[{ required: true, message: 'Please select a date' }]}
-                >
-                  <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-                </Form.Item>
-
-                <Row gutter={[12, 0]}>
-                  <Col xs={24} sm={12}>
-                    <Form.Item
-                      name="hearingType"
-                      label="Stage"
-                      rules={[{ required: true, message: 'Please select a stage' }]}
-                    >
-                      <Select showSearch optionFilterProp="children" placeholder="Select a stage">
-                        {STAGE_OPTIONS.map((type) => (
-                          <Option key={type.value} value={type.value}>
-                            {type.label}
-                          </Option>
-                        ))}
-                      </Select>
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} sm={12}>
-                    <Form.Item name="status" label="Status">
-                      <Select>
-                        {HEARING_STATUS_OPTIONS.map((status) => (
-                          <Option key={status.value} value={status.value}>
-                            {status.label}
-                          </Option>
-                        ))}
-                      </Select>
-                    </Form.Item>
-                  </Col>
-                </Row>
-
-                <Form.Item
-                  name="courtHall"
-                  label="Court Hall"
-                  rules={[{ required: true, message: 'Please enter court hall' }]}
-                >
-                  <Input placeholder="e.g., Court Hall 5" />
-                </Form.Item>
-
-                <Form.Item name="notes" label="Notes">
-                  <TextArea rows={3} placeholder="Any notes or preparation reminders for this hearing..." />
-                </Form.Item>
-
-                <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-                  <Space>
-                    <Button onClick={handleModalClose}>Cancel</Button>
-                    <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
-                      {editingHearing ? 'Update Hearing' : 'Add Hearing'}
-                    </Button>
-                  </Space>
-                </Form.Item>
-              </Form>
-            </Modal>
-          </Suspense>
-        )}
+        {/* Add/Edit Hearing Modal - Shared component */}
+        <HearingFormModal
+          open={isModalOpen}
+          onClose={handleModalClose}
+          onSuccess={handleModalSuccess}
+          cases={cases}
+          token={token}
+          editingHearing={editingHearing}
+          showStatus={true}
+        />
       </DashboardLayout>
     </ProtectedRoute>
   );
