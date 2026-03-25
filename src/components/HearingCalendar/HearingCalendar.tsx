@@ -461,11 +461,14 @@ export default function HearingCalendar() {
   );
 
   // Handle date cell click - opens date details modal
+  // info.source distinguishes between clicking a date ('date') vs header month/year change ('customize')
   const handleDateSelect = useCallback(
-    (date: dayjs.Dayjs) => {
+    (date: dayjs.Dayjs, info?: { source: string }) => {
       setSelectedDate(date);
-      // Open date details modal instead of create modal
-      setDateDetailsModalOpen(true);
+      // Only open modal when user clicks a date cell, not when month/year changes
+      if (!info || info.source === 'date') {
+        setDateDetailsModalOpen(true);
+      }
     },
     []
   );
@@ -581,8 +584,8 @@ export default function HearingCalendar() {
           <CalendarLegend />
           <div className="calendar-container">
             <Calendar
+              value={selectedDate}
               cellRender={dateCellRender}
-              onChange={handleDateChange}
               onSelect={handleDateSelect}
               mode="month"
               headerRender={({ value, onChange }) => {
@@ -602,6 +605,7 @@ export default function HearingCalendar() {
                       value={year}
                       onChange={(newYear) => {
                         const newValue = value.clone().year(newYear);
+                        setSelectedDate(newValue);
                         onChange(newValue);
                       }}
                       style={{ width: 90 }}
@@ -611,6 +615,7 @@ export default function HearingCalendar() {
                       value={month}
                       onChange={(newMonth) => {
                         const newValue = value.clone().month(newMonth);
+                        setSelectedDate(newValue);
                         onChange(newValue);
                       }}
                       style={{ width: 80 }}

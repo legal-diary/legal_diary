@@ -1110,3 +1110,55 @@ p {
     display: none !important;
   }
 }
+
+/* Hide expand icons on desktop — only show on mobile */
+@media (min-width: 769px) {
+  .responsive-table .ant-table-row-expand-icon-cell,
+  .responsive-table .ant-table-expand-icon-th {
+    display: none !important;
+  }
+  .responsive-table .ant-table-expanded-row {
+    display: none !important;
+  }
+}
+
+/* Expanded row content styling */
+.expanded-row-content {
+  padding: 8px 4px;
+}
+
+.expanded-row-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+}
+
+.expanded-row-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.expanded-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Mobile expand icon cell — minimal width for custom icon */
+@media (max-width: 768px) {
+  .responsive-table .ant-table-row-expand-icon-cell {
+    padding: 4px 2px !important;
+    width: 28px !important;
+    min-width: 28px !important;
+  }
+
+  /* Spread visible columns evenly on mobile */
+  .responsive-table .ant-table-content table {
+    table-layout: fixed !important;
+  }
+}
