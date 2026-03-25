@@ -52,12 +52,16 @@ export async function GET(request: NextRequest) {
           hearingDate: true,
           hearingType: true,
           courtHall: true,
+          status: true,
+          closureNote: true,
+          closedAt: true,
           Case: {
             select: {
               caseNumber: true,
               caseTitle: true,
               petitionerName: true,
               respondentName: true,
+              courtName: true,
             },
           },
           CalendarSync: {

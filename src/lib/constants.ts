@@ -43,9 +43,10 @@ export const STAGE_OPTIONS = [
 ] as const;
 
 export const HEARING_STATUS_OPTIONS = [
-  { value: 'SCHEDULED', label: 'Scheduled' },
+  { value: 'UPCOMING', label: 'Upcoming' },
+  { value: 'PENDING', label: 'Pending Closure' },
+  { value: 'CLOSED', label: 'Closed' },
   { value: 'POSTPONED', label: 'Postponed' },
-  { value: 'COMPLETED', label: 'Completed' },
   { value: 'CANCELLED', label: 'Cancelled' },
 ] as const;
 

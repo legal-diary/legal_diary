@@ -10,6 +10,7 @@ import { CalendarSkeleton, shimmerStyles, SectionLoader } from '@/components/Ske
 import { getDayStatus } from '@/data/bangaloreCourtHolidays2026';
 import GoogleCalendarConnect from '@/components/GoogleCalendar/GoogleCalendarConnect';
 import HearingFormModal from '@/components/HearingFormModal/HearingFormModal';
+import HearingClosureModal from '@/components/HearingClosureModal/HearingClosureModal';
 import { STAGE_OPTIONS, STAGE_LABEL_MAP } from '@/lib/constants';
 
 // Lazy load Modal
@@ -29,12 +30,16 @@ interface Hearing {
   hearingDate: string;
   hearingType: string;
   courtHall: string;
+  status?: string;
+  closureNote?: string | null;
+  closedAt?: string | null;
   CalendarSync?: CalendarSyncInfo[];
   Case: {
     caseNumber: string;
     caseTitle: string;
     petitionerName: string;
     respondentName: string;
+    courtName?: string | null;
   };
 }
 
@@ -124,6 +129,8 @@ export default function HearingCalendar() {
   const [editingHearing, setEditingHearing] = useState<Hearing | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [dateDetailsModalOpen, setDateDetailsModalOpen] = useState(false);
+  const [closureModalOpen, setClosureModalOpen] = useState(false);
+  const [closingHearing, setClosingHearing] = useState<Hearing | null>(null);
 
   // Helper to check if a hearing is synced to Google Calendar
   const isSyncedToGoogle = useCallback((hearing: Hearing): boolean => {
@@ -734,6 +741,20 @@ export default function HearingCalendar() {
               >
                 Edit
               </Button>,
+              ...((selectedHearing as any)?.status === 'UPCOMING' || (selectedHearing as any)?.status === 'PENDING' ? [
+                <Button
+                  key="close-hearing"
+                  style={{ backgroundColor: '#d4af37', borderColor: '#d4af37', color: '#fff' }}
+                  icon={<CheckCircleOutlined />}
+                  onClick={() => {
+                    setClosingHearing(selectedHearing);
+                    setClosureModalOpen(true);
+                    setHearingDetailsModalOpen(false);
+                  }}
+                >
+                  Close Hearing
+                </Button>,
+              ] : []),
               <Button
                 key="close"
                 onClick={() => {
@@ -741,7 +762,7 @@ export default function HearingCalendar() {
                   setSelectedHearing(null);
                 }}
               >
-                Close
+                Dismiss
               </Button>,
             ]}
             destroyOnClose
@@ -856,6 +877,22 @@ export default function HearingCalendar() {
         initialDate={modalInitialDate}
         showSuccessAnimation={true}
         onCaseChange={(caseId) => setSelectedCaseId(caseId)}
+      />
+
+      {/* Hearing Closure Modal */}
+      <HearingClosureModal
+        open={closureModalOpen}
+        onClose={() => {
+          setClosureModalOpen(false);
+          setClosingHearing(null);
+        }}
+        onSuccess={async () => {
+          setClosureModalOpen(false);
+          setClosingHearing(null);
+          await fetchCalendarData();
+        }}
+        hearing={closingHearing}
+        token={token}
       />
 
       {/* Date Details Modal - Google Calendar Style */}
@@ -1045,6 +1082,21 @@ export default function HearingCalendar() {
                                 Delete
                               </Button>
                             </Popconfirm>
+                            {(hearing.status === 'UPCOMING' || hearing.status === 'PENDING') && (
+                              <Button
+                                type="text"
+                                size="small"
+                                icon={<CheckCircleOutlined />}
+                                style={{ color: '#d4af37' }}
+                                onClick={() => {
+                                  setDateDetailsModalOpen(false);
+                                  setClosingHearing(hearing);
+                                  setClosureModalOpen(true);
+                                }}
+                              >
+                                Close
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>

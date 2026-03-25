@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { App } from 'antd';
 import FirmSelectionModal from '@/components/Auth/FirmSelectionModal';
 import SetPasswordModal from '@/components/Auth/SetPasswordModal';
 import { apiHeaders, authHeaders } from '@/lib/apiClient';
@@ -219,24 +220,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, token, login, register, logout, isLoading, isTokenExpired, needsFirmSetup, needsPasswordSetup, updateUser, setNeedsPasswordSetup }}>
-      {children}
-      {/* Show firm selection modal for Google OAuth users without firm */}
-      {token && needsFirmSetup && (
-        <FirmSelectionModal
-          open={needsFirmSetup}
-          token={token}
-          onSuccess={handleFirmSetupSuccess}
-        />
-      )}
-      {/* Show password setup modal for Google OAuth users without password */}
-      {token && needsPasswordSetup && !needsFirmSetup && (
-        <SetPasswordModal
-          open={needsPasswordSetup}
-          token={token}
-          onSuccess={handlePasswordSetupSuccess}
-          onSkip={handlePasswordSetupSkip}
-        />
-      )}
+      <App>
+        {children}
+        {/* Show firm selection modal for Google OAuth users without firm */}
+        {token && needsFirmSetup && (
+          <FirmSelectionModal
+            open={needsFirmSetup}
+            token={token}
+            onSuccess={handleFirmSetupSuccess}
+          />
+        )}
+        {/* Show password setup modal for Google OAuth users without password */}
+        {token && needsPasswordSetup && !needsFirmSetup && (
+          <SetPasswordModal
+            open={needsPasswordSetup}
+            token={token}
+            onSuccess={handlePasswordSetupSuccess}
+            onSkip={handlePasswordSetupSkip}
+          />
+        )}
+      </App>
     </AuthContext.Provider>
   );
 }

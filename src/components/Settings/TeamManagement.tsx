@@ -7,8 +7,7 @@ import {
   Tag,
   Button,
   Space,
-  message,
-  Modal,
+  App,
   Avatar,
   Tooltip,
   Badge,
@@ -43,6 +42,7 @@ interface TeamManagementProps {
 }
 
 export default function TeamManagement({ token }: TeamManagementProps) {
+  const { modal, message } = App.useApp();
   const [members, setMembers] = useState<Member[]>([]);
   const [firm, setFirm] = useState<Firm | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>('');
@@ -85,7 +85,7 @@ export default function TeamManagement({ token }: TeamManagementProps) {
     const member = members.find((m) => m.id === userId);
     const action = newRole === 'ADMIN' ? 'promote' : 'demote';
 
-    Modal.confirm({
+    modal.confirm({
       title: `${action === 'promote' ? 'Promote' : 'Demote'} ${member?.name || member?.email}?`,
       icon: <ExclamationCircleOutlined />,
       content: (
@@ -137,7 +137,7 @@ export default function TeamManagement({ token }: TeamManagementProps) {
   const handleRemoveMember = async (userId: string) => {
     const member = members.find((m) => m.id === userId);
 
-    Modal.confirm({
+    modal.confirm({
       title: `Remove ${member?.name || member?.email} from firm?`,
       icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
       content: (

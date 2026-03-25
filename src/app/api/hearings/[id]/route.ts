@@ -41,6 +41,9 @@ export async function GET(
       include: {
         Case: true,
         Reminder: true,
+        closedBy: {
+          select: { id: true, name: true, email: true },
+        },
       },
     });
 
@@ -112,6 +115,14 @@ export async function PUT(
       notes,
       status,
     } = await request.json();
+
+    // Block manual status change to CLOSED — must use the closure flow
+    if (status === 'CLOSED') {
+      return NextResponse.json(
+        { error: 'Use the closure flow to close hearings (POST /api/hearings/[id]/close)' },
+        { status: 400 }
+      );
+    }
 
     const updatedHearing = await prisma.hearing.update({
       where: { id },
