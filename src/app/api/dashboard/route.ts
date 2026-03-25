@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
 
     // Execute all queries in parallel for maximum speed
-    const [todaysHearings, upcomingHearings, casesMinimal] = await Promise.all([
+    const [todaysHearings, upcomingHearings, casesMinimal, pendingClosureHearings] = await Promise.all([
       // Today's hearings with only necessary case fields
       prisma.hearing.findMany({
         where: {
@@ -117,7 +117,54 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { caseNumber: 'asc' },
       }),
+
+      // Pending closures: past hearings still UPCOMING (deadline passed) + explicitly PENDING
+      prisma.hearing.findMany({
+        where: {
+          OR: [
+            {
+              status: 'UPCOMING',
+              hearingDate: { lt: todayStart }, // hearing day has fully passed
+            },
+            {
+              status: 'PENDING',
+            },
+          ],
+          Case: caseFilter,
+        },
+        select: {
+          id: true,
+          caseId: true,
+          hearingDate: true,
+          hearingType: true,
+          courtHall: true,
+          notes: true,
+          status: true,
+          Case: {
+            select: {
+              id: true,
+              caseNumber: true,
+              caseTitle: true,
+              petitionerName: true,
+              respondentName: true,
+              courtName: true,
+            },
+          },
+        },
+        orderBy: { hearingDate: 'asc' },
+      }),
     ]);
+
+    // Lazy status update: mark overdue UPCOMING hearings as PENDING in the database
+    const overdueIds = pendingClosureHearings
+      .filter(h => h.status === 'UPCOMING')
+      .map(h => h.id);
+    if (overdueIds.length > 0) {
+      await prisma.hearing.updateMany({
+        where: { id: { in: overdueIds } },
+        data: { status: 'PENDING' },
+      });
+    }
 
     // Get previous and next dates for today's hearings
     // Use a single query to get all related hearing dates
@@ -178,6 +225,12 @@ export async function GET(request: NextRequest) {
                    !todaysHearings.some(th => th.id === h.id))
       .slice(0, 10);
 
+    // Process pending closures — normalize status to PENDING for display
+    const processedPendingClosures = pendingClosureHearings.map(h => ({
+      ...h,
+      status: 'PENDING' as const,
+    }));
+
     // Build response payload
     const payload = {
       date: dayjs().format('YYYY-MM-DD'),
@@ -187,6 +240,8 @@ export async function GET(request: NextRequest) {
       },
       upcomingHearings: filteredUpcoming,
       cases: casesMinimal,
+      pendingClosures: processedPendingClosures,
+      totalPendingCount: processedPendingClosures.length,
     };
 
     // Generate ETag from response content for conditional requests

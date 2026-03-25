@@ -124,15 +124,20 @@ model Hearing {
   hearingType  String         @default("ARGUMENTS")
   courtHall    String
   notes        String?
-  status       HearingStatus  @default(SCHEDULED)
+  status       HearingStatus  @default(UPCOMING)
+  closureNote  String?
+  closedById   String?
+  closedAt     DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   Case         Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  closedBy     User?          @relation("HearingClosedBy", fields: [closedById], references: [id])
   Reminder     Reminder[]
   CalendarSync CalendarSync[]
 
   @@index([caseId])
   @@index([hearingDate])
+  @@index([closedById])
 }
 
 model GoogleCalendarToken {
@@ -204,6 +209,7 @@ model User {
   GoogleCalendarToken     GoogleCalendarToken?
   caseAssignments         CaseAssignment[]
   activityLogs            ActivityLog[]
+  hearingsClosed          Hearing[]        @relation("HearingClosedBy")
   todosAssigned           Todo[]           @relation("TodoAssignee")
   todosCreated            Todo[]           @relation("TodoCreator")
 
@@ -227,9 +233,10 @@ enum ClientParty {
 }
 
 enum HearingStatus {
-  SCHEDULED
+  UPCOMING
+  PENDING
+  CLOSED
   POSTPONED
-  COMPLETED
   CANCELLED
 }
 
@@ -338,6 +345,7 @@ enum ActivityAction {
   HEARING_UPDATED
   HEARING_DELETED
   HEARING_COMPLETED
+  HEARING_CLOSED
   HEARING_POSTPONED
 
   // Document actions

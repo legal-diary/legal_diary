@@ -438,7 +438,7 @@ export async function syncAllHearings(
   const hearings = await prisma.hearing.findMany({
     where: {
       Case: { firmId },
-      status: { in: ['SCHEDULED', 'POSTPONED'] },
+      status: { in: ['UPCOMING', 'PENDING', 'POSTPONED'] },
     },
     include: {
       Case: {

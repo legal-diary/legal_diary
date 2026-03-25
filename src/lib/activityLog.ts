@@ -178,6 +178,19 @@ export const ActivityLogger = {
     });
   },
 
+  hearingClosed: (userId: string, firmId: string, hearingId: string, caseNumber: string, hearingDate: string, request?: Request) => {
+    const reqInfo = request ? getRequestInfo(request) : {};
+    return logActivity({
+      userId,
+      firmId,
+      action: 'HEARING_CLOSED',
+      entityType: 'HEARING',
+      entityId: hearingId,
+      entityName: `${caseNumber} - ${hearingDate}`,
+      ...reqInfo,
+    });
+  },
+
   hearingDeleted: (userId: string, firmId: string, hearingId: string, caseNumber: string, request?: Request) => {
     const reqInfo = request ? getRequestInfo(request) : {};
     return logActivity({

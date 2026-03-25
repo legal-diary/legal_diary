@@ -73,7 +73,7 @@ export default function HearingFormModal({
         hearingType: editingHearing.hearingType,
         courtHall: editingHearing.courtHall,
         notes: editingHearing.notes,
-        status: editingHearing.status || 'SCHEDULED',
+        status: editingHearing.status || 'UPCOMING',
       });
     } else {
       form.resetFields();
@@ -182,7 +182,7 @@ export default function HearingFormModal({
           onFinish={handleSubmit}
           initialValues={{
             hearingType: 'ARGUMENTS',
-            status: 'SCHEDULED',
+            status: 'UPCOMING',
           }}
         >
           <Form.Item

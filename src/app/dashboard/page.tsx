@@ -41,6 +41,8 @@ import {
 import { STAGE_OPTIONS, STAGE_LABEL_MAP, HEARING_STATUS_OPTIONS } from '@/lib/constants';
 import { useDashboardSWR } from '@/hooks/useDashboardSWR';
 import HearingFormModal from '@/components/HearingFormModal/HearingFormModal';
+import HearingClosureModal from '@/components/HearingClosureModal/HearingClosureModal';
+import PendingClosuresSection from '@/components/Dashboard/PendingClosuresSection';
 
 dayjs.extend(relativeTime);
 
@@ -87,6 +89,24 @@ interface UpcomingHearing {
   };
 }
 
+interface PendingClosure {
+  id: string;
+  caseId: string;
+  hearingDate: string;
+  hearingType: string;
+  courtHall: string;
+  notes: string | null;
+  status: string;
+  Case: {
+    id: string;
+    caseNumber: string;
+    caseTitle: string;
+    petitionerName: string;
+    respondentName: string;
+    courtName: string | null;
+  };
+}
+
 interface DashboardResponse {
   date: string;
   todayHearings: {
@@ -95,6 +115,8 @@ interface DashboardResponse {
   };
   upcomingHearings: UpcomingHearing[];
   cases: Case[];
+  pendingClosures: PendingClosure[];
+  totalPendingCount: number;
 }
 
 
@@ -115,9 +137,10 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: 'blue',
-  POSTPONED: 'orange',
-  COMPLETED: 'green',
+  UPCOMING: 'blue',
+  PENDING: 'orange',
+  CLOSED: 'green',
+  POSTPONED: 'gold',
   CANCELLED: 'red',
 };
 
@@ -130,11 +153,12 @@ const formatDate = (date: string | null): string => {
 // Header component - memoized
 const DashboardHeader = React.memo<{
   totalCount: number;
+  pendingCount: number;
   loading: boolean;
   lastUpdated: Date | null;
   isPolling: boolean;
   isValidating: boolean;
-}>(({ totalCount, loading, lastUpdated, isPolling, isValidating }) => {
+}>(({ totalCount, pendingCount, loading, lastUpdated, isPolling, isValidating }) => {
   const todayFormatted = useMemo(() => dayjs().format('dddd, DD MMMM YYYY'), []);
   const todayFormattedMobile = useMemo(() => dayjs().format('ddd, DD MMM'), []);
 
@@ -179,6 +203,19 @@ const DashboardHeader = React.memo<{
                 Today&apos;s Matters
               </Text>
             </div>
+            {pendingCount > 0 && (
+              <div className="dashboard-stat-item">
+                <div className="dashboard-stat-icon" style={{ background: 'rgba(250, 173, 20, 0.2)' }}>
+                  <ClockCircleOutlined style={{ color: '#faad14' }} />
+                </div>
+                <Text className="dashboard-stat-value" style={{ color: '#faad14' }}>
+                  {pendingCount}
+                </Text>
+                <Text className="dashboard-stat-label">
+                  Pending Closures
+                </Text>
+              </div>
+            )}
           </div>
 
           {isPolling && lastUpdated && (
@@ -558,6 +595,7 @@ export default function DashboardPage() {
   const totalCount = dashboardData?.todayHearings?.totalCount ?? 0;
   const cases = dashboardData?.cases ?? [];
   const upcomingHearings = dashboardData?.upcomingHearings ?? [];
+  const pendingClosures = dashboardData?.pendingClosures ?? [];
 
   // Loading states: only true on first load (SWR shows cached data after that)
   const headerLoading = swrLoading;
@@ -567,6 +605,8 @@ export default function DashboardPage() {
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHearing, setEditingHearing] = useState<UpcomingHearing | null>(null);
+  const [closureModalOpen, setClosureModalOpen] = useState(false);
+  const [closingHearing, setClosingHearing] = useState<PendingClosure | null>(null);
 
   // Memoized handlers
   const handleAddHearing = useCallback(() => {
@@ -610,6 +650,22 @@ export default function DashboardPage() {
   const handleModalSuccess = useCallback(() => {
     setIsModalOpen(false);
     setEditingHearing(null);
+    refresh();
+  }, [refresh]);
+
+  const handleCloseHearing = useCallback((hearing: PendingClosure) => {
+    setClosingHearing(hearing);
+    setClosureModalOpen(true);
+  }, []);
+
+  const handleClosureModalClose = useCallback(() => {
+    setClosureModalOpen(false);
+    setClosingHearing(null);
+  }, []);
+
+  const handleClosureSuccess = useCallback(() => {
+    setClosureModalOpen(false);
+    setClosingHearing(null);
     refresh();
   }, [refresh]);
 
@@ -704,11 +760,20 @@ export default function DashboardPage() {
         {/* Header Section */}
         <DashboardHeader
           totalCount={totalCount}
+          pendingCount={pendingClosures.length}
           loading={headerLoading}
           lastUpdated={lastUpdated}
           isPolling={isPolling}
           isValidating={isValidating}
         />
+
+        {/* Pending Closures - shown above today's schedule */}
+        {!swrLoading && (
+          <PendingClosuresSection
+            pendingClosures={pendingClosures}
+            onCloseHearing={handleCloseHearing}
+          />
+        )}
 
         {/* Today's Schedule */}
         <TodayScheduleTable hearings={todayHearings} totalCount={totalCount} loading={todayLoading} />
@@ -770,6 +835,15 @@ export default function DashboardPage() {
           token={token}
           editingHearing={editingHearing}
           showStatus={true}
+        />
+
+        {/* Hearing Closure Modal */}
+        <HearingClosureModal
+          open={closureModalOpen}
+          onClose={handleClosureModalClose}
+          onSuccess={handleClosureSuccess}
+          hearing={closingHearing}
+          token={token}
         />
       </DashboardLayout>
     </ProtectedRoute>
