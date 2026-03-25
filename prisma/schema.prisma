@@ -192,6 +192,19 @@ model Session {
   @@index([userId])
 }
 
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  User      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
 model User {
   id                      String               @id @default(cuid())
   email                   String               @unique
@@ -209,9 +222,10 @@ model User {
   GoogleCalendarToken     GoogleCalendarToken?
   caseAssignments         CaseAssignment[]
   activityLogs            ActivityLog[]
-  hearingsClosed          Hearing[]        @relation("HearingClosedBy")
-  todosAssigned           Todo[]           @relation("TodoAssignee")
-  todosCreated            Todo[]           @relation("TodoCreator")
+  hearingsClosed          Hearing[]            @relation("HearingClosedBy")
+  passwordResetTokens     PasswordResetToken[]
+  todosAssigned           Todo[]               @relation("TodoAssignee")
+  todosCreated            Todo[]               @relation("TodoCreator")
 
   @@index([email])
   @@index([firmId])
