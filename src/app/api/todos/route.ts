@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
 
+const todoIncludes = {
+  case: {
+    select: { id: true, caseNumber: true, caseTitle: true },
+  },
+  assignedUser: {
+    select: { id: true, name: true, email: true },
+  },
+  createdBy: {
+    select: { id: true, name: true },
+  },
+  closedBy: {
+    select: { id: true, name: true },
+  },
+};
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -16,23 +31,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Role-based filtering: admins see all firm todos, others see only assigned
+    const isAdmin = user.role === 'ADMIN';
+    const baseWhere = isAdmin
+      ? { firmId: user.firmId }
+      : { firmId: user.firmId, assignedTo: user.id };
+
+    // Fetch active (pending) todos
     const todos = await prisma.todo.findMany({
-      where: { firmId: user.firmId },
-      include: {
-        case: {
-          select: { id: true, caseNumber: true, caseTitle: true },
-        },
-        assignedUser: {
-          select: { id: true, name: true, email: true },
-        },
-        createdBy: {
-          select: { id: true, name: true },
-        },
-      },
-      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      where: { ...baseWhere, status: 'PENDING' },
+      include: todoIncludes,
+      orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(todos);
+    // Fetch last 10 completed todos for history
+    const completedHistory = await prisma.todo.findMany({
+      where: { ...baseWhere, status: 'COMPLETED' },
+      include: todoIncludes,
+      orderBy: { closedAt: 'desc' },
+      take: 10,
+    });
+
+    // Count pending todos assigned to the current user (for badge)
+    const pendingCount = await prisma.todo.count({
+      where: {
+        firmId: user.firmId,
+        assignedTo: user.id,
+        status: 'PENDING',
+      },
+    });
+
+    return NextResponse.json({ todos, completedHistory, pendingCount });
   } catch (error) {
     console.error('Error fetching todos:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -89,17 +118,7 @@ export async function POST(request: NextRequest) {
         assignedTo: assignedTo || null,
         createdById: user.id,
       },
-      include: {
-        case: {
-          select: { id: true, caseNumber: true, caseTitle: true },
-        },
-        assignedUser: {
-          select: { id: true, name: true, email: true },
-        },
-        createdBy: {
-          select: { id: true, name: true },
-        },
-      },
+      include: todoIncludes,
     });
 
     return NextResponse.json(todo, { status: 201 });

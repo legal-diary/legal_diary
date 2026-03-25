@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     // Create session token
     const token = generateSessionToken();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const expiresAt = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000); // Never expire (100 years)
 
     await withRetry(() =>
       prisma.session.create({

@@ -32,13 +32,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper function to check if token is expired
-function isTokenExpiredLocal(expiresAt: string | null): boolean {
-  if (!expiresAt) return false;
-  const expiryTime = new Date(expiresAt).getTime();
-  return Date.now() >= expiryTime;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -56,52 +49,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const passwordSetupNeeded = localStorage.getItem('needsPasswordSetup');
 
     if (savedToken && savedUser) {
-      // Check if token has already expired
-      if (savedExpiresAt && isTokenExpiredLocal(savedExpiresAt)) {
-        // Token has expired, clear everything
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        localStorage.removeItem('tokenExpiresAt');
-        localStorage.removeItem('needsFirmSetup');
-        localStorage.removeItem('needsPasswordSetup');
-      } else {
-        setToken(savedToken);
-        const parsedUser = JSON.parse(savedUser);
-        setUser(parsedUser);
-        setExpiresAt(savedExpiresAt);
+      setToken(savedToken);
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+      setExpiresAt(savedExpiresAt);
 
-        // Check if user needs firm setup (Google OAuth user without firm)
-        if (firmSetupNeeded === 'true' || !parsedUser.firmId) {
-          setNeedsFirmSetup(true);
-        }
+      // Check if user needs firm setup (Google OAuth user without firm)
+      if (firmSetupNeeded === 'true' || !parsedUser.firmId) {
+        setNeedsFirmSetup(true);
+      }
 
-        // Check if user needs password setup (Google OAuth user without password)
-        if (passwordSetupNeeded === 'true') {
-          setNeedsPasswordSetup(true);
-        }
+      // Check if user needs password setup (Google OAuth user without password)
+      if (passwordSetupNeeded === 'true') {
+        setNeedsPasswordSetup(true);
       }
     }
     setIsLoading(false);
   }, []);
-
-  // Periodically check if token has expired (check every minute)
-  useEffect(() => {
-    if (!token || !expiresAt) return;
-
-    const interval = setInterval(() => {
-      if (isTokenExpiredLocal(expiresAt)) {
-        // Token has expired, auto-logout
-        setUser(null);
-        setToken(null);
-        setExpiresAt(null);
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        localStorage.removeItem('tokenExpiresAt');
-      }
-    }, 60 * 1000); // Check every minute
-
-    return () => clearInterval(interval);
-  }, [token, expiresAt]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -187,7 +151,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isTokenExpired = () => {
-    return isTokenExpiredLocal(expiresAt);
+    // Sessions never expire - always return false
+    return false;
   };
 
   // Update user data (e.g., after firm setup)

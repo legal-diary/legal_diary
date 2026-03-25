@@ -31,6 +31,7 @@ export default function LoginPage() {
   const { login, isLoading } = useAuth();
   const [form] = Form.useForm();
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<LoginError | null>(null);
   const [countdown, setCountdown] = useState<number>(0);
 
@@ -126,6 +127,7 @@ export default function LoginPage() {
       return;
     }
 
+    setSubmitting(true);
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -155,6 +157,8 @@ export default function LoginPage() {
         message: 'Network error. Please check your internet connection and try again.',
         type: 'error',
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -312,7 +316,7 @@ export default function LoginPage() {
                   htmlType="submit"
                   block
                   size="large"
-                  loading={isLoading}
+                  loading={submitting}
                   disabled={countdown > 0}
                   style={{
                     height: '3rem',

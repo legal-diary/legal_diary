@@ -34,6 +34,14 @@ export async function PUT(
 
     const { description, caseId, assignedTo, status } = await request.json();
 
+    // Block completing via PUT - must use /close endpoint
+    if (status === 'COMPLETED') {
+      return NextResponse.json(
+        { error: 'To close a todo, use the close endpoint with a closing comment' },
+        { status: 400 }
+      );
+    }
+
     const updated = await prisma.todo.update({
       where: { id },
       data: {

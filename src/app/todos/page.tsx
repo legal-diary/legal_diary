@@ -14,17 +14,20 @@ import {
   Space,
   Popconfirm,
   Typography,
+  Collapse,
 } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   CheckSquareOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/context/AuthContext';
 import { authHeaders } from '@/lib/apiClient';
+import dayjs from 'dayjs';
 
 const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
 
@@ -37,6 +40,9 @@ interface TodoItem {
   status: string;
   caseId: string | null;
   assignedTo: string | null;
+  closingComment: string | null;
+  closedAt: string | null;
+  closedBy: { id: string; name: string | null } | null;
   createdAt: string;
   case: { id: string; caseNumber: string; caseTitle: string } | null;
   assignedUser: { id: string; name: string | null; email: string } | null;
@@ -61,6 +67,7 @@ export default function TodosPage() {
   const isAdmin = user?.role === 'ADMIN';
 
   const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [completedHistory, setCompletedHistory] = useState<TodoItem[]>([]);
   const [cases, setCases] = useState<CaseOption[]>([]);
   const [members, setMembers] = useState<MemberOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +75,12 @@ export default function TodosPage() {
   const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
+
+  // Closing modal state
+  const [closingModalOpen, setClosingModalOpen] = useState(false);
+  const [closingTodo, setClosingTodo] = useState<TodoItem | null>(null);
+  const [closingSubmitting, setClosingSubmitting] = useState(false);
+  const [closingForm] = Form.useForm();
 
   const fetchTodos = useCallback(async () => {
     if (!token) return;
@@ -77,7 +90,8 @@ export default function TodosPage() {
       });
       if (response.ok) {
         const data = await response.json();
-        setTodos(data);
+        setTodos(data.todos || []);
+        setCompletedHistory(data.completedHistory || []);
       }
     } catch {
       message.error('Failed to load todos');
@@ -128,7 +142,6 @@ export default function TodosPage() {
       description: todo.description,
       caseId: todo.caseId || undefined,
       assignedTo: todo.assignedTo || undefined,
-      status: todo.status,
     });
     setModalOpen(true);
   }, [form]);
@@ -164,7 +177,6 @@ export default function TodosPage() {
           description: values.description,
           caseId: values.caseId || null,
           assignedTo: values.assignedTo || null,
-          status: values.status || 'PENDING',
         }),
       });
 
@@ -185,16 +197,164 @@ export default function TodosPage() {
     }
   }, [editingTodo, token, form, fetchTodos]);
 
-  const columns = useMemo(() => [
+  // Close todo handler
+  const handleCloseTodo = useCallback((todo: TodoItem) => {
+    setClosingTodo(todo);
+    closingForm.resetFields();
+    setClosingModalOpen(true);
+  }, [closingForm]);
+
+  const handleCloseSubmit = useCallback(async (values: any) => {
+    if (!closingTodo) return;
+    setClosingSubmitting(true);
+    try {
+      const response = await fetch(`/api/todos/${closingTodo.id}/close`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ closingComment: values.closingComment }),
+      });
+
+      if (response.ok) {
+        message.success('Todo closed successfully');
+        setClosingModalOpen(false);
+        setClosingTodo(null);
+        closingForm.resetFields();
+        fetchTodos();
+      } else {
+        const error = await response.json();
+        message.error(error.error || 'Failed to close todo');
+      }
+    } catch {
+      message.error('Failed to close todo');
+    } finally {
+      setClosingSubmitting(false);
+    }
+  }, [closingTodo, token, closingForm, fetchTodos]);
+
+  // Check if current user can close a specific todo
+  const canCloseTodo = useCallback((todo: TodoItem) => {
+    if (todo.status !== 'PENDING') return false;
+    if (isAdmin) return true;
+    return todo.assignedTo === user?.id;
+  }, [isAdmin, user?.id]);
+
+  // Check if current user has any action on a todo
+  const hasActions = useCallback((todo: TodoItem) => {
+    return isAdmin || canCloseTodo(todo);
+  }, [isAdmin, canCloseTodo]);
+
+  // Check if any todo has actions for the current user (to show/hide actions column)
+  const showActionsColumn = useMemo(() => {
+    return todos.some(todo => hasActions(todo));
+  }, [todos, hasActions]);
+
+  const columns = useMemo(() => {
+    const cols: any[] = [
+      {
+        title: 'Case No.',
+        key: 'caseNumber',
+        width: '18%',
+        ellipsis: true,
+        render: (_: any, record: TodoItem) =>
+          record.case ? (
+            <Text strong style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>
+              {record.case.caseNumber}
+            </Text>
+          ) : (
+            <Text type="secondary">-</Text>
+          ),
+      },
+      {
+        title: 'To-Do',
+        dataIndex: 'description',
+        key: 'description',
+        ellipsis: true,
+        render: (text: string) => (
+          <Text style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>{text}</Text>
+        ),
+      },
+      {
+        title: 'Assigned To',
+        key: 'assignedTo',
+        width: '18%',
+        ellipsis: true,
+        render: (_: any, record: TodoItem) =>
+          record.assignedUser ? (
+            <Text style={{ fontSize: 'clamp(0.75rem, 2vw, 0.85rem)' }}>
+              {record.assignedUser.name || record.assignedUser.email}
+            </Text>
+          ) : (
+            <Text type="secondary">Unassigned</Text>
+          ),
+      },
+      {
+        title: 'Status',
+        dataIndex: 'status',
+        key: 'status',
+        width: '12%',
+        render: (status: string) => (
+          <Tag color={status === 'COMPLETED' ? 'green' : 'orange'}>
+            {status === 'COMPLETED' ? 'Completed' : 'Pending'}
+          </Tag>
+        ),
+      },
+    ];
+
+    if (showActionsColumn) {
+      cols.push({
+        title: '',
+        key: 'actions',
+        width: '18%',
+        render: (_: any, record: TodoItem) => (
+          <Space size={2}>
+            {/* Update button - visible to admin or assigned user for pending todos */}
+            {canCloseTodo(record) && (
+              <Button
+                size="small"
+                style={{ borderColor: '#52c41a', color: '#52c41a' }}
+                onClick={() => handleCloseTodo(record)}
+              >
+                Update
+              </Button>
+            )}
+            {/* Edit/Delete - admin only */}
+            {isAdmin && (
+              <>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined style={{ fontSize: '14px' }} />}
+                  onClick={() => handleEdit(record)}
+                />
+                <Popconfirm
+                  title="Delete this todo?"
+                  onConfirm={() => handleDelete(record.id)}
+                  okText="Yes"
+                  cancelText="No"
+                  okButtonProps={{ danger: true, size: 'small' }}
+                >
+                  <Button type="text" size="small" danger icon={<DeleteOutlined style={{ fontSize: '14px' }} />} />
+                </Popconfirm>
+              </>
+            )}
+          </Space>
+        ),
+      });
+    }
+
+    return cols;
+  }, [isAdmin, showActionsColumn, canCloseTodo, handleEdit, handleDelete, handleCloseTodo]);
+
+  // History columns
+  const historyColumns = useMemo(() => [
     {
-      title: 'Case Number',
+      title: 'Case',
       key: 'caseNumber',
-      width: 140,
+      width: '15%',
+      ellipsis: true,
       render: (_: any, record: TodoItem) =>
         record.case ? (
-          <Text strong style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>
-            {record.case.caseNumber}
-          </Text>
+          <Text style={{ fontSize: 'clamp(0.7rem, 2vw, 0.85rem)' }}>{record.case.caseNumber}</Text>
         ) : (
           <Text type="secondary">-</Text>
         ),
@@ -203,60 +363,45 @@ export default function TodosPage() {
       title: 'To-Do',
       dataIndex: 'description',
       key: 'description',
+      width: '25%',
       ellipsis: true,
       render: (text: string) => (
-        <Text style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>{text}</Text>
+        <Text style={{ fontSize: 'clamp(0.7rem, 2vw, 0.85rem)' }}>{text}</Text>
       ),
     },
     {
-      title: 'Assigned To',
-      key: 'assignedTo',
-      width: 160,
-      render: (_: any, record: TodoItem) =>
-        record.assignedUser ? (
-          <Text style={{ fontSize: 'clamp(0.75rem, 2vw, 0.85rem)' }}>
-            {record.assignedUser.name || record.assignedUser.email}
-          </Text>
-        ) : (
-          <Text type="secondary">Unassigned</Text>
-        ),
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 110,
-      render: (status: string) => (
-        <Tag color={status === 'COMPLETED' ? 'green' : 'orange'}>
-          {status === 'COMPLETED' ? 'Completed' : 'Pending'}
-        </Tag>
+      title: 'Closing Comment',
+      dataIndex: 'closingComment',
+      key: 'closingComment',
+      ellipsis: true,
+      render: (text: string | null) => (
+        <Text type="secondary" style={{ fontSize: 'clamp(0.7rem, 2vw, 0.85rem)' }}>
+          {text || '-'}
+        </Text>
       ),
     },
-    ...(isAdmin ? [{
-      title: '',
-      key: 'actions',
-      width: 80,
+    {
+      title: 'Closed By',
+      key: 'closedBy',
+      width: '15%',
+      ellipsis: true,
       render: (_: any, record: TodoItem) => (
-        <Space size={2}>
-          <Button
-            type="text"
-            size="small"
-            icon={<EditOutlined style={{ fontSize: '14px' }} />}
-            onClick={() => handleEdit(record)}
-          />
-          <Popconfirm
-            title="Delete this todo?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{ danger: true, size: 'small' }}
-          >
-            <Button type="text" size="small" danger icon={<DeleteOutlined style={{ fontSize: '14px' }} />} />
-          </Popconfirm>
-        </Space>
+        <Text style={{ fontSize: 'clamp(0.7rem, 2vw, 0.85rem)' }}>
+          {record.closedBy?.name || '-'}
+        </Text>
       ),
-    }] : []),
-  ], [isAdmin, handleEdit, handleDelete]);
+    },
+    {
+      title: 'Closed',
+      key: 'closedAt',
+      width: '12%',
+      render: (_: any, record: TodoItem) => (
+        <Text type="secondary" style={{ fontSize: 'clamp(0.7rem, 2vw, 0.85rem)' }}>
+          {record.closedAt ? dayjs(record.closedAt).format('DD/MM/YY') : '-'}
+        </Text>
+      ),
+    },
+  ], []);
 
   return (
     <ProtectedRoute>
@@ -300,11 +445,41 @@ export default function TodosPage() {
               loading={loading}
               pagination={{ pageSize: 20 }}
               size="small"
-              scroll={{ x: 500 }}
+              className="responsive-todo-table"
             />
           )}
         </Card>
 
+        {/* Completed History - Collapsible Section */}
+        {completedHistory.length > 0 && (
+          <Card style={{ marginTop: 16 }} styles={{ body: { padding: 0 } }}>
+            <Collapse
+              ghost
+              items={[{
+                key: 'history',
+                label: (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <HistoryOutlined style={{ color: '#8c8c8c' }} />
+                    <span style={{ fontWeight: 500 }}>Recent Completed</span>
+                    <Tag color="default">{completedHistory.length}</Tag>
+                  </div>
+                ),
+                children: (
+                  <Table
+                    dataSource={completedHistory}
+                    columns={historyColumns}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    className="responsive-todo-table"
+                  />
+                ),
+              }]}
+            />
+          </Card>
+        )}
+
+        {/* Add/Edit Todo Modal */}
         {modalOpen && (
           <Suspense fallback={null}>
             <Modal
@@ -360,15 +535,6 @@ export default function TodosPage() {
                   </Select>
                 </Form.Item>
 
-                {editingTodo && (
-                  <Form.Item name="status" label="Status">
-                    <Select>
-                      <Select.Option value="PENDING">Pending</Select.Option>
-                      <Select.Option value="COMPLETED">Completed</Select.Option>
-                    </Select>
-                  </Form.Item>
-                )}
-
                 <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
                   <Space>
                     <Button onClick={() => { setModalOpen(false); setEditingTodo(null); form.resetFields(); }}>
@@ -383,6 +549,89 @@ export default function TodosPage() {
             </Modal>
           </Suspense>
         )}
+
+        {/* Close Todo Modal */}
+        {closingModalOpen && (
+          <Suspense fallback={null}>
+            <Modal
+              title="Close To-Do"
+              open={closingModalOpen}
+              onCancel={() => { setClosingModalOpen(false); setClosingTodo(null); closingForm.resetFields(); }}
+              footer={null}
+              destroyOnClose
+              centered
+              width="min(480px, 95vw)"
+            >
+              {closingTodo && (
+                <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#fafafa', borderRadius: '0.5rem' }}>
+                  <Text type="secondary" style={{ fontSize: '0.8rem' }}>Task:</Text>
+                  <div>
+                    <Text strong>{closingTodo.description}</Text>
+                  </div>
+                  {closingTodo.case && (
+                    <div style={{ marginTop: '0.25rem' }}>
+                      <Text type="secondary" style={{ fontSize: '0.8rem' }}>Case: {closingTodo.case.caseNumber}</Text>
+                    </div>
+                  )}
+                </div>
+              )}
+              <Form
+                form={closingForm}
+                layout="vertical"
+                onFinish={handleCloseSubmit}
+              >
+                <Form.Item
+                  name="closingComment"
+                  label="Closing Comment"
+                  rules={[
+                    { required: true, message: 'Closing comment is required' },
+                    { min: 3, message: 'Comment must be at least 3 characters' },
+                  ]}
+                >
+                  <TextArea
+                    rows={3}
+                    placeholder="Describe the resolution or reason for closing..."
+                    maxLength={500}
+                    showCount
+                  />
+                </Form.Item>
+
+                <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+                  <Space>
+                    <Button onClick={() => { setClosingModalOpen(false); setClosingTodo(null); closingForm.resetFields(); }}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={closingSubmitting}
+                      disabled={closingSubmitting}
+                      style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                    >
+                      Close Todo
+                    </Button>
+                  </Space>
+                </Form.Item>
+              </Form>
+            </Modal>
+          </Suspense>
+        )}
+        <style>{`
+          .responsive-todo-table .ant-table {
+            table-layout: fixed !important;
+          }
+          .responsive-todo-table .ant-table-cell {
+            word-break: break-word;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          @media (max-width: 576px) {
+            .responsive-todo-table .ant-table-cell {
+              padding: 6px 4px !important;
+              font-size: 0.75rem;
+            }
+          }
+        `}</style>
       </DashboardLayout>
     </ProtectedRoute>
   );

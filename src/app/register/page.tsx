@@ -1,15 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, message, Spin, Row, Col, Divider, Alert } from 'antd';
+import { Form, Input, Button, Card, message, Spin, Row, Col, Divider, Alert, Space } from 'antd';
 import {
   LockOutlined,
   UserOutlined,
   HomeOutlined,
   MailOutlined,
-  GoogleOutlined,
-  ExclamationCircleOutlined,
-  CheckCircleOutlined,
+  TeamOutlined,
+  PlusCircleOutlined,
 } from '@ant-design/icons';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -40,33 +39,8 @@ export default function RegisterPage() {
   const { isLoading } = useAuth();
   const [form] = Form.useForm();
   const [firmChoice, setFirmChoice] = useState<'existing' | 'new' | null>(null);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [registerError, setRegisterError] = useState<RegisterError | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  const handleGoogleSignUp = async () => {
-    setGoogleLoading(true);
-    setRegisterError(null);
-    try {
-      const response = await fetch('/api/auth/google', {
-        headers: apiHeaders(),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to initiate Google sign-up');
-      }
-
-      // Redirect to Google OAuth consent screen
-      window.location.href = data.authUrl;
-    } catch (error) {
-      setRegisterError({
-        message: error instanceof Error ? error.message : 'Failed to sign up with Google',
-        type: 'error',
-      });
-      setGoogleLoading(false);
-    }
-  };
 
   // Clear error when user starts typing
   const handleFieldChange = () => {
@@ -276,6 +250,7 @@ export default function RegisterPage() {
                 />
               )}
 
+              {/* Personal Details */}
               <Form.Item
                 name="name"
                 label="Full Name"
@@ -352,94 +327,144 @@ export default function RegisterPage() {
                 />
               </Form.Item>
 
-              <Divider>Firm Selection (Required)</Divider>
+              {/* Firm Selection */}
+              {firmChoice === null && (
+                <>
+                  <Divider>Firm Selection (Required)</Divider>
 
-              {/* Firm selection warning if not selected */}
-              {registerError && !registerError.field && registerError.type === 'warning' && (
-                <Alert
-                  message="Firm Required"
-                  description={registerError.message}
-                  type="warning"
-                  showIcon
-                  style={{ marginBottom: '1rem', borderRadius: '0.5rem' }}
-                />
+                  {/* Firm not selected warning */}
+                  {registerError && !registerError.field && registerError.type === 'warning' && (
+                    <Alert
+                      message="Firm Required"
+                      description={registerError.message}
+                      type="warning"
+                      showIcon
+                      style={{ marginBottom: '1rem', borderRadius: '0.5rem' }}
+                    />
+                  )}
+
+                  <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                    <Button
+                      block
+                      size="large"
+                      icon={<TeamOutlined />}
+                      onClick={() => setFirmChoice('existing')}
+                      style={{
+                        height: '3rem',
+                        fontSize: 'clamp(0.9rem, 2vw, 1rem)',
+                        fontWeight: '600',
+                        borderRadius: '0.6rem',
+                      }}
+                    >
+                      Join Existing Firm
+                    </Button>
+                    <Button
+                      block
+                      size="large"
+                      icon={<PlusCircleOutlined />}
+                      onClick={() => setFirmChoice('new')}
+                      style={{
+                        height: '3rem',
+                        fontSize: 'clamp(0.9rem, 2vw, 1rem)',
+                        fontWeight: '600',
+                        borderRadius: '0.6rem',
+                      }}
+                    >
+                      Create New Firm
+                    </Button>
+                  </Space>
+                </>
               )}
 
-              <Form.Item
-                name="existingFirmId"
-                label="Join Existing Firm"
-                rules={[
-                  {
-                    validator: (_, value) => {
-                      if (firmChoice === 'existing' && !value?.trim()) {
-                        return Promise.reject(new Error('Please enter a Firm ID'));
-                      }
-                      return Promise.resolve();
-                    },
-                  },
-                ]}
-                validateStatus={registerError?.field === 'existingFirmId' ? 'error' : undefined}
-                help={registerError?.field === 'existingFirmId' ? registerError.message : undefined}
-                extra={
-                  <span style={{ fontSize: '0.8rem', color: '#666' }}>
-                    Ask your firm admin to share the Firm ID from Settings
-                  </span>
-                }
-              >
-                <Input
-                  prefix={<HomeOutlined />}
-                  placeholder="Enter Firm ID"
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setFirmChoice('existing');
-                      form.setFieldValue('newFirmName', undefined);
-                    } else {
-                      setFirmChoice(null);
+              {firmChoice === 'existing' && (
+                <>
+                  <Divider>Join Existing Firm</Divider>
+                  <Form.Item
+                    name="existingFirmId"
+                    rules={[
+                      {
+                        validator: (_, value) => {
+                          if (!value?.trim()) {
+                            return Promise.reject(new Error('Please enter a Firm ID'));
+                          }
+                          return Promise.resolve();
+                        },
+                      },
+                    ]}
+                    validateStatus={registerError?.field === 'existingFirmId' ? 'error' : undefined}
+                    help={registerError?.field === 'existingFirmId' ? registerError.message : undefined}
+                    extra={
+                      <span style={{ fontSize: '0.8rem', color: '#666' }}>
+                        Ask your firm admin to share the Firm ID from Settings
+                      </span>
                     }
-                  }}
-                  disabled={firmChoice === 'new' && !!form.getFieldValue('newFirmName')}
-                  allowClear
-                />
-              </Form.Item>
+                  >
+                    <Input
+                      prefix={<HomeOutlined />}
+                      placeholder="Enter Firm ID"
+                      allowClear
+                    />
+                  </Form.Item>
+                  <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                    <a
+                      onClick={() => {
+                        setFirmChoice(null);
+                        form.setFieldValue('existingFirmId', undefined);
+                        setRegisterError(null);
+                      }}
+                      style={{ color: '#1890ff', fontSize: 'clamp(0.8rem, 2vw, 0.9rem)', cursor: 'pointer' }}
+                    >
+                      Want to create a new firm instead?
+                    </a>
+                  </div>
+                </>
+              )}
 
-              <div style={{ textAlign: 'center', margin: '1.5vh 0' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: 'clamp(0.8rem, 2vw, 1rem)' }}>— OR —</span>
-              </div>
-
-              <Form.Item
-                name="newFirmName"
-                label="Create New Firm"
-                rules={[
-                  {
-                    validator: (_, value) => {
-                      if (firmChoice === 'new' && !value?.trim()) {
-                        return Promise.reject(new Error('Please enter a firm name'));
-                      }
-                      if (value && (value.length < 2 || value.length > 100)) {
-                        return Promise.reject(new Error('Firm name must be between 2 and 100 characters'));
-                      }
-                      return Promise.resolve();
-                    },
-                  },
-                ]}
-                validateStatus={registerError?.field === 'newFirmName' ? 'error' : undefined}
-                help={registerError?.field === 'newFirmName' ? registerError.message : undefined}
-                extra={
-                  <span style={{ fontSize: '0.8rem', color: '#666' }}>
-                    You will be the admin of this firm
-                  </span>
-                }
-              >
-                <Input
-                  prefix={<HomeOutlined />}
-                  placeholder="Your New Firm Name"
-                  onChange={() => {
-                    setFirmChoice('new');
-                    form.setFieldValue('existingFirmId', undefined);
-                  }}
-                  disabled={firmChoice === 'existing' && !!form.getFieldValue('existingFirmId')}
-                />
-              </Form.Item>
+              {firmChoice === 'new' && (
+                <>
+                  <Divider>Create New Firm</Divider>
+                  <Form.Item
+                    name="newFirmName"
+                    rules={[
+                      {
+                        validator: (_, value) => {
+                          if (!value?.trim()) {
+                            return Promise.reject(new Error('Please enter a firm name'));
+                          }
+                          if (value.length < 2 || value.length > 100) {
+                            return Promise.reject(new Error('Firm name must be between 2 and 100 characters'));
+                          }
+                          return Promise.resolve();
+                        },
+                      },
+                    ]}
+                    validateStatus={registerError?.field === 'newFirmName' ? 'error' : undefined}
+                    help={registerError?.field === 'newFirmName' ? registerError.message : undefined}
+                    extra={
+                      <span style={{ fontSize: '0.8rem', color: '#666' }}>
+                        You will be the admin of this firm
+                      </span>
+                    }
+                  >
+                    <Input
+                      prefix={<HomeOutlined />}
+                      placeholder="Your New Firm Name"
+                    />
+                  </Form.Item>
+                  <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                    <a
+                      onClick={() => {
+                        setFirmChoice(null);
+                        form.setFieldValue('newFirmName', undefined);
+                        setRegisterError(null);
+                      }}
+                      style={{ color: '#1890ff', fontSize: 'clamp(0.8rem, 2vw, 0.9rem)', cursor: 'pointer' }}
+                    >
+                      Want to join an existing firm instead?
+                    </a>
+                  </div>
+                </>
+              )}
 
               <Form.Item style={{ marginTop: '1.5rem' }}>
                 <Button
@@ -458,43 +483,6 @@ export default function RegisterPage() {
                   {submitting ? 'Creating Account...' : 'Register'}
                 </Button>
               </Form.Item>
-
-              {/* <Divider style={{ margin: '1rem 0' }}>
-                <span style={{ color: '#999', fontSize: '0.85rem' }}>or</span>
-              </Divider>
-
-              <Button
-                block
-                size="large"
-                onClick={handleGoogleSignUp}
-                loading={googleLoading}
-                disabled={isLoading}
-                icon={<GoogleOutlined />}
-                style={{
-                  height: '3rem',
-                  fontSize: 'clamp(0.9rem, 2vw, 1rem)',
-                  fontWeight: '600',
-                  background: '#ffffff',
-                  border: '1px solid #dadce0',
-                  borderRadius: '0.6rem',
-                  color: '#3c4043',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f8f9fa';
-                  e.currentTarget.style.borderColor = '#c1c1c1';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#ffffff';
-                  e.currentTarget.style.borderColor = '#dadce0';
-                }}
-              >
-                Sign up with Google
-              </Button> */}
 
               <div style={{
                 textAlign: 'center',

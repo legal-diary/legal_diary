@@ -226,6 +226,7 @@ model User {
   passwordResetTokens     PasswordResetToken[]
   todosAssigned           Todo[]               @relation("TodoAssignee")
   todosCreated            Todo[]               @relation("TodoCreator")
+  todosClosed             Todo[]               @relation("TodoCloser")
 
   @@index([email])
   @@index([firmId])
@@ -291,19 +292,24 @@ model Todo {
   caseId       String?
   description  String
   assignedTo   String?
-  status       TodoStatus @default(PENDING)
-  createdById  String
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  status         TodoStatus @default(PENDING)
+  createdById    String
+  closingComment String?
+  closedAt       DateTime?
+  closedById     String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   firm         Firm       @relation(fields: [firmId], references: [id], onDelete: Cascade)
   case         Case?      @relation(fields: [caseId], references: [id], onDelete: SetNull)
   assignedUser User?      @relation("TodoAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
   createdBy    User       @relation("TodoCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  closedBy     User?      @relation("TodoCloser", fields: [closedById], references: [id], onDelete: SetNull)
 
   @@index([firmId])
   @@index([caseId])
   @@index([assignedTo])
+  @@index([closedById])
 }
 
 // Rate limiting records (persisted for serverless environments)

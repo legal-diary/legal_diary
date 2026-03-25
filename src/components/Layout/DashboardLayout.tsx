@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, memo, lazy, Suspense } from 'react';
-import { Layout, Menu, Button, Avatar, Tag, Tooltip } from 'antd';
+import { Layout, Menu, Button, Avatar, Tag, Tooltip, Badge } from 'antd';
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -20,6 +20,7 @@ import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { usePathname } from 'next/navigation';
+import { usePendingTodoCount } from '@/hooks/usePendingTodoCount';
 
 // Lazy load heavy components
 const Dropdown = lazy(() => import('antd').then(mod => ({ default: mod.Dropdown })));
@@ -27,8 +28,8 @@ const Drawer = lazy(() => import('antd').then(mod => ({ default: mod.Drawer })))
 
 const { Header, Content, Sider } = Layout;
 
-// Memoized navigation items - defined outside component
-const createDesktopNavigationItems = () => [
+// Navigation items factory - accepts pendingCount for badge
+const createDesktopNavigationItems = (pendingCount: number) => [
   {
     key: 'dashboard',
     icon: <DashboardOutlined style={{ fontSize: '1.2rem' }} />,
@@ -56,8 +57,13 @@ const createDesktopNavigationItems = () => [
   },
   {
     key: 'todos',
-    icon: <CheckSquareOutlined style={{ fontSize: '1.2rem' }} />,
-    label: <Link href="/todos" style={{ textDecoration: 'none', color: 'inherit' }}>To-Do</Link>,
+    icon: (
+      <span style={{ position: 'relative', display: 'inline-flex' }}>
+        <CheckSquareOutlined style={{ fontSize: '1.2rem' }} />
+        {pendingCount > 0 && <span className="todo-blink-dot" />}
+      </span>
+    ),
+    label: <Link href="/todos" style={{ textDecoration: 'none', color: 'inherit' }}>To-Do{pendingCount > 0 ? ` (${pendingCount})` : ''}</Link>,
   },
   {
     key: 'settings',
@@ -119,7 +125,8 @@ const MobileMenuContent = memo<{
   handleMenuClick: (path: string) => void;
   handleLogout: () => void;
   getSelectedKey: () => string;
-}>(({ pathname, expandedMenu, setExpandedMenu, handleMenuClick, handleLogout, getSelectedKey }) => (
+  pendingTodoCount: number;
+}>(({ pathname, expandedMenu, setExpandedMenu, handleMenuClick, handleLogout, getSelectedKey, pendingTodoCount }) => (
   <>
     <div className="mobile-menu-container">
       <div
@@ -179,8 +186,14 @@ const MobileMenuContent = memo<{
         onClick={() => handleMenuClick('/todos')}
         className={`mobile-menu-item ${getSelectedKey() === 'todos' ? 'active' : ''}`}
       >
-        <CheckSquareOutlined style={{ fontSize: '1.2rem' }} />
+        <span style={{ position: 'relative', display: 'inline-flex' }}>
+          <CheckSquareOutlined style={{ fontSize: '1.2rem' }} />
+          {pendingTodoCount > 0 && <span className="todo-blink-dot" />}
+        </span>
         <span>To-Do</span>
+        {pendingTodoCount > 0 && (
+          <Badge count={pendingTodoCount} size="small" style={{ marginLeft: 'auto' }} />
+        )}
       </div>
 
       <div
@@ -220,6 +233,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { pendingCount: pendingTodoCount } = usePendingTodoCount();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // default collapsed
@@ -277,8 +291,8 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     ],
   }), [handleLogout]);
 
-  // Memoized navigation items
-  const desktopNavigationItems = useMemo(createDesktopNavigationItems, []);
+  // Memoized navigation items - rebuild when pendingTodoCount changes
+  const desktopNavigationItems = useMemo(() => createDesktopNavigationItems(pendingTodoCount), [pendingTodoCount]);
 
   // Memoized user avatar
   const userInitial = useMemo(() => user?.name?.charAt(0).toUpperCase() || 'U', [user?.name]);
@@ -402,7 +416,10 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
               }}
               aria-label="Open menu"
             >
-              <MenuOutlined />
+              <span style={{ position: 'relative', display: 'inline-flex' }}>
+                <MenuOutlined />
+                {pendingTodoCount > 0 && <span className="todo-blink-dot" />}
+              </span>
             </button>
             <span className="mobile-firm-name" style={{
               fontSize: '0.7rem',
@@ -518,6 +535,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
               handleMenuClick={handleMenuClick}
               handleLogout={handleLogout}
               getSelectedKey={getSelectedKey}
+              pendingTodoCount={pendingTodoCount}
             />
           </Drawer>
         </Suspense>
@@ -805,6 +823,23 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
         /* Smooth content area transition */
         .main-content-layout {
           transition: margin-left 0.3s cubic-bezier(0.2, 0, 0, 1) !important;
+        }
+
+        /* Todo blinking dot for pending todos */
+        .todo-blink-dot {
+          position: absolute;
+          top: -2px;
+          right: -6px;
+          width: 8px;
+          height: 8px;
+          background: #ff4d4f;
+          border-radius: 50%;
+          animation: todoBlink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes todoBlink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.15; }
         }
       `}</style>
     </Layout>
