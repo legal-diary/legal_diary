@@ -14,6 +14,7 @@ import {
   Divider,
   Space,
   Popconfirm,
+  Popover,
 } from 'antd';
 import {
   CalendarOutlined,
@@ -24,6 +25,9 @@ import {
   EditOutlined,
   DeleteOutlined,
   ScheduleOutlined,
+  EyeOutlined,
+  DownOutlined,
+  UpOutlined,
 } from '@ant-design/icons';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -43,6 +47,7 @@ import { useDashboardSWR } from '@/hooks/useDashboardSWR';
 import HearingFormModal from '@/components/HearingFormModal/HearingFormModal';
 import HearingClosureModal from '@/components/HearingClosureModal/HearingClosureModal';
 import PendingClosuresSection from '@/components/Dashboard/PendingClosuresSection';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 dayjs.extend(relativeTime);
 
@@ -403,7 +408,9 @@ const TodayScheduleTable = React.memo<{
   hearings: TodayHearing[];
   totalCount: number;
   loading: boolean;
-}>(({ hearings, totalCount, loading }) => {
+  isMobile: boolean;
+  onCloseHearing?: (hearing: any) => void;
+}>(({ hearings, totalCount, loading, isMobile, onCloseHearing }) => {
   const columns = useMemo(
     () => [
       {
@@ -422,10 +429,11 @@ const TodayScheduleTable = React.memo<{
         title: 'Case No.',
         dataIndex: 'caseNumber',
         key: 'caseNumber',
-        width: 120,
-        fixed: 'left' as const,
+        width: isMobile ? 110 : 120,
+        ellipsis: true,
+        ...(isMobile ? {} : { fixed: 'left' as const }),
         render: (text: string, record: TodayHearing) => (
-          <Link href={`/cases/${record.caseId}`} style={{ color: '#1890ff', fontWeight: 500, fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>
+          <Link href={`/cases/${record.caseId}`} style={{ color: '#1890ff', fontWeight: 500, fontSize: 'clamp(0.7rem, 2vw, 0.9rem)' }}>
             {text}
           </Link>
         ),
@@ -434,11 +442,11 @@ const TodayScheduleTable = React.memo<{
         title: 'Party',
         dataIndex: 'partyName',
         key: 'partyName',
-        width: 140,
+        width: isMobile ? 110 : 140,
         ellipsis: true,
         render: (text: string, record: TodayHearing) => (
           <Tooltip title={record.caseTitle}>
-            <Text strong style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>{text}</Text>
+            <Text strong style={{ fontSize: 'clamp(0.7rem, 2vw, 0.9rem)' }}>{text}</Text>
           </Tooltip>
         ),
       },
@@ -447,11 +455,12 @@ const TodayScheduleTable = React.memo<{
         dataIndex: 'stage',
         key: 'stage',
         width: 120,
+        className: 'hide-on-mobile',
         render: (stage: string, record: TodayHearing) => (
           <div>
             <Badge status={STAGE_COLORS[stage] as any} text={<span style={{ fontSize: 'clamp(0.7rem, 1.8vw, 0.85rem)' }}>{STAGE_LABELS[stage] || stage}</span>} />
             {record.hearingType && (
-              <div className="hide-on-mobile">
+              <div>
                 <Text type="secondary" style={{ fontSize: '0.7rem' }}>
                   {STAGE_LABEL_MAP[record.hearingType] || record.hearingType.replace(/_/g, ' ')}
                 </Text>
@@ -495,17 +504,24 @@ const TodayScheduleTable = React.memo<{
         title: 'Notes',
         dataIndex: 'notes',
         key: 'notes',
-        width: 150,
+        width: 60,
         className: 'hide-on-mobile',
-        ellipsis: true,
-        render: (notes: string | null) => (
-          <Tooltip title={notes}>
-            <Text type="secondary" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.85rem)' }}>{notes || '-'}</Text>
-          </Tooltip>
-        ),
+        render: (notes: string | null) =>
+          notes ? (
+            <Popover
+              content={<div style={{ maxWidth: 320, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>{notes}</div>}
+              title="Notes"
+              trigger="click"
+              placement="left"
+            >
+              <Button type="text" size="small" icon={<EyeOutlined />} style={{ color: '#1890ff' }} />
+            </Popover>
+          ) : (
+            <Text type="secondary">-</Text>
+          ),
       },
     ],
-    []
+    [isMobile]
   );
 
   if (loading) return <TodayScheduleSkeleton />;
@@ -552,9 +568,52 @@ const TodayScheduleTable = React.memo<{
           pagination={false}
           rowKey="id"
           size="small"
-          scroll={{ x: 500 }}
+          scroll={isMobile ? undefined : { x: 500 }}
           rowClassName={(_, index) => (index % 2 === 0 ? 'table-row-light' : 'table-row-dark')}
           className="responsive-table"
+          expandable={isMobile ? {
+            expandIcon: ({ expanded, onExpand, record }: any) => (
+              <span onClick={e => onExpand(record, e)} style={{ cursor: 'pointer', color: '#999', fontSize: 12 }}>
+                {expanded ? <UpOutlined /> : <DownOutlined />}
+              </span>
+            ),
+            expandedRowRender: (record: TodayHearing) => (
+              <div className="expanded-row-content">
+                <div className="expanded-row-grid">
+                  <div><Text type="secondary">Stage:</Text> <Badge status={STAGE_COLORS[record.stage] as any} text={STAGE_LABELS[record.stage] || record.stage} /></div>
+                  <div><Text type="secondary">Type:</Text> <Tag color="blue" style={{ fontSize: '0.7rem' }}>{STAGE_LABEL_MAP[record.hearingType] || record.hearingType.replace(/_/g, ' ')}</Tag></div>
+                  <div><Text type="secondary">Prev Date:</Text> <Text>{formatDate(record.previousDate)}</Text></div>
+                  <div><Text type="secondary">Court:</Text> <Text>{record.courtName || '-'}{record.courtHall ? ` (Hall: ${record.courtHall})` : ''}</Text></div>
+                  {record.notes && <div style={{ gridColumn: '1 / -1' }}><Text type="secondary">Notes:</Text> <Text style={{ whiteSpace: 'pre-wrap' }}>{record.notes}</Text></div>}
+                </div>
+                <div className="expanded-row-actions">
+                  <Link href={`/cases/${record.caseId}`}>
+                    <Button size="small" type="link" icon={<EyeOutlined />}>View Case</Button>
+                  </Link>
+                  {onCloseHearing && (
+                    <Button
+                      size="small"
+                      style={{ backgroundColor: '#d4af37', borderColor: '#d4af37', color: '#fff' }}
+                      icon={<CheckCircleOutlined />}
+                      onClick={() => onCloseHearing({
+                        id: record.id,
+                        caseId: record.caseId,
+                        hearingDate: record.currentDate,
+                        hearingType: record.hearingType,
+                        courtHall: record.courtHall,
+                        notes: record.notes,
+                        status: 'UPCOMING',
+                        Case: { id: record.caseId, caseNumber: record.caseNumber, caseTitle: record.caseTitle, petitionerName: '', respondentName: '', courtName: record.courtName },
+                      })}
+                    >
+                      Close Hearing
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ),
+            rowExpandable: () => true,
+          } : undefined}
         />
       )}
     </Card>
@@ -566,6 +625,7 @@ TodayScheduleTable.displayName = 'TodayScheduleTable';
 // Main Dashboard Component
 export default function DashboardPage() {
   const { token, user } = useAuth();
+  const isMobile = useIsMobile();
 
   // SWR-powered data fetching with auto-polling for admins
   const { data: dashboardData, error: swrError, isLoading: swrLoading, isValidating, refresh, isPolling } = useDashboardSWR();
@@ -676,8 +736,8 @@ export default function DashboardPage() {
         title: 'Date',
         dataIndex: 'hearingDate',
         key: 'hearingDate',
-        width: 85,
-        fixed: 'left' as const,
+        width: isMobile ? 55 : 85,
+        ...(isMobile ? {} : { fixed: 'left' as const }),
         render: (date: string) => {
           const isToday = dayjs(date).isSame(dayjs(), 'day');
           return (
@@ -690,18 +750,20 @@ export default function DashboardPage() {
       {
         title: 'Case',
         key: 'case',
-        width: 130,
+        width: isMobile ? 110 : 130,
         ellipsis: true,
         render: (_: any, record: UpcomingHearing) => (
           <div>
             <Link href={`/cases/${record.caseId}`} style={{ color: '#1890ff', fontSize: 'clamp(0.7rem, 2vw, 0.8rem)' }}>
               {record.Case?.caseNumber || 'N/A'}
             </Link>
-            <div className="hide-xs">
-              <Text type="secondary" style={{ fontSize: '0.65rem' }}>
-                {record.Case?.caseTitle || 'Unknown'}
-              </Text>
-            </div>
+            {!isMobile && (
+              <div>
+                <Text type="secondary" style={{ fontSize: '0.65rem' }}>
+                  {record.Case?.caseTitle || 'Unknown'}
+                </Text>
+              </div>
+            )}
           </div>
         ),
       },
@@ -732,8 +794,8 @@ export default function DashboardPage() {
       {
         title: '',
         key: 'actions',
-        width: 70,
-        fixed: 'right' as const,
+        width: isMobile ? 50 : 70,
+        ...(isMobile ? {} : { fixed: 'right' as const }),
         render: (_: any, record: UpcomingHearing) => (
           <Space size={2}>
             <Button type="text" size="small" icon={<EditOutlined style={{ fontSize: '14px' }} />} onClick={() => handleEditHearing(record)} />
@@ -751,7 +813,7 @@ export default function DashboardPage() {
         ),
       },
     ],
-    [handleEditHearing, handleDeleteHearing]
+    [isMobile, handleEditHearing, handleDeleteHearing]
   );
 
   return (
@@ -776,7 +838,7 @@ export default function DashboardPage() {
         )}
 
         {/* Today's Schedule */}
-        <TodayScheduleTable hearings={todayHearings} totalCount={totalCount} loading={todayLoading} />
+        <TodayScheduleTable hearings={todayHearings} totalCount={totalCount} loading={todayLoading} isMobile={isMobile} onCloseHearing={handleCloseHearing} />
 
         {/* Divider */}
         <Divider style={{ margin: '32px 0 24px' }} />
@@ -819,8 +881,33 @@ export default function DashboardPage() {
                 pagination={false}
                 rowKey="id"
                 size="small"
-                scroll={{ x: 350 }}
+                scroll={isMobile ? undefined : { x: 350 }}
                 className="responsive-table upcoming-table"
+                expandable={isMobile ? {
+                  expandIcon: ({ expanded, onExpand, record }: any) => (
+                    <span onClick={e => onExpand(record, e)} style={{ cursor: 'pointer', color: '#999', fontSize: 12 }}>
+                      {expanded ? <UpOutlined /> : <DownOutlined />}
+                    </span>
+                  ),
+                  expandedRowRender: (record: UpcomingHearing) => (
+                    <div className="expanded-row-content">
+                      <div className="expanded-row-grid">
+                        <div><Text type="secondary">Case:</Text> <Text strong>{record.Case?.caseTitle || 'Unknown'}</Text></div>
+                        <div><Text type="secondary">Stage:</Text> <Tag color="blue" style={{ fontSize: '0.7rem' }}>{STAGE_LABEL_MAP[record.hearingType] || record.hearingType.replace(/_/g, ' ')}</Tag></div>
+                        <div><Text type="secondary">Status:</Text> <Tag color={STATUS_COLORS[record.status] || 'default'} style={{ fontSize: '0.7rem' }}>{record.status}</Tag></div>
+                        <div><Text type="secondary">Court:</Text> <Text>{record.courtHall || '-'}</Text></div>
+                        {record.notes && <div style={{ gridColumn: '1 / -1' }}><Text type="secondary">Notes:</Text> <Text style={{ whiteSpace: 'pre-wrap' }}>{record.notes}</Text></div>}
+                      </div>
+                      <div className="expanded-row-actions">
+                        <Button size="small" icon={<EditOutlined />} onClick={() => handleEditHearing(record)}>Edit</Button>
+                        <Popconfirm title="Delete?" onConfirm={() => handleDeleteHearing(record.id)} okText="Yes" cancelText="No" okButtonProps={{ danger: true, size: 'small' }}>
+                          <Button size="small" danger icon={<DeleteOutlined />}>Delete</Button>
+                        </Popconfirm>
+                      </div>
+                    </div>
+                  ),
+                  rowExpandable: () => true,
+                } : undefined}
               />
             )}
           </Card>
