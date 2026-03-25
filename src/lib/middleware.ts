@@ -12,15 +12,6 @@ export async function verifyToken(token: string) {
       return null;
     }
 
-    // Check if session is expired
-    const now = new Date();
-    if (session.expiresAt < now) {
-      await prisma.session.delete({
-        where: { id: session.id },
-      });
-      return null;
-    }
-
     return session.User;
   } catch (error) {
     console.error('[verifyToken] Token verification error:', error);
