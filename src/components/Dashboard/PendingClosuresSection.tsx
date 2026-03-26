@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Card, Table, Tag, Button, Typography, Badge, Tooltip } from 'antd';
-import { WarningOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { Table, Tag, Button, Typography, Tooltip } from 'antd';
+import { DownOutlined, UpOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import dayjs from 'dayjs';
 import { STAGE_LABEL_MAP } from '@/lib/constants';
@@ -142,54 +142,32 @@ export default function PendingClosuresSection({
   if (pendingClosures.length === 0) return null;
 
   return (
-    <Card
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <WarningOutlined style={{ color: '#faad14' }} />
-          <span>Pending Closures</span>
-          <Badge
-            count={pendingClosures.length}
-            style={{ backgroundColor: '#faad14' }}
-          />
-        </div>
-      }
-      styles={{ body: { padding: 0 } }}
-      style={{
-        marginBottom: 24,
-        borderColor: '#ffd591',
-        background: '#fffbe6',
-      }}
-      headStyle={{
-        borderBottom: '1px solid #ffd591',
-      }}
-    >
-      <Table
-        dataSource={pendingClosures}
-        columns={columns}
-        pagination={false}
-        rowKey="id"
-        size="small"
-        scroll={isMobile ? undefined : { x: 500 }}
-        className="responsive-table"
-        expandable={isMobile ? {
-          expandIcon: ({ expanded, onExpand, record }: any) => (
-            <span onClick={(e: React.MouseEvent) => onExpand(record, e)} style={{ cursor: 'pointer', color: '#999', fontSize: 12 }}>
-              {expanded ? <UpOutlined /> : <DownOutlined />}
-            </span>
-          ),
-          expandedRowRender: (record: PendingClosure) => (
-            <div className="expanded-row-content">
-              <div className="expanded-row-grid">
-                <div><Text type="secondary">Party:</Text> <Text strong>{record.Case.caseTitle}</Text></div>
-                <div><Text type="secondary">Stage:</Text> <Tag color="blue" style={{ fontSize: '0.7rem' }}>{STAGE_LABEL_MAP[record.hearingType] || record.hearingType.replace(/_/g, ' ')}</Tag></div>
-                <div><Text type="secondary">Court:</Text> <Text>{record.Case.courtName || record.courtHall || '-'}</Text></div>
-                {record.notes && <div style={{ gridColumn: '1 / -1' }}><Text type="secondary">Notes:</Text> <Text style={{ whiteSpace: 'pre-wrap' }}>{record.notes}</Text></div>}
-              </div>
+    <Table
+      dataSource={pendingClosures}
+      columns={columns}
+      pagination={false}
+      rowKey="id"
+      size="small"
+      scroll={isMobile ? undefined : { x: 500 }}
+      className="responsive-table"
+      expandable={isMobile ? {
+        expandIcon: ({ expanded, onExpand, record }: any) => (
+          <span onClick={(e: React.MouseEvent) => onExpand(record, e)} style={{ cursor: 'pointer', color: '#999', fontSize: 12 }}>
+            {expanded ? <UpOutlined /> : <DownOutlined />}
+          </span>
+        ),
+        expandedRowRender: (record: PendingClosure) => (
+          <div className="expanded-row-content">
+            <div className="expanded-row-grid">
+              <div><Text type="secondary">Party:</Text> <Text strong>{record.Case.caseTitle}</Text></div>
+              <div><Text type="secondary">Stage:</Text> <Tag color="blue" style={{ fontSize: '0.7rem' }}>{STAGE_LABEL_MAP[record.hearingType] || record.hearingType.replace(/_/g, ' ')}</Tag></div>
+              <div><Text type="secondary">Court:</Text> <Text>{record.Case.courtName || record.courtHall || '-'}</Text></div>
+              {record.notes && <div style={{ gridColumn: '1 / -1' }}><Text type="secondary">Notes:</Text> <Text style={{ whiteSpace: 'pre-wrap' }}>{record.notes}</Text></div>}
             </div>
-          ),
-          rowExpandable: () => true,
-        } : undefined}
-      />
-    </Card>
+          </div>
+        ),
+        rowExpandable: () => true,
+      } : undefined}
+    />
   );
 }

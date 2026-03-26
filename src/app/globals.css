@@ -1162,3 +1162,122 @@ p {
     table-layout: fixed !important;
   }
 }
+
+/* =========================================
+   Additional responsive breakpoints
+   ========================================= */
+
+@media (max-width: 1200px) {
+  .hide-xl,
+  .ant-table .hide-xl,
+  .ant-table-cell.hide-xl,
+  th.hide-xl,
+  td.hide-xl {
+    display: none !important;
+  }
+
+  .responsive-table .ant-table-cell {
+    padding: 10px 8px !important;
+  }
+
+  .responsive-table .ant-table-thead > tr > th {
+    padding: 10px 8px !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .hide-lg,
+  .ant-table .hide-lg,
+  .ant-table-cell.hide-lg,
+  th.hide-lg,
+  td.hide-lg {
+    display: none !important;
+  }
+
+  .responsive-table .ant-table-cell {
+    padding: 8px 6px !important;
+  }
+
+  .responsive-table .ant-table-thead > tr > th {
+    padding: 8px 6px !important;
+    font-size: 0.8rem !important;
+  }
+}
+
+/* =========================================
+   Dashboard collapsible section styling
+   ========================================= */
+
+/* Pending Closures collapse — yellow warning theme */
+.dashboard-collapse-pending .ant-collapse {
+  background: transparent;
+  border: none;
+}
+
+.dashboard-collapse-pending .ant-collapse-item {
+  border: 1px solid #ffd591 !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.dashboard-collapse-pending .ant-collapse-item > .ant-collapse-header {
+  background: #fffbe6 !important;
+  border-radius: 8px !important;
+  padding: clamp(10px, 2vw, 16px) clamp(12px, 2vw, 24px) !important;
+}
+
+.dashboard-collapse-pending .ant-collapse-item-active > .ant-collapse-header {
+  border-radius: 8px 8px 0 0 !important;
+}
+
+.dashboard-collapse-pending .ant-collapse-content {
+  background: #fffdf0;
+  border-top: 1px solid #ffd591;
+}
+
+.dashboard-collapse-pending .ant-collapse-content-box {
+  padding: 0 !important;
+}
+
+/* Manage Hearings collapse — purple theme */
+.dashboard-collapse-hearings .ant-collapse {
+  background: transparent;
+  border: none;
+}
+
+.dashboard-collapse-hearings .ant-collapse-item {
+  border: 1px solid #d3adf7 !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.dashboard-collapse-hearings .ant-collapse-item > .ant-collapse-header {
+  background: #f9f0ff !important;
+  border-radius: 8px !important;
+  padding: clamp(10px, 2vw, 16px) clamp(12px, 2vw, 24px) !important;
+}
+
+.dashboard-collapse-hearings .ant-collapse-item-active > .ant-collapse-header {
+  border-radius: 8px 8px 0 0 !important;
+}
+
+.dashboard-collapse-hearings .ant-collapse-content {
+  background: #fefcff;
+  border-top: 1px solid #d3adf7;
+}
+
+.dashboard-collapse-hearings .ant-collapse-content-box {
+  padding: 12px !important;
+}
+
+/* Responsive Collapse headers */
+@media (max-width: 576px) {
+  .dashboard-collapse-pending .ant-collapse-item > .ant-collapse-header,
+  .dashboard-collapse-hearings .ant-collapse-item > .ant-collapse-header {
+    padding: 8px 12px !important;
+  }
+
+  .dashboard-collapse-hearings .ant-collapse-content-box {
+    padding: 8px !important;
+  }
+}
