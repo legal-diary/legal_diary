@@ -15,6 +15,7 @@ import {
   Space,
   Popconfirm,
   Popover,
+  Collapse,
 } from 'antd';
 import {
   CalendarOutlined,
@@ -28,6 +29,7 @@ import {
   EyeOutlined,
   DownOutlined,
   UpOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -470,17 +472,6 @@ const TodayScheduleTable = React.memo<{
         ),
       },
       {
-        title: 'Next',
-        dataIndex: 'nextDate',
-        key: 'nextDate',
-        width: 90,
-        render: (date: string | null) => (
-          <Text type={date ? undefined : 'secondary'} style={{ color: date ? '#52c41a' : undefined, fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>
-            {date ? formatDate(date) : 'TBF'}
-          </Text>
-        ),
-      },
-      {
         title: 'Court',
         dataIndex: 'courtName',
         key: 'courtName',
@@ -829,89 +820,114 @@ export default function DashboardPage() {
           isValidating={isValidating}
         />
 
-        {/* Pending Closures - shown above today's schedule */}
-        {!swrLoading && (
-          <PendingClosuresSection
-            pendingClosures={pendingClosures}
-            onCloseHearing={handleCloseHearing}
-          />
-        )}
-
-        {/* Today's Schedule */}
+        {/* Today's Schedule - always visible, top priority */}
         <TodayScheduleTable hearings={todayHearings} totalCount={totalCount} loading={todayLoading} isMobile={isMobile} onCloseHearing={handleCloseHearing} />
 
-        {/* Divider */}
-        <Divider style={{ margin: '32px 0 24px' }} />
-
-        {/* Hearing Management Section */}
-        <SectionLoader loading={upcomingLoading} skeleton={<UpcomingHearingsSkeleton />}>
-          <Card
-            title={
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <ScheduleOutlined style={{ color: '#722ed1' }} />
-                <span>Manage Hearings</span>
-                <Tag color="purple">{upcomingHearings.length} upcoming</Tag>
-              </div>
-            }
-            extra={
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleAddHearing}>
-                Add New Hearing
-              </Button>
-            }
-          >
-            <Text type="secondary" style={{ display: 'block', marginBottom: '16px' }}>
-              Add new hearings or update existing ones. Click on any hearing to edit its details.
-            </Text>
-
-            {upcomingHearings.length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <div>
-                    <Text>No upcoming hearings scheduled</Text>
-                    <br />
-                    <Text type="secondary">Click &quot;Add New Hearing&quot; to schedule one</Text>
+        {/* Pending Closures - collapsible, collapsed by default */}
+        {!swrLoading && pendingClosures.length > 0 && (
+          <div className="dashboard-collapse-pending" style={{ marginTop: 24 }}>
+            <Collapse
+              items={[{
+                key: 'pending-closures',
+                label: (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <WarningOutlined style={{ color: '#faad14' }} />
+                    <span style={{ fontWeight: 500, fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>Pending Closures</span>
+                    <Badge count={pendingClosures.length} style={{ backgroundColor: '#faad14' }} />
                   </div>
-                }
-              />
-            ) : (
-              <Table
-                dataSource={upcomingHearings}
-                columns={upcomingColumns}
-                pagination={false}
-                rowKey="id"
-                size="small"
-                scroll={isMobile ? undefined : { x: 350 }}
-                className="responsive-table upcoming-table"
-                expandable={isMobile ? {
-                  expandIcon: ({ expanded, onExpand, record }: any) => (
-                    <span onClick={e => onExpand(record, e)} style={{ cursor: 'pointer', color: '#999', fontSize: 12 }}>
-                      {expanded ? <UpOutlined /> : <DownOutlined />}
-                    </span>
-                  ),
-                  expandedRowRender: (record: UpcomingHearing) => (
-                    <div className="expanded-row-content">
-                      <div className="expanded-row-grid">
-                        <div><Text type="secondary">Case:</Text> <Text strong>{record.Case?.caseTitle || 'Unknown'}</Text></div>
-                        <div><Text type="secondary">Stage:</Text> <Tag color="blue" style={{ fontSize: '0.7rem' }}>{STAGE_LABEL_MAP[record.hearingType] || record.hearingType.replace(/_/g, ' ')}</Tag></div>
-                        <div><Text type="secondary">Status:</Text> <Tag color={STATUS_COLORS[record.status] || 'default'} style={{ fontSize: '0.7rem' }}>{record.status}</Tag></div>
-                        <div><Text type="secondary">Court:</Text> <Text>{record.courtHall || '-'}</Text></div>
-                        {record.notes && <div style={{ gridColumn: '1 / -1' }}><Text type="secondary">Notes:</Text> <Text style={{ whiteSpace: 'pre-wrap' }}>{record.notes}</Text></div>}
-                      </div>
-                      <div className="expanded-row-actions">
-                        <Button size="small" icon={<EditOutlined />} onClick={() => handleEditHearing(record)}>Edit</Button>
-                        <Popconfirm title="Delete?" onConfirm={() => handleDeleteHearing(record.id)} okText="Yes" cancelText="No" okButtonProps={{ danger: true, size: 'small' }}>
-                          <Button size="small" danger icon={<DeleteOutlined />}>Delete</Button>
-                        </Popconfirm>
-                      </div>
-                    </div>
-                  ),
-                  rowExpandable: () => true,
-                } : undefined}
-              />
-            )}
-          </Card>
-        </SectionLoader>
+                ),
+                children: (
+                  <PendingClosuresSection
+                    pendingClosures={pendingClosures}
+                    onCloseHearing={handleCloseHearing}
+                  />
+                ),
+              }]}
+            />
+          </div>
+        )}
+
+        {/* Manage Hearings - collapsible, collapsed by default */}
+        <div className="dashboard-collapse-hearings" style={{ marginTop: 24 }}>
+          <SectionLoader loading={upcomingLoading} skeleton={<UpcomingHearingsSkeleton />}>
+            <Collapse
+              items={[{
+                key: 'manage-hearings',
+                label: (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
+                    <ScheduleOutlined style={{ color: '#722ed1' }} />
+                    <span style={{ fontWeight: 500, fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>Manage Hearings</span>
+                    <Tag color="purple">{upcomingHearings.length} upcoming</Tag>
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={(e) => { e.stopPropagation(); handleAddHearing(); }}
+                      size="small"
+                      style={{ marginLeft: 'auto' }}
+                    >
+                      Add New Hearing
+                    </Button>
+                  </div>
+                ),
+                children: (
+                  <div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: '16px', padding: '0 4px' }}>
+                      Add new hearings or update existing ones. Click on any hearing to edit its details.
+                    </Text>
+
+                    {upcomingHearings.length === 0 ? (
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description={
+                          <div>
+                            <Text>No upcoming hearings scheduled</Text>
+                            <br />
+                            <Text type="secondary">Click &quot;Add New Hearing&quot; to schedule one</Text>
+                          </div>
+                        }
+                      />
+                    ) : (
+                      <Table
+                        dataSource={upcomingHearings}
+                        columns={upcomingColumns}
+                        pagination={false}
+                        rowKey="id"
+                        size="small"
+                        scroll={isMobile ? undefined : { x: 350 }}
+                        className="responsive-table upcoming-table"
+                        expandable={isMobile ? {
+                          expandIcon: ({ expanded, onExpand, record }: any) => (
+                            <span onClick={e => onExpand(record, e)} style={{ cursor: 'pointer', color: '#999', fontSize: 12 }}>
+                              {expanded ? <UpOutlined /> : <DownOutlined />}
+                            </span>
+                          ),
+                          expandedRowRender: (record: UpcomingHearing) => (
+                            <div className="expanded-row-content">
+                              <div className="expanded-row-grid">
+                                <div><Text type="secondary">Case:</Text> <Text strong>{record.Case?.caseTitle || 'Unknown'}</Text></div>
+                                <div><Text type="secondary">Stage:</Text> <Tag color="blue" style={{ fontSize: '0.7rem' }}>{STAGE_LABEL_MAP[record.hearingType] || record.hearingType.replace(/_/g, ' ')}</Tag></div>
+                                <div><Text type="secondary">Status:</Text> <Tag color={STATUS_COLORS[record.status] || 'default'} style={{ fontSize: '0.7rem' }}>{record.status}</Tag></div>
+                                <div><Text type="secondary">Court:</Text> <Text>{record.courtHall || '-'}</Text></div>
+                                {record.notes && <div style={{ gridColumn: '1 / -1' }}><Text type="secondary">Notes:</Text> <Text style={{ whiteSpace: 'pre-wrap' }}>{record.notes}</Text></div>}
+                              </div>
+                              <div className="expanded-row-actions">
+                                <Button size="small" icon={<EditOutlined />} onClick={() => handleEditHearing(record)}>Edit</Button>
+                                <Popconfirm title="Delete?" onConfirm={() => handleDeleteHearing(record.id)} okText="Yes" cancelText="No" okButtonProps={{ danger: true, size: 'small' }}>
+                                  <Button size="small" danger icon={<DeleteOutlined />}>Delete</Button>
+                                </Popconfirm>
+                              </div>
+                            </div>
+                          ),
+                          rowExpandable: () => true,
+                        } : undefined}
+                      />
+                    )}
+                  </div>
+                ),
+              }]}
+            />
+          </SectionLoader>
+        </div>
 
         {/* Add/Edit Hearing Modal - Shared component */}
         <HearingFormModal
