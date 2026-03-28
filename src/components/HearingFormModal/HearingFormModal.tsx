@@ -77,11 +77,19 @@ export default function HearingFormModal({
       });
     } else {
       form.resetFields();
+      const fieldsToSet: Record<string, any> = {};
       if (initialDate) {
-        form.setFieldsValue({ hearingDate: initialDate });
+        fieldsToSet.hearingDate = initialDate;
+      }
+      // Auto-select case when only one option available
+      if (cases.length === 1) {
+        fieldsToSet.caseId = cases[0].id;
+      }
+      if (Object.keys(fieldsToSet).length > 0) {
+        form.setFieldsValue(fieldsToSet);
       }
     }
-  }, [open, editingHearing, initialDate, form]);
+  }, [open, editingHearing, initialDate, form, cases]);
 
   const handleSubmit = useCallback(
     async (values: any) => {
