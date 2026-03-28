@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
 
     // Execute all queries in parallel for maximum speed
-    const [todaysHearings, upcomingHearings, casesMinimal, pendingClosureHearings] = await Promise.all([
+    const [todaysHearings, upcomingHearings, casesMinimal, pendingClosureHearings, closedHearings] = await Promise.all([
       // Today's hearings with only necessary case fields
       prisma.hearing.findMany({
         where: {
@@ -153,6 +153,35 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { hearingDate: 'asc' },
       }),
+
+      // Closed hearings where hearingDate is within last 30 days
+      prisma.hearing.findMany({
+        where: {
+          status: 'CLOSED',
+          hearingDate: { gte: dayjs().tz(IST).subtract(30, 'day').startOf('day').toDate() },
+          Case: caseFilter,
+        },
+        select: {
+          id: true,
+          caseId: true,
+          hearingDate: true,
+          closedAt: true,
+          closureNote: true,
+          closedBy: {
+            select: { name: true },
+          },
+          Case: {
+            select: {
+              caseNumber: true,
+              caseTitle: true,
+              petitionerName: true,
+              respondentName: true,
+            },
+          },
+        },
+        orderBy: { hearingDate: 'desc' },
+        take: 50,
+      }),
     ]);
 
     // Lazy status update: mark overdue UPCOMING hearings as PENDING in the database
@@ -216,6 +245,7 @@ export async function GET(request: NextRequest) {
         previousDate: previousHearing?.hearingDate || null,
         currentDate: hearing.hearingDate,
         nextDate: nextHearing?.hearingDate || null,
+        status: hearing.status,
       };
     });
 
@@ -242,6 +272,7 @@ export async function GET(request: NextRequest) {
       cases: casesMinimal,
       pendingClosures: processedPendingClosures,
       totalPendingCount: processedPendingClosures.length,
+      closedHearings,
     };
 
     // Generate ETag from response content for conditional requests

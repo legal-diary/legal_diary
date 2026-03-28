@@ -15,6 +15,7 @@ interface DashboardResponse {
   cases: any[];
   pendingClosures: any[];
   totalPendingCount: number;
+  closedHearings: any[];
 }
 
 // ETag-aware fetcher: sends If-None-Match, returns cached data on 304

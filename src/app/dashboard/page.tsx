@@ -14,8 +14,9 @@ import {
   Divider,
   Space,
   Popconfirm,
-  Popover,
   Collapse,
+  Dropdown,
+  Modal,
 } from 'antd';
 import {
   CalendarOutlined,
@@ -31,6 +32,8 @@ import {
   WarningOutlined,
   BankOutlined,
   ExclamationCircleOutlined,
+  MoreOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -71,6 +74,7 @@ interface TodayHearing {
   previousDate: string | null;
   currentDate: string;
   nextDate: string | null;
+  status: string;
 }
 
 interface Case {
@@ -115,6 +119,21 @@ interface PendingClosure {
   };
 }
 
+interface ClosedHearing {
+  id: string;
+  caseId: string;
+  hearingDate: string;
+  closedAt: string;
+  closureNote: string | null;
+  closedBy: { name: string } | null;
+  Case: {
+    caseNumber: string;
+    caseTitle: string;
+    petitionerName: string;
+    respondentName: string;
+  };
+}
+
 interface DashboardResponse {
   date: string;
   todayHearings: {
@@ -125,6 +144,7 @@ interface DashboardResponse {
   cases: Case[];
   pendingClosures: PendingClosure[];
   totalPendingCount: number;
+  closedHearings: ClosedHearing[];
 }
 
 
@@ -366,6 +386,8 @@ const TodayScheduleTable = React.memo<{
   isMobile: boolean;
   onCloseHearing?: (hearing: any) => void;
 }>(({ hearings, totalCount, loading, isMobile, onCloseHearing }) => {
+  const [viewNotesHearing, setViewNotesHearing] = useState<TodayHearing | null>(null);
+
   const columns = useMemo(
     () => [
       {
@@ -413,7 +435,7 @@ const TodayScheduleTable = React.memo<{
         className: 'hide-on-mobile',
         render: (stage: string, record: TodayHearing) => (
           <div>
-            <Badge status={STAGE_COLORS[stage] as any} text={<span style={{ fontSize: 'clamp(0.7rem, 1.8vw, 0.85rem)' }}>{STAGE_LABELS[stage] || stage}</span>} />
+            <Badge color={record.status === 'CLOSED' ? '#faad14' : '#1890ff'} text={<span style={{ fontSize: 'clamp(0.7rem, 1.8vw, 0.85rem)' }}>{record.status === 'CLOSED' ? 'Closed' : 'Active'}</span>} />
             {record.hearingType && (
               <div>
                 <Text type="secondary" style={{ fontSize: '0.7rem' }}>
@@ -445,32 +467,56 @@ const TodayScheduleTable = React.memo<{
         ),
       },
       {
-        title: 'Notes',
-        dataIndex: 'notes',
-        key: 'notes',
-        width: 60,
+        title: '',
+        key: 'actions',
+        width: 50,
         className: 'hide-on-mobile',
-        render: (notes: string | null) =>
-          notes ? (
-            <Popover
-              content={<div style={{ maxWidth: 320, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>{notes}</div>}
-              title="Notes"
-              trigger="click"
-              placement="left"
-            >
-              <Button type="text" size="small" icon={<EyeOutlined />} style={{ color: '#1890ff' }} />
-            </Popover>
-          ) : (
-            <Text type="secondary">-</Text>
-          ),
+        render: (_: any, record: TodayHearing) => {
+          const menuItems = [
+            ...(record.status !== 'CLOSED' ? [{
+              key: 'close',
+              label: 'Close Hearing',
+              icon: <CheckCircleOutlined />,
+              onClick: () => onCloseHearing?.({
+                id: record.id,
+                caseId: record.caseId,
+                hearingDate: record.currentDate,
+                hearingType: record.hearingType,
+                courtHall: record.courtHall,
+                notes: record.notes,
+                status: 'UPCOMING',
+                Case: {
+                  id: record.caseId,
+                  caseNumber: record.caseNumber,
+                  caseTitle: record.caseTitle,
+                  petitionerName: '',
+                  respondentName: '',
+                  courtName: record.courtName,
+                },
+              }),
+            }] : []),
+            {
+              key: 'notes',
+              label: 'View Notes',
+              icon: <EyeOutlined />,
+              onClick: () => setViewNotesHearing(record),
+            },
+          ];
+          return (
+            <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+              <Button type="text" size="small" icon={<MoreOutlined style={{ fontSize: 16 }} />} />
+            </Dropdown>
+          );
+        },
       },
     ],
-    [isMobile]
+    [isMobile, onCloseHearing]
   );
 
   if (loading) return <TodayScheduleSkeleton />;
 
   return (
+    <>
     <Card
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -561,6 +607,22 @@ const TodayScheduleTable = React.memo<{
         />
       )}
     </Card>
+
+    <Modal
+      title={<span style={{ color: '#1a3a52', fontWeight: 600 }}>Notes</span>}
+      open={!!viewNotesHearing}
+      onCancel={() => setViewNotesHearing(null)}
+      footer={null}
+      width={480}
+      destroyOnClose
+    >
+      {viewNotesHearing && (
+        <div style={{ whiteSpace: 'pre-wrap', maxHeight: 300, overflow: 'auto', fontSize: '0.9rem', padding: '8px 0' }}>
+          {viewNotesHearing.notes || 'No notes'}
+        </div>
+      )}
+    </Modal>
+    </>
   );
 });
 
@@ -600,6 +662,7 @@ export default function DashboardPage() {
   const cases = dashboardData?.cases ?? [];
   const upcomingHearings = dashboardData?.upcomingHearings ?? [];
   const pendingClosures = dashboardData?.pendingClosures ?? [];
+  const closedHearings = dashboardData?.closedHearings ?? [];
 
   // Loading states: only true on first load (SWR shows cached data after that)
   const headerLoading = swrLoading;
@@ -772,6 +835,71 @@ export default function DashboardPage() {
     [isMobile, handleEditHearing, handleDeleteHearing]
   );
 
+  // Hearing history columns (compact view)
+  const historyColumns = useMemo(
+    () => [
+      {
+        title: 'Case No.',
+        key: 'caseNumber',
+        width: 120,
+        render: (_: any, record: ClosedHearing) => (
+          <Link href={`/cases/${record.caseId}`} style={{ color: '#1890ff', fontWeight: 500, fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>
+            {record.Case.caseNumber}
+          </Link>
+        ),
+      },
+      {
+        title: 'Party',
+        key: 'party',
+        width: 140,
+        ellipsis: true,
+        className: 'hide-on-mobile',
+        render: (_: any, record: ClosedHearing) => (
+          <Text style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>
+            {record.Case.caseTitle}
+          </Text>
+        ),
+      },
+      {
+        title: 'Hearing Date',
+        dataIndex: 'hearingDate',
+        key: 'hearingDate',
+        width: 95,
+        render: (date: string) => (
+          <Text style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>{formatDate(date)}</Text>
+        ),
+      },
+      {
+        title: 'Closed',
+        dataIndex: 'closedAt',
+        key: 'closedAt',
+        width: 95,
+        className: 'hide-on-mobile',
+        render: (date: string) => (
+          <Text type="secondary" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>{formatDate(date)}</Text>
+        ),
+      },
+      {
+        title: 'Closure Note',
+        key: 'closureNote',
+        ellipsis: true,
+        render: (_: any, record: ClosedHearing) => (
+          <div>
+            <Text style={{ fontSize: 'clamp(0.75rem, 2vw, 0.85rem)' }}>{record.closureNote || '-'}</Text>
+            {record.closedBy?.name && (
+              <div>
+                <Text type="secondary" style={{ fontSize: '0.7rem' }}>
+                  Closed by: {record.closedBy.name}
+                </Text>
+              </div>
+            )}
+          </div>
+        ),
+      },
+    ],
+    []
+  );
+
   return (
     <ProtectedRoute>
       <DashboardLayout>
@@ -896,6 +1024,36 @@ export default function DashboardPage() {
             />
           </SectionLoader>
         </div>
+
+        {/* Hearing History - collapsible, collapsed by default */}
+        {!swrLoading && closedHearings.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <Collapse
+              items={[{
+                key: 'hearing-history',
+                label: (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <HistoryOutlined style={{ color: '#1a3a52' }} />
+                    <span style={{ fontWeight: 500, fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>Hearing History</span>
+                    <Tag color="default">{closedHearings.length} closed (30 days)</Tag>
+                  </div>
+                ),
+                children: (
+                  <Table
+                    dataSource={closedHearings}
+                    columns={historyColumns}
+                    pagination={false}
+                    rowKey="id"
+                    size="small"
+                    scroll={isMobile ? undefined : { x: 500 }}
+                    rowClassName={(_, index) => (index % 2 === 0 ? 'table-row-light' : 'table-row-dark')}
+                    className="responsive-table"
+                  />
+                ),
+              }]}
+            />
+          </div>
+        )}
 
         {/* Add/Edit Hearing Modal - Shared component */}
         <HearingFormModal

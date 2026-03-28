@@ -52,7 +52,8 @@ import { useParams, useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import Link from 'next/link';
 import { CaseDetailSkeleton, shimmerStyles, SectionLoader } from '@/components/Skeletons';
-import { STAGE_OPTIONS, STAGE_LABEL_MAP } from '@/lib/constants';
+import { STAGE_LABEL_MAP } from '@/lib/constants';
+import HearingFormModal from '@/components/HearingFormModal/HearingFormModal';
 
 // Lazy load Modal to reduce initial bundle
 const Modal = lazy(() => import('antd').then(mod => ({ default: mod.Modal })));
@@ -135,7 +136,6 @@ export default function CaseDetailPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -145,8 +145,7 @@ export default function CaseDetailPage() {
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [cameraModalOpen, setCameraModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [hearingSubmitting, setHearingSubmitting] = useState(false);
-  const [editingHearingId, setEditingHearingId] = useState<string | null>(null);
+  const [editingHearing, setEditingHearing] = useState<any>(null);
   const [hearingDeleting, setHearingDeleting] = useState(false);
   const [courtTypes, setCourtTypes] = useState<CourtTypeOption[]>([]);
   const [newCourtName, setNewCourtName] = useState('');
@@ -320,52 +319,18 @@ export default function CaseDetailPage() {
     }
   }, [uploadedFiles, caseId, token, fetchCaseDetail]);
 
-  const handleHearingSubmit = useCallback(async (values: any) => {
-    setHearingSubmitting(true);
-    try {
-      const isEditing = !!editingHearingId;
-      const url = isEditing ? `/api/hearings/${editingHearingId}` : '/api/hearings';
-      const method = isEditing ? 'PUT' : 'POST';
-
-      const payload: any = {
-        hearingDate: values.hearingDate.toISOString(),
-        hearingType: values.hearingType,
-        courtHall: values.courtHall,
-      };
-      if (!isEditing) payload.caseId = caseId;
-
-      const response = await fetch(url, {
-        method,
-        headers: authHeaders(token),
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        message.success(isEditing ? 'Hearing updated' : 'Hearing scheduled');
-        setHearingModalOpen(false);
-        setEditingHearingId(null);
-        form.resetFields();
-        fetchCaseDetail();
-      } else {
-        const error = await response.json();
-        message.error(error.error || 'Failed to save hearing');
-      }
-    } catch {
-      message.error('Failed to save hearing');
-    } finally {
-      setHearingSubmitting(false);
-    }
-  }, [caseId, token, form, fetchCaseDetail, editingHearingId]);
-
   const handleEditHearingInCase = useCallback((hearing: any) => {
-    setEditingHearingId(hearing.id);
-    form.setFieldsValue({
-      hearingDate: dayjs(hearing.hearingDate),
+    setEditingHearing({
+      id: hearing.id,
+      caseId: caseId,
+      hearingDate: hearing.hearingDate,
       hearingType: hearing.hearingType,
       courtHall: hearing.courtHall || '',
+      notes: hearing.notes,
+      status: hearing.status,
     });
     setHearingModalOpen(true);
-  }, [form]);
+  }, [caseId]);
 
   const handleDeleteHearingInCase = useCallback(async (hearingId: string) => {
     setHearingDeleting(true);
@@ -1346,45 +1311,15 @@ export default function CaseDetailPage() {
         </Suspense>
       )}
 
-      {hearingModalOpen && (
-        <Suspense fallback={null}>
-          <Modal
-            title={editingHearingId ? "Edit Hearing" : "Schedule Hearing"}
-            open={hearingModalOpen}
-            onCancel={() => { setHearingModalOpen(false); setEditingHearingId(null); form.resetFields(); }}
-            footer={null}
-            destroyOnClose
-          >
-            <Form form={form} onFinish={handleHearingSubmit} layout="vertical">
-              <Form.Item name="hearingDate" label="Hearing Date" rules={[{ required: true }]}>
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
-              <Form.Item name="hearingType" label="Stage" rules={[{ required: true, message: 'Please select a stage' }]}>
-                <Select showSearch optionFilterProp="children" placeholder="Select a stage">
-                  {STAGE_OPTIONS.map((type) => (
-                    <Select.Option key={type.value} value={type.value}>{type.label}</Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-              <Form.Item name="courtHall" label="Court Hall" rules={[{ required: true, message: 'Please enter court hall' }]}>
-                <Input placeholder="e.g., Court Hall 5" />
-              </Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                block
-                loading={hearingSubmitting}
-                disabled={hearingSubmitting}
-              >
-                {hearingSubmitting
-                  ? (editingHearingId ? 'Updating...' : 'Scheduling...')
-                  : (editingHearingId ? 'Update Hearing' : 'Schedule Hearing')
-                }
-              </Button>
-            </Form>
-          </Modal>
-        </Suspense>
-      )}
+      <HearingFormModal
+        open={hearingModalOpen}
+        onClose={() => { setHearingModalOpen(false); setEditingHearing(null); }}
+        onSuccess={() => { setHearingModalOpen(false); setEditingHearing(null); fetchCaseDetail(); }}
+        cases={caseData ? [{ id: caseData.id, caseNumber: caseData.caseNumber, caseTitle: caseData.caseTitle }] : []}
+        token={token}
+        editingHearing={editingHearing}
+        showStatus={true}
+      />
 
       {editModalOpen && (
         <Suspense fallback={null}>
