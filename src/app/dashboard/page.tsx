@@ -19,7 +19,6 @@ import {
 } from 'antd';
 import {
   CalendarOutlined,
-  FileTextOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
   PlusOutlined,
@@ -30,6 +29,8 @@ import {
   DownOutlined,
   UpOutlined,
   WarningOutlined,
+  BankOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -165,7 +166,8 @@ const DashboardHeader = React.memo<{
   lastUpdated: Date | null;
   isPolling: boolean;
   isValidating: boolean;
-}>(({ totalCount, pendingCount, loading, lastUpdated, isPolling, isValidating }) => {
+  onPendingClick?: () => void;
+}>(({ totalCount, pendingCount, loading, lastUpdated, isPolling, isValidating, onPendingClick }) => {
   const todayFormatted = useMemo(() => dayjs().format('dddd, DD MMMM YYYY'), []);
   const todayFormattedMobile = useMemo(() => dayjs().format('ddd, DD MMM'), []);
 
@@ -181,127 +183,125 @@ const DashboardHeader = React.memo<{
 
   return (
     <div className="dashboard-header">
-      <div className="dashboard-header-content">
-        <div className="dashboard-header-left">
-          <CalendarOutlined className="dashboard-header-icon" />
-          <div>
-            <Text className="dashboard-header-label">
-              Legal Referencer
-            </Text>
-            <Title level={2} className="dashboard-header-date desktop-date">
-              {todayFormatted}
-            </Title>
-            <Title level={3} className="dashboard-header-date mobile-date">
-              {todayFormattedMobile}
-            </Title>
-          </div>
-        </div>
-
-        <div className="dashboard-header-right">
-          <div className="dashboard-header-stats">
-            <div className="dashboard-stat-item">
-              <div className="dashboard-stat-icon">
-                <FileTextOutlined />
-              </div>
-              <Text className="dashboard-stat-value">
-                {totalCount}
-              </Text>
-              <Text className="dashboard-stat-label">
-                Today&apos;s Matters
-              </Text>
-            </div>
-            {pendingCount > 0 && (
-              <div className="dashboard-stat-item">
-                <div className="dashboard-stat-icon" style={{ background: 'rgba(250, 173, 20, 0.2)' }}>
-                  <ClockCircleOutlined style={{ color: '#faad14' }} />
-                </div>
-                <Text className="dashboard-stat-value" style={{ color: '#faad14' }}>
-                  {pendingCount}
-                </Text>
-                <Text className="dashboard-stat-label">
-                  Pending Closures
-                </Text>
-              </div>
-            )}
-          </div>
-
-          {isPolling && lastUpdated && (
-            <div className="live-indicator">
-              <span className={`live-dot${isValidating ? ' pulsing' : ''}`} />
-              <Text className="live-text">
-                {isValidating ? 'Updating...' : `Updated ${dayjs(lastUpdated).fromNow()}`}
-              </Text>
-            </div>
-          )}
-        </div>
+      {/* Date */}
+      <div className="header-date desktop-date">
+        <CalendarOutlined className="header-date-icon" />
+        <span>{todayFormatted}</span>
       </div>
+      <div className="header-date mobile-date">
+        <CalendarOutlined className="header-date-icon" />
+        <span>{todayFormattedMobile}</span>
+      </div>
+
+      {/* Stats */}
+      <div className="header-stats">
+        <div className="header-stat">
+          <BankOutlined className="header-stat-icon" />
+          <span className="header-stat-count">{totalCount}</span>
+        </div>
+
+        {pendingCount > 0 && (
+          <div className="header-stat header-stat-pending" onClick={onPendingClick} role="button" tabIndex={0}>
+            <ExclamationCircleOutlined className="header-stat-icon-pending" />
+            <span className="header-stat-count-pending">{pendingCount}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Live indicator */}
+      {isPolling && lastUpdated && (
+        <div className="header-live">
+          <span className={`live-dot${isValidating ? ' pulsing' : ''}`} />
+        </div>
+      )}
 
       <style jsx>{`
         .dashboard-header {
-          margin-bottom: 24px;
+          margin-bottom: 12px;
           background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-          padding: clamp(16px, 4vw, 32px);
-          border-radius: 12px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        .dashboard-header-content {
+          padding: 10px 20px;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.12);
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 16px;
+          gap: clamp(12px, 3vw, 24px);
         }
 
-        .dashboard-header-left {
+        .header-date {
           display: flex;
           align-items: center;
-          gap: clamp(8px, 2vw, 16px);
-        }
-
-        :global(.dashboard-header-icon) {
-          font-size: clamp(24px, 5vw, 36px) !important;
-          color: #4fd1c5;
-        }
-
-        :global(.dashboard-header-label) {
-          color: #a0aec0;
-          font-size: clamp(11px, 2vw, 14px);
-          display: block;
-        }
-
-        :global(.dashboard-header-date) {
-          margin: 0 !important;
-          color: #fff !important;
-          font-weight: 600 !important;
-        }
-
-        :global(.desktop-date) {
-          display: block;
-          font-size: clamp(1.2rem, 3vw, 1.8rem) !important;
-        }
-
-        :global(.mobile-date) {
-          display: none;
-          font-size: 1.1rem !important;
-        }
-
-        .dashboard-header-right {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
           gap: 8px;
+          color: #fff;
+          font-weight: 600;
+          font-size: clamp(0.85rem, 2.5vw, 1.05rem);
+          white-space: nowrap;
         }
 
-        .dashboard-header-stats {
+        :global(.header-date-icon) {
+          color: #4fd1c5 !important;
+          font-size: clamp(14px, 2.5vw, 18px) !important;
+        }
+
+        .desktop-date {
           display: flex;
-          gap: 24px;
         }
 
-        .live-indicator {
+        .mobile-date {
+          display: none;
+        }
+
+        .header-stats {
+          display: flex;
+          align-items: center;
+          gap: clamp(10px, 2vw, 16px);
+          margin-left: auto;
+        }
+
+        .header-stat {
           display: flex;
           align-items: center;
           gap: 6px;
+          background: rgba(79, 209, 197, 0.15);
+          padding: 4px 12px;
+          border-radius: 16px;
+        }
+
+        :global(.header-stat-icon) {
+          color: #4fd1c5 !important;
+          font-size: clamp(13px, 2vw, 16px) !important;
+        }
+
+        .header-stat-count {
+          color: #fff;
+          font-weight: 600;
+          font-size: clamp(0.8rem, 2vw, 0.95rem);
+        }
+
+        .header-stat-pending {
+          background: rgba(250, 173, 20, 0.15);
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+
+        .header-stat-pending:hover {
+          background: rgba(250, 173, 20, 0.3);
+        }
+
+        :global(.header-stat-icon-pending) {
+          color: #faad14 !important;
+          font-size: clamp(13px, 2vw, 16px) !important;
+        }
+
+        .header-stat-count-pending {
+          color: #faad14;
+          font-weight: 600;
+          font-size: clamp(0.8rem, 2vw, 0.95rem);
+        }
+
+        .header-live {
+          display: flex;
+          align-items: center;
+          flex-shrink: 0;
         }
 
         .live-dot {
@@ -310,7 +310,6 @@ const DashboardHeader = React.memo<{
           border-radius: 50%;
           background: #52c41a;
           display: inline-block;
-          flex-shrink: 0;
         }
 
         .live-dot.pulsing {
@@ -322,80 +321,34 @@ const DashboardHeader = React.memo<{
           50% { opacity: 0.4; transform: scale(0.8); }
         }
 
-        :global(.live-text) {
-          color: #a0aec0;
-          font-size: clamp(10px, 1.5vw, 12px);
-        }
-
-        .dashboard-stat-item {
-          text-align: center;
-        }
-
-        .dashboard-stat-icon {
-          background: rgba(79, 209, 197, 0.2);
-          border-radius: 50%;
-          width: clamp(36px, 8vw, 48px);
-          height: clamp(36px, 8vw, 48px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto 8px;
-        }
-
-        :global(.dashboard-stat-icon .anticon) {
-          font-size: clamp(18px, 4vw, 24px);
-          color: #4fd1c5;
-        }
-
-        :global(.dashboard-stat-value) {
-          color: #fff;
-          font-size: clamp(18px, 4vw, 24px) !important;
-          font-weight: 600;
-          display: block;
-        }
-
-        :global(.dashboard-stat-label) {
-          color: #a0aec0;
-          font-size: clamp(10px, 2vw, 12px);
-        }
-
         @media (max-width: 768px) {
           .dashboard-header {
-            padding: 16px;
-            border-radius: 8px;
+            padding: 8px 14px;
+            gap: 10px;
           }
 
-          .dashboard-header-content {
-            flex-direction: column;
-            align-items: flex-start;
+          .desktop-date {
+            display: none;
           }
 
-          .dashboard-header-right {
-            width: 100%;
-            align-items: flex-start;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255,255,255,0.1);
+          .mobile-date {
+            display: flex;
           }
 
-          .dashboard-header-stats {
-            width: 100%;
-            justify-content: flex-start;
-          }
-
-          :global(.desktop-date) {
-            display: none !important;
-          }
-
-          :global(.mobile-date) {
-            display: block !important;
+          .header-stat {
+            padding: 3px 8px;
           }
         }
 
-        @media (max-width: 576px) {
+        @media (max-width: 480px) {
           .dashboard-header {
-            padding: 12px;
-            margin-bottom: 16px;
+            padding: 7px 10px;
+            gap: 8px;
+          }
+
+          .header-stat {
+            padding: 2px 6px;
+            gap: 4px;
           }
         }
       `}</style>
@@ -535,7 +488,7 @@ const TodayScheduleTable = React.memo<{
           View Full Calendar
         </Link>
       }
-      styles={{ body: { padding: 0 } }}
+      styles={{ body: { padding: 0, minHeight: '60vh' } }}
     >
       {hearings.length === 0 ? (
         <div style={{ padding: '48px 24px' }}>
@@ -658,6 +611,18 @@ export default function DashboardPage() {
   const [editingHearing, setEditingHearing] = useState<UpcomingHearing | null>(null);
   const [closureModalOpen, setClosureModalOpen] = useState(false);
   const [closingHearing, setClosingHearing] = useState<PendingClosure | null>(null);
+
+  // Pending closures collapse state
+  const [pendingCollapseKey, setPendingCollapseKey] = useState<string[]>([]);
+  const pendingRef = useRef<HTMLDivElement>(null);
+
+  const handlePendingClick = useCallback(() => {
+    setPendingCollapseKey(['pending-closures']);
+    // Wait for Ant Design Collapse expand animation (~300ms) to finish before scrolling
+    setTimeout(() => {
+      pendingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 250);
+  }, []);
 
   // Memoized handlers
   const handleAddHearing = useCallback(() => {
@@ -818,6 +783,7 @@ export default function DashboardPage() {
           lastUpdated={lastUpdated}
           isPolling={isPolling}
           isValidating={isValidating}
+          onPendingClick={handlePendingClick}
         />
 
         {/* Today's Schedule - always visible, top priority */}
@@ -825,8 +791,10 @@ export default function DashboardPage() {
 
         {/* Pending Closures - collapsible, collapsed by default */}
         {!swrLoading && pendingClosures.length > 0 && (
-          <div className="dashboard-collapse-pending" style={{ marginTop: 24 }}>
+          <div className="dashboard-collapse-pending" style={{ marginTop: 24 }} ref={pendingRef}>
             <Collapse
+              activeKey={pendingCollapseKey}
+              onChange={(keys) => setPendingCollapseKey(Array.isArray(keys) ? keys as string[] : [keys as string])}
               items={[{
                 key: 'pending-closures',
                 label: (
