@@ -232,6 +232,13 @@ export default function CasesPage() {
       filtered = filtered.filter((c) => c.priority === priorityFilter);
     }
 
+    // Sort so closed cases always appear at the end
+    filtered.sort((a, b) => {
+      const aClosed = a.status === 'CLOSED' ? 1 : 0;
+      const bClosed = b.status === 'CLOSED' ? 1 : 0;
+      return aClosed - bClosed;
+    });
+
     return filtered;
   }, [cases, searchText, statusFilter, priorityFilter]);
 
