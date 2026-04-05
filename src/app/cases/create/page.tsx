@@ -17,7 +17,7 @@ import {
 import { UploadOutlined, CameraOutlined, PlusOutlined, UserOutlined, CheckCircleFilled } from '@ant-design/icons';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
-import { apiHeaders, authHeaders } from '@/lib/apiClient';
+import { authHeaders } from '@/lib/apiClient';
 import { useRouter } from 'next/navigation';
 import CameraCapture from '@/components/CameraCapture';
 
@@ -130,7 +130,7 @@ export default function CreateCasePage() {
 
         const uploadResponse = await fetch(`/api/cases/${caseData.id}/upload`, {
           method: 'POST',
-          headers: { ...apiHeaders(), Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}` },
           body: formData,
         });
 
@@ -147,7 +147,7 @@ export default function CreateCasePage() {
 
         const scanResponse = await fetch(`/api/cases/${caseData.id}/upload-images`, {
           method: 'POST',
-          headers: { ...apiHeaders(), Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}` },
           body: imageFormData,
         });
 
