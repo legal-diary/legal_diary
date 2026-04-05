@@ -47,7 +47,7 @@ import CloseCaseModal from '@/components/Cases/CloseCaseModal';
 import DocumentViewer from '@/components/Documents/DocumentViewer';
 import CameraCapture from '@/components/CameraCapture';
 import { useAuth } from '@/context/AuthContext';
-import { apiHeaders, authHeaders } from '@/lib/apiClient';
+import { authHeaders } from '@/lib/apiClient';
 import { useParams, useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import Link from 'next/link';
@@ -298,7 +298,7 @@ export default function CaseDetailPage() {
 
       const response = await fetch(`/api/cases/${caseId}/upload`, {
         method: 'POST',
-        headers: { ...apiHeaders(), Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
