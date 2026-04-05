@@ -276,6 +276,25 @@ export default function CaseDetailPage() {
     }
   }, [token]);
 
+  // Delete document from Supabase storage and database
+  const handleDeleteDocument = useCallback(async (docId: string) => {
+    try {
+      const response = await fetch(`/api/documents/${docId}`, {
+        method: 'DELETE',
+        headers: authHeaders(token),
+      });
+      if (response.ok) {
+        message.success('Document deleted');
+        fetchCaseDetail();
+      } else {
+        const error = await response.json();
+        message.error(error.error || 'Failed to delete document');
+      }
+    } catch {
+      message.error('Failed to delete document');
+    }
+  }, [token, fetchCaseDetail]);
+
   const handleFileUpload = useCallback((info: any) => {
     const fileList = info.fileList
       .filter((file: any) => file.originFileObj)
@@ -548,10 +567,29 @@ export default function CaseDetailPage() {
           >
             Download
           </Button>
+          {!record.isFinalOrder && !(caseData?.status === 'CLOSED' && !isAdmin) && (
+            <Popconfirm
+              title="Delete this document?"
+              description="This action cannot be undone."
+              onConfirm={() => handleDeleteDocument(record.id)}
+              okText="Yes"
+              cancelText="No"
+              okButtonProps={{ danger: true }}
+            >
+              <Button
+                icon={<DeleteOutlined />}
+                size="small"
+                type="link"
+                danger
+              >
+                Delete
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
-  ], [handleViewDocument, handleDownloadDocument]);
+  ], [handleViewDocument, handleDownloadDocument, handleDeleteDocument, isAdmin, caseData?.status]);
 
   // AI dropdown menu items
   const aiMenuItems: MenuProps['items'] = useMemo(() => [
@@ -808,6 +846,24 @@ export default function CaseDetailPage() {
                                 >
                                   Download
                                 </Button>
+                                {!doc.isFinalOrder && !(caseData?.status === 'CLOSED' && !isAdmin) && (
+                                  <Popconfirm
+                                    title="Delete this document?"
+                                    description="This action cannot be undone."
+                                    onConfirm={() => handleDeleteDocument(doc.id)}
+                                    okText="Yes"
+                                    cancelText="No"
+                                    okButtonProps={{ danger: true }}
+                                  >
+                                    <Button
+                                      icon={<DeleteOutlined />}
+                                      size="small"
+                                      danger
+                                    >
+                                      Delete
+                                    </Button>
+                                  </Popconfirm>
+                                )}
                               </Space>
                             </div>
                           </div>
