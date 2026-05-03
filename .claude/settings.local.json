@@ -28,7 +28,8 @@
       "Bash(npx next build)",
       "Bash(cd:*)",
       "Bash(find 'C:\\\\coding\\\\Legal Diary\\\\legal-diary' -type f -name *hearing* -o -name *Hearing*)",
-      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "PowerShell(Get-NetTCPConnection *)"
     ],
     "deny": [],
     "ask": []

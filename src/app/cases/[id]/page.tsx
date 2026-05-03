@@ -43,6 +43,7 @@ import { Dropdown, MenuProps } from 'antd';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import AIAnalysisTab from '@/components/Cases/AIAnalysisTab';
 import CaseAssignment from '@/components/Cases/CaseAssignment';
+import CaseNotes from '@/components/Cases/CaseNotes';
 import CloseCaseModal from '@/components/Cases/CloseCaseModal';
 import DocumentViewer from '@/components/Documents/DocumentViewer';
 import CameraCapture from '@/components/CameraCapture';
@@ -89,6 +90,8 @@ interface Case {
   status: string;
   priority: string;
   description?: string;
+  tasks?: string | null;
+  closureReason?: string | null;
   courtName?: string;
   courtHall?: string;
   courtTypeId?: string;
@@ -130,6 +133,14 @@ export default function CaseDetailPage() {
 
   // State
   const [caseData, setCaseData] = useState<Case | null>(null);
+  // Read access is firm-wide; write requires the user to be assigned (or admin).
+  // Derived after caseData loads.
+  const isAssigned = useMemo(
+    () => !!caseData?.assignments?.some((a) => a.userId === user?.id),
+    [caseData, user?.id]
+  );
+  const canWrite = isAdmin || isAssigned;
+  const isClosed = caseData?.status === 'CLOSED';
   const [loading, setLoading] = useState(true);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [hearingModalOpen, setHearingModalOpen] = useState(false);
@@ -393,6 +404,7 @@ export default function CaseDetailPage() {
         courtHall: caseData.courtHall,
         judgeAssigned: caseData.judgeAssigned,
         description: caseData.description,
+        tasks: caseData.tasks,
       });
       setEditModalOpen(true);
     }
@@ -497,7 +509,7 @@ export default function CaseDetailPage() {
       key: 'status',
       render: (status: string) => <Tag color="green">{status}</Tag>,
     },
-    ...(isAdmin && caseData?.status !== 'CLOSED' ? [{
+    ...(canWrite && caseData?.status !== 'CLOSED' ? [{
       title: '',
       key: 'actions',
       width: 80,
@@ -509,19 +521,23 @@ export default function CaseDetailPage() {
             icon={<EditOutlined style={{ fontSize: '14px' }} />}
             onClick={() => handleEditHearingInCase(record)}
           />
-          <Popconfirm
-            title="Delete this hearing?"
-            onConfirm={() => handleDeleteHearingInCase(record.id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{ danger: true, size: 'small' }}
-          >
-            <Button type="text" size="small" danger icon={<DeleteOutlined style={{ fontSize: '14px' }} />} />
-          </Popconfirm>
+          {/* Hearing deletion is admin-only — advocates can edit/close but
+              cannot remove the row */}
+          {isAdmin && (
+            <Popconfirm
+              title="Delete this hearing?"
+              onConfirm={() => handleDeleteHearingInCase(record.id)}
+              okText="Yes"
+              cancelText="No"
+              okButtonProps={{ danger: true, size: 'small' }}
+            >
+              <Button type="text" size="small" danger icon={<DeleteOutlined style={{ fontSize: '14px' }} />} />
+            </Popconfirm>
+          )}
         </Space>
       ),
     }] : []),
-  ], [isAdmin, caseData?.status, handleEditHearingInCase, handleDeleteHearingInCase]);
+  ], [canWrite, isAdmin, caseData?.status, handleEditHearingInCase, handleDeleteHearingInCase]);
 
   const fileColumns = useMemo(() => [
     {
@@ -567,7 +583,8 @@ export default function CaseDetailPage() {
           >
             Download
           </Button>
-          {!record.isFinalOrder && !(caseData?.status === 'CLOSED' && !isAdmin) && (
+          {/* Document deletion is admin-only — advocates can upload but not remove */}
+          {!record.isFinalOrder && isAdmin && (
             <Popconfirm
               title="Delete this document?"
               description="This action cannot be undone."
@@ -589,7 +606,7 @@ export default function CaseDetailPage() {
         </Space>
       ),
     },
-  ], [handleViewDocument, handleDownloadDocument, handleDeleteDocument, isAdmin, caseData?.status]);
+  ], [handleViewDocument, handleDownloadDocument, handleDeleteDocument, canWrite, isAdmin, caseData?.status]);
 
   // AI dropdown menu items
   const aiMenuItems: MenuProps['items'] = useMemo(() => [
@@ -715,6 +732,12 @@ export default function CaseDetailPage() {
               </Card>
             )}
 
+            {caseData.tasks && (
+              <Card title="Tasks" style={{ marginTop: '2vh' }}>
+                <p style={{ fontSize: 'clamp(0.9rem, 2vw, 1rem)', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{caseData.tasks}</p>
+              </Card>
+            )}
+
             {caseData.AISummary && (
               <Card title="AI Summary & Insights" style={{ marginTop: '2vh' }}>
                 <Card.Meta title="Summary" description={caseData.AISummary.summary} style={{ marginBottom: '1.5vh' }} />
@@ -757,7 +780,7 @@ export default function CaseDetailPage() {
         children: (
           <Card
             extra={
-              caseData.status !== 'CLOSED' ? (
+              caseData.status !== 'CLOSED' && canWrite ? (
                 <Button type="primary" icon={<PlusOutlined />} onClick={() => setHearingModalOpen(true)}>
                   Schedule Hearing
                 </Button>
@@ -778,7 +801,7 @@ export default function CaseDetailPage() {
         children: (
           <Card
             extra={
-              caseData.status !== 'CLOSED' ? (
+              caseData.status !== 'CLOSED' && canWrite ? (
                 <Space wrap>
                   <Button type="primary" icon={<UploadOutlined />} onClick={() => setUploadModalOpen(true)}>
                     Upload
@@ -846,7 +869,8 @@ export default function CaseDetailPage() {
                                 >
                                   Download
                                 </Button>
-                                {!doc.isFinalOrder && !(caseData?.status === 'CLOSED' && !isAdmin) && (
+                                {/* Document deletion is admin-only */}
+                                {!doc.isFinalOrder && isAdmin && (
                                   <Popconfirm
                                     title="Delete this document?"
                                     description="This action cannot be undone."
@@ -880,6 +904,19 @@ export default function CaseDetailPage() {
         ),
       },
       {
+        key: 'notes',
+        label: 'Notes',
+        children: (
+          <CaseNotes
+            caseId={caseId}
+            token={token || ''}
+            isAdmin={isAdmin}
+            canWrite={canWrite}
+            currentUserId={user?.id || ''}
+          />
+        ),
+      },
+      {
         key: 'ai-analysis',
         label: 'AI Analysis',
         children: (
@@ -889,12 +926,13 @@ export default function CaseDetailPage() {
             aiSummary={caseData.AISummary}
             fileDocuments={caseData.FileDocument || []}
             token={token || ''}
+            canWrite={canWrite}
             onAnalysisComplete={fetchCaseDetail}
           />
         ),
       },
     ];
-  }, [caseData, caseId, token, hearingColumns, fileColumns, fetchCaseDetail, isAdmin]);
+  }, [caseData, caseId, token, hearingColumns, fileColumns, fetchCaseDetail, isAdmin, canWrite, user?.id]);
 
   // Loading state
   if (loading) {
@@ -920,10 +958,10 @@ export default function CaseDetailPage() {
       {/* Header */}
       <div className="case-detail-header">
         <Card>
-          {caseData.status === 'CLOSED' && (
+          {!canWrite && caseData.status !== 'CLOSED' && (
             <div style={{
-              background: '#f5f5f5',
-              border: '1px solid #d9d9d9',
+              background: '#fff7e6',
+              border: '1px solid #ffd591',
               borderRadius: '8px',
               padding: '10px 16px',
               marginBottom: '16px',
@@ -932,27 +970,60 @@ export default function CaseDetailPage() {
               gap: '10px',
               flexWrap: 'wrap',
             }}>
-              <LockOutlined style={{ fontSize: '18px', color: '#8c8c8c' }} />
-              <span style={{ fontWeight: 600, color: '#595959', fontSize: 'clamp(0.8rem, 2vw, 0.95rem)', flex: 1 }}>
-                This case is closed. No edits, hearings, or uploads are allowed.
+              <EyeOutlined style={{ fontSize: '18px', color: '#fa8c16' }} />
+              <span style={{ fontWeight: 600, color: '#874d00', fontSize: 'clamp(0.8rem, 2vw, 0.95rem)' }}>
+                Read-only view — you aren&apos;t assigned to this case. Ask an admin to assign you if you need to make changes.
               </span>
-              {isAdmin && (
-                <Popconfirm
-                  title="Re-open this case?"
-                  description="The case will return to Active status. All existing data will be preserved."
-                  onConfirm={handleReopenCase}
-                  okText="Re-open"
-                  cancelText="Cancel"
-                >
-                  <Button
-                    type="link"
-                    icon={<UnlockOutlined />}
-                    loading={reopening}
-                    style={{ padding: 0 }}
+            </div>
+          )}
+          {caseData.status === 'CLOSED' && (
+            <div style={{
+              background: '#f5f5f5',
+              border: '1px solid #d9d9d9',
+              borderRadius: '8px',
+              padding: '10px 16px',
+              marginBottom: '16px',
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                flexWrap: 'wrap',
+              }}>
+                <LockOutlined style={{ fontSize: '18px', color: '#8c8c8c' }} />
+                <span style={{ fontWeight: 600, color: '#595959', fontSize: 'clamp(0.8rem, 2vw, 0.95rem)', flex: 1 }}>
+                  This case is closed. No edits, hearings, or uploads are allowed.
+                </span>
+                {isAdmin && (
+                  <Popconfirm
+                    title="Re-open this case?"
+                    description="The case will return to Active status. All existing data will be preserved."
+                    onConfirm={handleReopenCase}
+                    okText="Re-open"
+                    cancelText="Cancel"
                   >
-                    Re-open Case
-                  </Button>
-                </Popconfirm>
+                    <Button
+                      type="link"
+                      icon={<UnlockOutlined />}
+                      loading={reopening}
+                      style={{ padding: 0 }}
+                    >
+                      Re-open Case
+                    </Button>
+                  </Popconfirm>
+                )}
+              </div>
+              {caseData.closureReason && (
+                <div style={{
+                  marginTop: '10px',
+                  paddingTop: '10px',
+                  borderTop: '1px dashed #d9d9d9',
+                  fontSize: 'clamp(0.8rem, 2vw, 0.9rem)',
+                  color: '#595959',
+                }}>
+                  <span style={{ fontWeight: 600 }}>Reason for closure:</span>{' '}
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{caseData.closureReason}</span>
+                </div>
               )}
             </div>
           )}
@@ -965,12 +1036,14 @@ export default function CaseDetailPage() {
             </div>
             <div className="case-header-actions">
               <Space wrap size={[8, 8]} className="action-buttons">
-                <Dropdown menu={{ items: aiMenuItems }}>
-                  <Button icon={<ThunderboltOutlined />} loading={aiLoading} size="middle">
-                    <span className="btn-text">AI</span> <DownOutlined />
-                  </Button>
-                </Dropdown>
-                {caseData.status !== 'CLOSED' && (
+                {canWrite && (
+                  <Dropdown menu={{ items: aiMenuItems }}>
+                    <Button icon={<ThunderboltOutlined />} loading={aiLoading} size="middle">
+                      <span className="btn-text">AI</span> <DownOutlined />
+                    </Button>
+                  </Dropdown>
+                )}
+                {caseData.status !== 'CLOSED' && canWrite && (
                   <Button icon={<EditOutlined />} onClick={handleEditOpen} size="middle">
                     <span className="btn-text">Edit</span>
                   </Button>
@@ -1525,7 +1598,14 @@ export default function CaseDetailPage() {
                 <Input.TextArea rows={4} />
               </Form.Item>
 
-              {caseData.FileDocument && caseData.FileDocument.length > 0 && (
+              <Form.Item name="tasks" label="Tasks">
+                <Input.TextArea rows={3} placeholder="List the initial action items for this case..." />
+              </Form.Item>
+
+              {/* Document removal via the edit-case form is admin-only.
+                  Advocates editing the case still see all other fields but
+                  no per-document delete checkboxes. */}
+              {isAdmin && caseData.FileDocument && caseData.FileDocument.length > 0 && (
                 <Form.Item label="Manage Documents">
                   <Card type="inner" size="small">
                     <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#666' }}>

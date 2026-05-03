@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { writeCaseFilter } from '@/lib/access';
 import { analyzeDocumentsWithAI } from '@/lib/openai';
 import { safeExtractFileContent } from '@/lib/fileProcessor';
 
@@ -24,16 +25,12 @@ export async function POST(
 
     const { documentIds } = await request.json();
 
-    // Role-based case access verification
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = {
-      id: caseId,
-      firmId: user.firmId,
-      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
-    };
-
+    // Running AI is a write — advocates must be assigned to the case.
     const caseRecord = await prisma.case.findFirst({
-      where: caseFilter,
+      where: {
+        id: caseId,
+        ...writeCaseFilter({ id: user.id, firmId: user.firmId, role: user.role }),
+      },
       include: {
         FileDocument: true,
       },

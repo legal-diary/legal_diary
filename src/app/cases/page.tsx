@@ -9,11 +9,13 @@ import {
   Select,
   Row,
   Col,
+  Segmented,
   message,
 } from 'antd';
 import { SearchOutlined, PlusOutlined, LockOutlined } from '@ant-design/icons';
 import CloseCaseModal from '@/components/Cases/CloseCaseModal';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/context/AuthContext';
@@ -30,10 +32,19 @@ interface Case {
   status: string;
   priority: string;
   courtName?: string;
+  courtTypeId?: string | null;
   createdAt: string;
+  // Just userIds — enough for client-side "My cases" filter without
+  // an extra round trip when the user toggles the segmented control.
+  assignments?: { userId: string }[];
   _count?: {
     Hearing: number;
   };
+}
+
+interface CourtTypeOption {
+  id: string;
+  name: string;
 }
 
 // Static color maps - moved outside component
@@ -55,12 +66,14 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 // Memoized Case Card component
 const CaseCard = React.memo<{ caseData: Case; isAdmin?: boolean; onCloseCase?: (caseId: string) => void }>(({ caseData, isAdmin, onCloseCase }) => {
+  const router = useRouter();
   const isClosed = caseData.status === 'CLOSED';
 
   return (
     <Card
       hoverable
       className={`case-card ${isClosed ? 'case-card-closed' : ''}`}
+      onClick={() => router.push(`/cases/${caseData.id}`)}
       style={{
         height: '100%',
         borderRadius: 'clamp(0.5rem, 2vw, 0.8rem)',
@@ -70,12 +83,12 @@ const CaseCard = React.memo<{ caseData: Case; isAdmin?: boolean; onCloseCase?: (
         background: isClosed ? '#fff1f0' : '#ffffff',
         position: 'relative',
         overflow: 'hidden',
+        cursor: 'pointer',
       }}
       styles={{
         body: { padding: 'clamp(10px, 3vw, 16px)' },
       }}
     >
-      {/* Closed case ribbon */}
       {isClosed && (
         <div style={{
           position: 'absolute',
@@ -102,15 +115,21 @@ const CaseCard = React.memo<{ caseData: Case; isAdmin?: boolean; onCloseCase?: (
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'clamp(0.5rem, 2vw, 1rem)', marginTop: isClosed ? '16px' : 0 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <Link href={`/cases/${caseData.id}`} style={{ textDecoration: 'none' }}>
-            <h3 style={{ margin: '0 0 0.3rem 0', color: isClosed ? '#595959' : '#000000', fontWeight: '700', cursor: 'pointer', fontSize: 'clamp(0.85rem, 2.5vw, 1rem)' }}>
-              {caseData.caseNumber}
-            </h3>
-          </Link>
+          <h3 style={{ margin: '0 0 0.3rem 0', color: isClosed ? '#595959' : '#000000', fontWeight: '700', fontSize: 'clamp(0.85rem, 2.5vw, 1rem)' }}>
+            {caseData.caseNumber}
+          </h3>
           <p style={{ margin: '0.2rem 0', color: '#666', fontSize: 'clamp(0.75rem, 2vw, 0.9rem)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {caseData.caseTitle}
           </p>
         </div>
+        {!isClosed && isAdmin && onCloseCase && (
+          <Button
+            size="small"
+            icon={<LockOutlined />}
+            onClick={(e) => { e.stopPropagation(); onCloseCase(caseData.id); }}
+            style={{ background: '#8c8c8c', borderColor: '#8c8c8c', color: '#fff', height: '24px', width: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
+          />
+        )}
       </div>
 
       <div style={{ marginBottom: 'clamp(0.5rem, 2vw, 1rem)' }}>
@@ -129,7 +148,7 @@ const CaseCard = React.memo<{ caseData: Case; isAdmin?: boolean; onCloseCase?: (
         </div>
       </div>
 
-      <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.85rem)', color: '#666', marginBottom: '0.5rem' }}>
+      <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.85rem)', color: '#666' }}>
         <div style={{ marginBottom: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           <strong>Petitioner:</strong> {caseData.petitionerName}
         </div>
@@ -148,22 +167,6 @@ const CaseCard = React.memo<{ caseData: Case; isAdmin?: boolean; onCloseCase?: (
           <strong>Created:</strong> {dayjs(caseData.createdAt).format('DD/MM/YYYY')}
         </div>
       </div>
-
-      <div style={{ marginTop: 'clamp(0.5rem, 2vw, 1rem)', paddingTop: 'clamp(0.5rem, 2vw, 1rem)', borderTop: '1px solid #f0f0f0', display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <Link href={`/cases/${caseData.id}`} style={{ flex: 1, display: 'block' }}>
-          <Button type={isClosed ? 'default' : 'primary'} block size="small" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.85rem)' }}>
-            View Details
-          </Button>
-        </Link>
-        {!isClosed && isAdmin && onCloseCase && (
-          <Button
-            size="small"
-            icon={<LockOutlined />}
-            onClick={(e) => { e.stopPropagation(); onCloseCase(caseData.id); }}
-            style={{ background: '#8c8c8c', borderColor: '#8c8c8c', color: '#fff', height: '24px', width: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
-          />
-        )}
-      </div>
     </Card>
   );
 });
@@ -174,14 +177,19 @@ export default function CasesPage() {
   const { token, user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
   const [cases, setCases] = useState<Case[]>([]);
+  const [courtTypes, setCourtTypes] = useState<CourtTypeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('');
+  // statusFilter: '' = both, 'OPEN' = anything not CLOSED, 'CLOSED' = closed
+  const [statusFilter, setStatusFilter] = useState<'' | 'OPEN' | 'CLOSED'>('');
+  const [courtTypeFilter, setCourtTypeFilter] = useState('');
+  const [viewScope, setViewScope] = useState<'all' | 'mine'>('all');
   const [closeCaseId, setCloseCaseId] = useState<string | null>(null);
   const [closeCaseNumber, setCloseCaseNumber] = useState('');
 
-  // Fetch cases with optimized API call
+  // Fetch the firm-wide list once. The "All firm cases | My cases" toggle is
+  // applied client-side from the assignment userIds embedded in each row, so
+  // toggling does NOT trigger a re-fetch.
   const fetchCases = useCallback(async () => {
     if (!token) return;
 
@@ -209,9 +217,36 @@ export default function CasesPage() {
     }
   }, [token, fetchCases]);
 
+  // One-shot fetch of the firm's court types for the filter dropdown.
+  // Cached on the client; new firm-level court types are rare enough that we
+  // don't refetch on toggle.
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    fetch('/api/court-types', { headers: authHeaders(token) })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: CourtTypeOption[]) => {
+        if (alive) setCourtTypes(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        // Silently fall through — the dropdown just stays empty.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
   // Memoized filtered cases - computed only when dependencies change
   const filteredCases = useMemo(() => {
     let filtered = cases;
+
+    // Scope toggle is applied client-side from the assignment userIds.
+    if (viewScope === 'mine' && user?.id) {
+      const myId = user.id;
+      filtered = filtered.filter(
+        (c) => c.assignments?.some((a) => a.userId === myId)
+      );
+    }
 
     if (searchText) {
       const search = searchText.toLowerCase();
@@ -224,12 +259,19 @@ export default function CasesPage() {
       );
     }
 
-    if (statusFilter) {
-      filtered = filtered.filter((c) => c.status === statusFilter);
+    // Status: binary Open/Closed. "Open" means anything not CLOSED — including
+    // PENDING_JUDGMENT, APPEAL, etc. — since the case isn't closed via the
+    // dedicated Close Case flow yet.
+    if (statusFilter === 'OPEN') {
+      filtered = filtered.filter((c) => c.status !== 'CLOSED');
+    } else if (statusFilter === 'CLOSED') {
+      filtered = filtered.filter((c) => c.status === 'CLOSED');
     }
 
-    if (priorityFilter) {
-      filtered = filtered.filter((c) => c.priority === priorityFilter);
+    // Court filter is on courtTypeId (FK to CourtType). Cases without a court
+    // type are hidden when a specific court is chosen, surfaced when it isn't.
+    if (courtTypeFilter) {
+      filtered = filtered.filter((c) => c.courtTypeId === courtTypeFilter);
     }
 
     // Sort so closed cases always appear at the end
@@ -240,19 +282,19 @@ export default function CasesPage() {
     });
 
     return filtered;
-  }, [cases, searchText, statusFilter, priorityFilter]);
+  }, [cases, searchText, statusFilter, courtTypeFilter, viewScope, user?.id]);
 
   // Memoized handlers
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value);
   }, []);
 
-  const handleStatusChange = useCallback((value: string) => {
+  const handleStatusChange = useCallback((value: 'OPEN' | 'CLOSED' | undefined) => {
     setStatusFilter(value || '');
   }, []);
 
-  const handlePriorityChange = useCallback((value: string) => {
-    setPriorityFilter(value || '');
+  const handleCourtTypeChange = useCallback((value: string | undefined) => {
+    setCourtTypeFilter(value || '');
   }, []);
 
   const handleCloseCase = useCallback((caseId: string) => {
@@ -276,57 +318,94 @@ export default function CasesPage() {
               </Link>
             }
           >
-            {/* Filters */}
-            <div style={{ marginBottom: '2.5vh', paddingBottom: '1.5vh', borderBottom: '1px solid #f0f0f0' }}>
+            {/* Scope toggle: All firm cases vs My cases */}
+            <div style={{ marginBottom: '1.5vh' }}>
+              <Segmented
+                value={viewScope}
+                onChange={(v) => setViewScope(v as 'all' | 'mine')}
+                options={[
+                  { label: 'All firm cases', value: 'all' },
+                  { label: 'My cases', value: 'mine' },
+                ]}
+              />
+            </div>
+
+            {/* Filters — three equal columns on tablet+, stacked on mobile.
+                All three controls are size="large" (40px) and pinned to the
+                same height via the `cases-filter-row` scoped styles below, so
+                the search Input (which AntD wraps in .ant-input-affix-wrapper
+                because of the prefix icon) lines up with the two Selects. */}
+            <div className="cases-filter-row" style={{ marginBottom: '2.5vh', paddingBottom: '1.5vh', borderBottom: '1px solid #f0f0f0' }}>
+              <style jsx>{`
+                .cases-filter-row :global(.ant-input-affix-wrapper),
+                .cases-filter-row :global(.ant-select .ant-select-selector) {
+                  height: 40px !important;
+                  display: flex;
+                  align-items: center;
+                }
+                .cases-filter-row :global(.ant-input-affix-wrapper > input.ant-input) {
+                  height: 100%;
+                  line-height: 1.5;
+                }
+                .cases-filter-row :global(.ant-select-single .ant-select-selection-item),
+                .cases-filter-row :global(.ant-select-single .ant-select-selection-placeholder) {
+                  line-height: 38px;
+                }
+              `}</style>
               <Row gutter={[16, 16]}>
-                <Col xs={24} sm={24} md={12} lg={8}>
+                <Col xs={24} md={8}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#000', marginBottom: '0.5rem' }}>
                       Search
                     </label>
                     <Input
+                      size="large"
                       placeholder="Case number, petitioner, or respondent..."
                       prefix={<SearchOutlined />}
                       value={searchText}
                       onChange={handleSearchChange}
+                      style={{ width: '100%' }}
                     />
                   </div>
                 </Col>
-                <Col xs={24} sm={12} md={12} lg={8}>
+                <Col xs={24} md={8}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#000', marginBottom: '0.5rem' }}>
                       Status
                     </label>
                     <Select
-                      placeholder="All statuses"
+                      size="large"
+                      placeholder="All cases"
                       allowClear
                       value={statusFilter || undefined}
                       onChange={handleStatusChange}
+                      style={{ width: '100%' }}
                     >
-                      <Select.Option value="ACTIVE">Active</Select.Option>
-                      <Select.Option value="PENDING_JUDGMENT">Pending Judgment</Select.Option>
-                      <Select.Option value="CONCLUDED">Concluded</Select.Option>
-                      <Select.Option value="APPEAL">Appeal</Select.Option>
-                      <Select.Option value="DISMISSED">Dismissed</Select.Option>
+                      <Select.Option value="OPEN">Open</Select.Option>
                       <Select.Option value="CLOSED">Closed</Select.Option>
                     </Select>
                   </div>
                 </Col>
-                <Col xs={24} sm={12} md={12} lg={8}>
+                <Col xs={24} md={8}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#000', marginBottom: '0.5rem' }}>
-                      Priority
+                      Court
                     </label>
                     <Select
-                      placeholder="All priorities"
+                      size="large"
+                      placeholder="All courts"
                       allowClear
-                      value={priorityFilter || undefined}
-                      onChange={handlePriorityChange}
+                      showSearch
+                      optionFilterProp="children"
+                      value={courtTypeFilter || undefined}
+                      onChange={handleCourtTypeChange}
+                      style={{ width: '100%' }}
                     >
-                      <Select.Option value="LOW">Low</Select.Option>
-                      <Select.Option value="MEDIUM">Medium</Select.Option>
-                      <Select.Option value="HIGH">High</Select.Option>
-                      <Select.Option value="URGENT">Urgent</Select.Option>
+                      {courtTypes.map((ct) => (
+                        <Select.Option key={ct.id} value={ct.id}>
+                          {ct.name}
+                        </Select.Option>
+                      ))}
                     </Select>
                   </div>
                 </Col>
@@ -337,10 +416,11 @@ export default function CasesPage() {
             {filteredCases.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>
                 <p>
-                  No cases found.{' '}
-                  {searchText || statusFilter || priorityFilter
-                    ? 'Try adjusting your filters.'
-                    : 'Create a new case to get started.'}
+                  {viewScope === 'mine' && cases.length > 0
+                    ? "You're not assigned to any cases yet. Switch to All firm cases to browse the firm."
+                    : searchText || statusFilter || courtTypeFilter
+                      ? 'No cases match the current filters. Try adjusting them.'
+                      : 'No cases found. Create a new case to get started.'}
                 </p>
               </div>
             ) : (

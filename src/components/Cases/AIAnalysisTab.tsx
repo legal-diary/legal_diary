@@ -40,6 +40,9 @@ interface AIAnalysisTabProps {
   fileDocuments: FileDocument[];
   token: string;
   onAnalysisComplete: () => void;
+  // When false, the user can read existing AI output but cannot run new
+  // analyses (running AI consumes credits and is gated to assigned advocates).
+  canWrite?: boolean;
 }
 
 export default function AIAnalysisTab({
@@ -49,6 +52,7 @@ export default function AIAnalysisTab({
   fileDocuments,
   token,
   onAnalysisComplete,
+  canWrite = true,
 }: AIAnalysisTabProps) {
   const [reanalyzeLoading, setReanalyzeLoading] = useState(false);
   const [documentAnalysisLoading, setDocumentAnalysisLoading] = useState(false);
@@ -149,20 +153,24 @@ export default function AIAnalysisTab({
       {/* Case Re-analysis Section */}
       <Card title="Case Analysis" variant="outlined">
         <Alert
-          message="Re-analyze this case with updated details and documents"
+          message={canWrite
+            ? 'Re-analyze this case with updated details and documents'
+            : 'You can read the existing AI analysis. Running new analyses requires being assigned to this case.'}
           type="info"
           showIcon
           style={{ marginBottom: '1rem' }}
         />
-        <Button
-          type="primary"
-          icon={<ThunderboltOutlined />}
-          onClick={handleReanalyze}
-          loading={reanalyzeLoading}
-          block
-        >
-          {reanalyzeLoading ? 'Re-analyzing...' : 'Re-analyze Case with All Documents'}
-        </Button>
+        {canWrite && (
+          <Button
+            type="primary"
+            icon={<ThunderboltOutlined />}
+            onClick={handleReanalyze}
+            loading={reanalyzeLoading}
+            block
+          >
+            {reanalyzeLoading ? 'Re-analyzing...' : 'Re-analyze Case with All Documents'}
+          </Button>
+        )}
 
         {aiSummary && (
           <Card style={{ marginTop: '1.5rem' }} type="inner">
@@ -211,7 +219,7 @@ export default function AIAnalysisTab({
       </Card>
 
       {/* Document Analysis Section */}
-      {fileDocuments.length > 0 && (
+      {fileDocuments.length > 0 && canWrite && (
         <Card title="Document Analysis" variant="outlined">
           <Alert
             message="Select documents to analyze and get AI-powered insights"
@@ -313,7 +321,8 @@ export default function AIAnalysisTab({
         </Card>
       )}
 
-      {/* Custom Analysis Section */}
+      {/* Custom Analysis Section — gated to assigned advocates / admins */}
+      {canWrite && (
       <Card title="Custom Analysis" variant="outlined">
         <Alert
           message="Ask AI a specific question about this case"
@@ -379,6 +388,7 @@ export default function AIAnalysisTab({
           </Card>
         )}
       </Card>
+      )}
     </Space>
   );
 }

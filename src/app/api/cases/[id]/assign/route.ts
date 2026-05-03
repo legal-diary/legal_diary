@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { readCaseFilter } from '@/lib/access';
 
 /**
  * POST /api/cases/[id]/assign
@@ -230,16 +231,10 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based access check
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = {
-      id: caseId,
-      firmId: user.firmId,
-      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
-    };
-
+    // Reading the assignment list is firm-wide — anyone in the firm can see
+    // who is working on a given case.
     const caseRecord = await prisma.case.findFirst({
-      where: caseFilter,
+      where: { id: caseId, ...readCaseFilter({ firmId: user.firmId }) },
       include: {
         assignments: {
           include: {

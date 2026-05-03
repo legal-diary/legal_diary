@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { readCaseFilter } from '@/lib/access';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -30,17 +31,13 @@ export async function GET(request: NextRequest) {
     const todayStart = dayjs().tz(IST).startOf('day').toDate();
     const todayEnd = dayjs().tz(IST).endOf('day').toDate();
 
-    // Role-based filtering:
-    // - ADMIN sees data from all cases in their firm
-    // - ADVOCATE sees data only from cases they're assigned to
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = isAdmin
-      ? { firmId: user.firmId }
-      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+    // Dashboard read is firm-wide — Today's Schedule shows the whole firm's day.
+    // Assignee chips on each row let advocates tell whose hearing is whose.
+    const caseFilter = readCaseFilter({ firmId: user.firmId });
 
     // Execute all queries in parallel for maximum speed
     const [todaysHearings, upcomingHearings, casesMinimal, pendingClosureHearings, closedHearings] = await Promise.all([
-      // Today's hearings with only necessary case fields
+      // Today's hearings with only necessary case fields + assignee info
       prisma.hearing.findMany({
         where: {
           hearingDate: {
@@ -65,6 +62,12 @@ export async function GET(request: NextRequest) {
               respondentName: true,
               status: true,
               courtName: true,
+              assignments: {
+                select: {
+                  userId: true,
+                  user: { select: { id: true, name: true, email: true } },
+                },
+              },
             },
           },
         },
@@ -89,10 +92,12 @@ export async function GET(request: NextRequest) {
           status: true,
           Case: {
             select: {
+              id: true,
               caseNumber: true,
               caseTitle: true,
               petitionerName: true,
               respondentName: true,
+              status: true,
             },
           },
         },
@@ -148,6 +153,13 @@ export async function GET(request: NextRequest) {
               petitionerName: true,
               respondentName: true,
               courtName: true,
+              status: true,
+              assignments: {
+                select: {
+                  userId: true,
+                  user: { select: { id: true, name: true, email: true } },
+                },
+              },
             },
           },
         },
@@ -246,6 +258,7 @@ export async function GET(request: NextRequest) {
         currentDate: hearing.hearingDate,
         nextDate: nextHearing?.hearingDate || null,
         status: hearing.status,
+        assignments: hearing.Case.assignments,
       };
     });
 

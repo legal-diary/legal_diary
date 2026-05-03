@@ -95,7 +95,7 @@ const actionConfig: Record<
   HEARING_DELETED: { icon: <CalendarOutlined />, color: 'red', label: 'Hearing Deleted' },
   HEARING_COMPLETED: { icon: <CalendarOutlined />, color: 'cyan', label: 'Hearing Completed' },
   HEARING_CLOSED: { icon: <CalendarOutlined />, color: 'gold', label: 'Hearing Closed' },
-  HEARING_POSTPONED: { icon: <CalendarOutlined />, color: 'orange', label: 'Hearing Postponed' },
+  HEARING_POSTPONED: { icon: <CalendarOutlined />, color: 'orange', label: 'Hearing Adjourned' },
   DOCUMENT_UPLOADED: { icon: <FileOutlined />, color: 'green', label: 'Document Uploaded' },
   DOCUMENT_DELETED: { icon: <FileOutlined />, color: 'red', label: 'Document Deleted' },
   DOCUMENT_VIEWED: { icon: <EyeOutlined />, color: 'default', label: 'Document Viewed' },

@@ -68,13 +68,23 @@ export async function POST(
       );
     }
 
-    // Parse FormData and get the final order file
+    // Parse FormData and get the final order file + closure reason
     const formData = await request.formData();
     const file = formData.get('finalOrder') as File | null;
+    const closureReasonRaw = formData.get('closureReason');
+    const closureReason =
+      typeof closureReasonRaw === 'string' ? closureReasonRaw.trim() : '';
 
     if (!file || !(file instanceof File) || file.size === 0) {
       return NextResponse.json(
         { error: 'Final order document is required to close a case' },
+        { status: 400 }
+      );
+    }
+
+    if (!closureReason) {
+      return NextResponse.json(
+        { error: 'Reason for closure is required to close a case' },
         { status: 400 }
       );
     }
@@ -137,6 +147,7 @@ export async function POST(
           status: 'CLOSED',
           closedAt: new Date(),
           closedById: user.id,
+          closureReason,
         },
         include: {
           FileDocument: true,

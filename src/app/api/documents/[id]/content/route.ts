@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { readCaseFilter } from '@/lib/access';
 import { downloadFile } from '@/lib/supabase';
 
 export async function GET(
@@ -22,16 +23,11 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based access - find document and verify through case assignments
-    const isAdmin = user.role === 'ADMIN';
-
+    // Reading documents follows the firm-wide read scope.
     const document = await prisma.fileDocument.findFirst({
       where: {
         id: documentId,
-        Case: {
-          firmId: user.firmId,
-          ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
-        },
+        Case: readCaseFilter({ firmId: user.firmId }),
       },
       include: {
         Case: {

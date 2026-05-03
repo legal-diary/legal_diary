@@ -10,7 +10,7 @@ import {
   SettingOutlined,
   CloseOutlined,
   MenuOutlined,
-  DownOutlined,
+  ReadOutlined,
   CheckSquareOutlined,
   LeftOutlined,
   RightOutlined,
@@ -38,22 +38,17 @@ const createDesktopNavigationItems = (pendingCount: number) => [
   {
     key: 'cases',
     icon: <FileTextOutlined style={{ fontSize: '1.2rem' }} />,
-    label: 'Cases',
-    children: [
-      {
-        key: 'cases-list',
-        label: <Link href="/cases" style={{ textDecoration: 'none', color: 'inherit' }}>All Cases</Link>,
-      },
-      {
-        key: 'cases-create',
-        label: <Link href="/cases/create" style={{ textDecoration: 'none', color: 'inherit' }}>New Case</Link>,
-      },
-    ],
+    label: <Link href="/cases" style={{ textDecoration: 'none', color: 'inherit' }}>Cases</Link>,
   },
   {
     key: 'calendar',
     icon: <CalendarOutlined style={{ fontSize: '1.2rem' }} />,
     label: <Link href="/calendar" style={{ textDecoration: 'none', color: 'inherit' }}>Hearing Calendar</Link>,
+  },
+  {
+    key: 'judgments',
+    icon: <ReadOutlined style={{ fontSize: '1.2rem' }} />,
+    label: <Link href="/judgments" style={{ textDecoration: 'none', color: 'inherit' }}>Judgments</Link>,
   },
   {
     key: 'todos',
@@ -120,13 +115,11 @@ SidebarLogoToggle.displayName = 'SidebarLogoToggle';
 // Mobile menu component
 const MobileMenuContent = memo<{
   pathname: string;
-  expandedMenu: string | null;
-  setExpandedMenu: (menu: string | null) => void;
   handleMenuClick: (path: string) => void;
   handleLogout: () => void;
   getSelectedKey: () => string;
   pendingTodoCount: number;
-}>(({ pathname, expandedMenu, setExpandedMenu, handleMenuClick, handleLogout, getSelectedKey, pendingTodoCount }) => (
+}>(({ pathname, handleMenuClick, handleLogout, getSelectedKey, pendingTodoCount }) => (
   <>
     <div className="mobile-menu-container">
       <div
@@ -137,41 +130,12 @@ const MobileMenuContent = memo<{
         <span>Dashboard</span>
       </div>
 
-      <div className="mobile-menu-item-group">
-        <div
-          onClick={() => setExpandedMenu(expandedMenu === 'cases' ? null : 'cases')}
-          className={`mobile-menu-item ${getSelectedKey() === 'cases' ? 'active' : ''}`}
-        >
-          <FileTextOutlined style={{ fontSize: '1.2rem' }} />
-          <span>Cases</span>
-          <DownOutlined
-            style={{
-              marginLeft: 'auto',
-              transition: 'transform 0.3s ease',
-              transform: expandedMenu === 'cases' ? 'rotate(180deg)' : 'rotate(0deg)',
-              fontSize: '0.8rem',
-            }}
-          />
-        </div>
-
-        {expandedMenu === 'cases' && (
-          <div className="mobile-submenu">
-            <div
-              onClick={() => handleMenuClick('/cases')}
-              className={`mobile-submenu-item ${
-                pathname.includes('/cases') && !pathname.includes('/cases/create') ? 'active' : ''
-              }`}
-            >
-              All Cases
-            </div>
-            <div
-              onClick={() => handleMenuClick('/cases/create')}
-              className={`mobile-submenu-item ${pathname.includes('/cases/create') ? 'active' : ''}`}
-            >
-              New Case
-            </div>
-          </div>
-        )}
+      <div
+        onClick={() => handleMenuClick('/cases')}
+        className={`mobile-menu-item ${getSelectedKey() === 'cases' ? 'active' : ''}`}
+      >
+        <FileTextOutlined style={{ fontSize: '1.2rem' }} />
+        <span>Cases</span>
       </div>
 
       <div
@@ -180,6 +144,14 @@ const MobileMenuContent = memo<{
       >
         <CalendarOutlined style={{ fontSize: '1.2rem' }} />
         <span>Hearing Calendar</span>
+      </div>
+
+      <div
+        onClick={() => handleMenuClick('/judgments')}
+        className={`mobile-menu-item ${getSelectedKey() === 'judgments' ? 'active' : ''}`}
+      >
+        <ReadOutlined style={{ fontSize: '1.2rem' }} />
+        <span>Judgments</span>
       </div>
 
       <div
@@ -235,7 +207,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { pendingCount: pendingTodoCount } = usePendingTodoCount();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // default collapsed
 
   // Persist sidebar state in localStorage
@@ -263,6 +235,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const getSelectedKey = useCallback(() => {
     if (pathname.includes('/cases')) return 'cases';
     if (pathname.includes('/calendar')) return 'calendar';
+    if (pathname.includes('/judgments')) return 'judgments';
     if (pathname.includes('/todos')) return 'todos';
     if (pathname.includes('/settings')) return 'settings';
     return 'dashboard';
@@ -530,8 +503,6 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
           >
             <MobileMenuContent
               pathname={pathname}
-              expandedMenu={expandedMenu}
-              setExpandedMenu={setExpandedMenu}
               handleMenuClick={handleMenuClick}
               handleLogout={handleLogout}
               getSelectedKey={getSelectedKey}

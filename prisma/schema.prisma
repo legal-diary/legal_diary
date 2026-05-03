@@ -32,6 +32,7 @@ model Case {
   clientParty     ClientParty      @default(PETITIONER)
   vakalat         String?
   description     String
+  tasks           String?
   status          CaseStatus       @default(ACTIVE)
   priority        Priority         @default(MEDIUM)
   createdById     String
@@ -42,6 +43,7 @@ model Case {
   judgeAssigned   String?
   closedAt        DateTime?
   closedById      String?
+  closureReason   String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   AISummary       AISummary?
@@ -52,6 +54,7 @@ model Case {
   Hearing         Hearing[]
   assignments     CaseAssignment[]
   Todo            Todo[]
+  CaseNote        CaseNote[]
 
   @@index([caseNumber])
   @@index([createdById])
@@ -100,6 +103,7 @@ model Firm {
   User_User_firmIdToFirm  User[]      @relation("User_firmIdToFirm")
   Todo                    Todo[]
   CourtType               CourtType[]
+  judgments               Judgment[]
 
   @@index([ownerId])
 }
@@ -227,10 +231,78 @@ model User {
   todosAssigned           Todo[]               @relation("TodoAssignee")
   todosCreated            Todo[]               @relation("TodoCreator")
   todosClosed             Todo[]               @relation("TodoCloser")
+  caseNotes               CaseNote[]
+  judgments               Judgment[]            @relation("JudgmentCreator")
+  judgmentThreads         JudgmentThread[]      @relation("JudgmentThreadCreator")
 
   @@index([email])
   @@index([firmId])
   @@index([googleId])
+}
+
+model CaseNote {
+  id          String   @id @default(cuid())
+  caseId      String
+  content     String
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  Case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  @@index([caseId])
+  @@index([createdById])
+}
+
+model Judgment {
+  id          String               @id @default(cuid())
+  firmId      String
+  createdById String
+  type        JudgmentType
+  category    String
+  headnote    String               @db.Text
+  citation    String
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  firm        Firm                 @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  createdBy   User                 @relation("JudgmentCreator", fields: [createdById], references: [id])
+  attachments JudgmentAttachment[]
+  threads     JudgmentThread[]
+
+  @@index([firmId])
+  @@index([createdById])
+}
+
+model JudgmentAttachment {
+  id         String   @id @default(cuid())
+  judgmentId String
+  fileName   String
+  fileUrl    String
+  fileType   String
+  fileSize   Int
+  uploadedAt DateTime @default(now())
+  judgment   Judgment @relation(fields: [judgmentId], references: [id], onDelete: Cascade)
+
+  @@index([judgmentId])
+}
+
+model JudgmentThread {
+  id          String   @id @default(cuid())
+  judgmentId  String
+  content     String   @db.Text
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  judgment    Judgment @relation(fields: [judgmentId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation("JudgmentThreadCreator", fields: [createdById], references: [id])
+
+  @@index([judgmentId])
+  @@index([createdById])
+}
+
+enum JudgmentType {
+  RESEARCH
+  OFFICE_JUDGMENT
 }
 
 enum CaseStatus {
@@ -392,6 +464,11 @@ enum ActivityAction {
   CALENDAR_CONNECTED
   CALENDAR_DISCONNECTED
   CALENDAR_SYNCED
+
+  // Judgment actions
+  JUDGMENT_CREATED
+  JUDGMENT_UPDATED
+  JUDGMENT_DELETED
 }
 
 enum EntityType {
@@ -402,4 +479,5 @@ enum EntityType {
   FIRM
   CALENDAR
   AI_ANALYSIS
+  JUDGMENT
 }

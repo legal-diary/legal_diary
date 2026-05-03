@@ -60,6 +60,11 @@ dayjs.extend(relativeTime);
 const { Title, Text } = Typography;
 
 // Types
+interface AssigneeRef {
+  userId: string;
+  user: { id: string; name: string | null; email: string };
+}
+
 interface TodayHearing {
   id: string;
   caseId: string;
@@ -75,6 +80,7 @@ interface TodayHearing {
   currentDate: string;
   nextDate: string | null;
   status: string;
+  assignments?: AssigneeRef[];
 }
 
 interface Case {
@@ -94,10 +100,12 @@ interface UpcomingHearing {
   notes: string | null;
   status: string;
   Case: {
+    id?: string;
     caseNumber: string;
     caseTitle: string;
     petitionerName: string;
     respondentName: string;
+    status?: string;
   };
 }
 
@@ -116,6 +124,7 @@ interface PendingClosure {
     petitionerName: string;
     respondentName: string;
     courtName: string | null;
+    status?: string;
   };
 }
 
@@ -384,9 +393,18 @@ const TodayScheduleTable = React.memo<{
   totalCount: number;
   loading: boolean;
   isMobile: boolean;
+  currentUserId: string;
+  isAdmin: boolean;
   onCloseHearing?: (hearing: any) => void;
-}>(({ hearings, totalCount, loading, isMobile, onCloseHearing }) => {
+}>(({ hearings, totalCount, loading, isMobile, currentUserId, isAdmin, onCloseHearing }) => {
   const [viewNotesHearing, setViewNotesHearing] = useState<TodayHearing | null>(null);
+
+  // Helper: can the current user act on (close) this hearing?
+  const canCloseHearing = useCallback(
+    (record: TodayHearing) =>
+      isAdmin || !!record.assignments?.some((a) => a.userId === currentUserId),
+    [isAdmin, currentUserId]
+  );
 
   const columns = useMemo(
     () => [
@@ -426,6 +444,29 @@ const TodayScheduleTable = React.memo<{
             <Text strong style={{ fontSize: 'clamp(0.7rem, 2vw, 0.9rem)' }}>{text}</Text>
           </Tooltip>
         ),
+      },
+      {
+        title: 'Assigned',
+        key: 'assignees',
+        width: 110,
+        className: 'hide-on-mobile',
+        render: (_: any, record: TodayHearing) => {
+          const list = record.assignments || [];
+          if (list.length === 0) {
+            return <Text type="secondary" style={{ fontSize: '0.7rem' }}>—</Text>;
+          }
+          const display = list
+            .map((a) => {
+              if (a.userId === currentUserId) return 'You';
+              return a.user.name || a.user.email.split('@')[0];
+            })
+            .join(', ');
+          return (
+            <Tooltip title={list.map((a) => a.user.name || a.user.email).join(', ')}>
+              <Text style={{ fontSize: 'clamp(0.7rem, 1.8vw, 0.85rem)' }}>{display}</Text>
+            </Tooltip>
+          );
+        },
       },
       {
         title: 'Stage',
@@ -473,7 +514,7 @@ const TodayScheduleTable = React.memo<{
         className: 'hide-on-mobile',
         render: (_: any, record: TodayHearing) => {
           const menuItems = [
-            ...(record.status !== 'CLOSED' ? [{
+            ...(record.status !== 'CLOSED' && canCloseHearing(record) ? [{
               key: 'close',
               label: 'Close Hearing',
               icon: <CheckCircleOutlined />,
@@ -492,6 +533,7 @@ const TodayScheduleTable = React.memo<{
                   petitionerName: '',
                   respondentName: '',
                   courtName: record.courtName,
+                  status: record.stage,
                 },
               }),
             }] : []),
@@ -510,7 +552,7 @@ const TodayScheduleTable = React.memo<{
         },
       },
     ],
-    [isMobile, onCloseHearing]
+    [isMobile, onCloseHearing, currentUserId, canCloseHearing]
   );
 
   if (loading) return <TodayScheduleSkeleton />;
@@ -593,7 +635,7 @@ const TodayScheduleTable = React.memo<{
                         courtHall: record.courtHall,
                         notes: record.notes,
                         status: 'UPCOMING',
-                        Case: { id: record.caseId, caseNumber: record.caseNumber, caseTitle: record.caseTitle, petitionerName: '', respondentName: '', courtName: record.courtName },
+                        Case: { id: record.caseId, caseNumber: record.caseNumber, caseTitle: record.caseTitle, petitionerName: '', respondentName: '', courtName: record.courtName, status: record.stage },
                       })}
                     >
                       Close Hearing
@@ -631,6 +673,8 @@ TodayScheduleTable.displayName = 'TodayScheduleTable';
 // Main Dashboard Component
 export default function DashboardPage() {
   const { token, user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const currentUserId = user?.id || '';
   const isMobile = useIsMobile();
 
   // SWR-powered data fetching with auto-polling for admins
@@ -915,7 +959,7 @@ export default function DashboardPage() {
         />
 
         {/* Today's Schedule - always visible, top priority */}
-        <TodayScheduleTable hearings={todayHearings} totalCount={totalCount} loading={todayLoading} isMobile={isMobile} onCloseHearing={handleCloseHearing} />
+        <TodayScheduleTable hearings={todayHearings} totalCount={totalCount} loading={todayLoading} isMobile={isMobile} currentUserId={currentUserId} isAdmin={isAdmin} onCloseHearing={handleCloseHearing} />
 
         {/* Pending Closures - collapsible, collapsed by default */}
         {!swrLoading && pendingClosures.length > 0 && (
@@ -936,6 +980,8 @@ export default function DashboardPage() {
                   <PendingClosuresSection
                     pendingClosures={pendingClosures}
                     onCloseHearing={handleCloseHearing}
+                    currentUserId={currentUserId}
+                    isAdmin={isAdmin}
                   />
                 ),
               }]}

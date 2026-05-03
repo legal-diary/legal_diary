@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { readCaseFilter, writeCaseFilter } from '@/lib/access';
 import { ActivityLogger } from '@/lib/activityLog';
 
-// GET all cases for a firm (role-based filtering)
+// GET all cases — firm-wide read; opt into "my cases" via ?assignedToMe=true
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -19,17 +20,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based case filtering:
-    // - ADMIN sees all cases in their firm
-    // - ADVOCATE sees only cases they're assigned to
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = isAdmin
-      ? { firmId: user.firmId }
-      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
-
-    // Check if minimal data is requested (for list views)
     const url = new URL(request.url);
+    const assignedToMe = url.searchParams.get('assignedToMe') === 'true';
     const minimal = url.searchParams.get('minimal') === 'true';
+
+    // Read is firm-wide by default. ?assignedToMe=true narrows to assignments
+    // (works for any role, so admins can also use the toggle).
+    const caseFilter = assignedToMe
+      ? writeCaseFilter({ id: user.id, firmId: user.firmId, role: 'ADVOCATE' })
+      : readCaseFilter({ firmId: user.firmId });
 
     if (minimal) {
       const cases = await prisma.case.findMany({
@@ -43,7 +42,13 @@ export async function GET(request: NextRequest) {
           status: true,
           priority: true,
           courtName: true,
+          courtTypeId: true,
           createdAt: true,
+          // Just the userIds — enough for client-side "my cases" filtering
+          // without sending full advocate records on every list fetch.
+          assignments: {
+            select: { userId: true },
+          },
           _count: {
             select: { Hearing: true },
           },
@@ -125,15 +130,16 @@ export async function POST(request: NextRequest) {
       clientParty,
       vakalat,
       description,
+      tasks,
       courtTypeId,
       courtHall,
       judgeAssigned,
       priority,
     } = await request.json();
 
-    if (!caseNumber || !petitionerName || !respondentName || !description) {
+    if (!caseNumber || !petitionerName || !respondentName || !description || !tasks?.trim()) {
       return NextResponse.json(
-        { error: 'caseNumber, petitionerName, respondentName, and description are required' },
+        { error: 'caseNumber, petitionerName, respondentName, description, and tasks are required' },
         { status: 400 }
       );
     }
@@ -166,6 +172,7 @@ export async function POST(request: NextRequest) {
         clientParty: clientParty || 'PETITIONER',
         vakalat,
         description,
+        tasks: tasks.trim(),
         courtTypeId,
         courtName,
         courtHall,
