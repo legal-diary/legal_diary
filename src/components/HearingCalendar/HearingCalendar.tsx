@@ -35,11 +35,17 @@ interface Hearing {
   closedAt?: string | null;
   CalendarSync?: CalendarSyncInfo[];
   Case: {
+    id?: string;
     caseNumber: string;
     caseTitle: string;
     petitionerName: string;
     respondentName: string;
     courtName?: string | null;
+    status?: string;
+    assignments?: Array<{
+      userId: string;
+      user: { id: string; name: string | null; email: string };
+    }>;
   };
 }
 
@@ -111,7 +117,20 @@ interface GoogleCalendarStatus {
 }
 
 export default function HearingCalendar() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const currentUserId = user?.id || '';
+
+  // Helper: can the current user act on this hearing? Admins can always act;
+  // advocates need to be assigned to the underlying case.
+  const canActOnHearing = useCallback(
+    (h: Hearing | null | undefined) => {
+      if (!h) return false;
+      if (isAdmin) return true;
+      return !!h.Case.assignments?.some((a) => a.userId === currentUserId);
+    },
+    [isAdmin, currentUserId]
+  );
   const [hearings, setHearings] = useState<Hearing[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
@@ -721,32 +740,39 @@ export default function HearingCalendar() {
               setSelectedHearing(null);
             }}
             footer={[
-              <Popconfirm
-                key="delete"
-                title="Delete Hearing"
-                description="Are you sure you want to delete this hearing?"
-                onConfirm={() => handleDeleteHearing(selectedHearing.id)}
-                okText="Yes, Delete"
-                cancelText="Cancel"
-                okButtonProps={{ danger: true, loading: deleting }}
-              >
+              // Edit is for assigned advocates + admins (canActOnHearing).
+              // Delete is admin-only — destructive ops are gated tighter than
+              // edits.
+              ...(canActOnHearing(selectedHearing) ? [
                 <Button
-                  danger
-                  icon={<DeleteOutlined />}
-                  loading={deleting}
+                  key="edit"
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={() => handleEditHearing(selectedHearing)}
                 >
-                  Delete
-                </Button>
-              </Popconfirm>,
-              <Button
-                key="edit"
-                type="primary"
-                icon={<EditOutlined />}
-                onClick={() => handleEditHearing(selectedHearing)}
-              >
-                Edit
-              </Button>,
-              ...((selectedHearing as any)?.status === 'UPCOMING' || (selectedHearing as any)?.status === 'PENDING' ? [
+                  Edit
+                </Button>,
+              ] : []),
+              ...(isAdmin ? [
+                <Popconfirm
+                  key="delete"
+                  title="Delete Hearing"
+                  description="Are you sure you want to delete this hearing?"
+                  onConfirm={() => handleDeleteHearing(selectedHearing.id)}
+                  okText="Yes, Delete"
+                  cancelText="Cancel"
+                  okButtonProps={{ danger: true, loading: deleting }}
+                >
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    loading={deleting}
+                  >
+                    Delete
+                  </Button>
+                </Popconfirm>,
+              ] : []),
+              ...(canActOnHearing(selectedHearing) && ((selectedHearing as any)?.status === 'UPCOMING' || (selectedHearing as any)?.status === 'PENDING') ? [
                 <Button
                   key="close-hearing"
                   style={{ backgroundColor: '#d4af37', borderColor: '#d4af37', color: '#fff' }}
@@ -1057,37 +1083,43 @@ export default function HearingCalendar() {
                             >
                               View
                             </Button>
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={<EditOutlined />}
-                              onClick={() => {
-                                setDateDetailsModalOpen(false);
-                                handleEditHearing(hearing);
-                              }}
-                            >
-                              Edit
-                            </Button>
-                            <Popconfirm
-                              title="Delete Hearing"
-                              description="Are you sure you want to delete this hearing?"
-                              onConfirm={async () => {
-                                await handleDeleteHearing(hearing.id);
-                              }}
-                              okText="Yes, Delete"
-                              cancelText="Cancel"
-                              okButtonProps={{ danger: true }}
-                            >
+                            {canActOnHearing(hearing) && (
                               <Button
                                 type="text"
                                 size="small"
-                                danger
-                                icon={<DeleteOutlined />}
+                                icon={<EditOutlined />}
+                                onClick={() => {
+                                  setDateDetailsModalOpen(false);
+                                  handleEditHearing(hearing);
+                                }}
                               >
-                                Delete
+                                Edit
                               </Button>
-                            </Popconfirm>
-                            {(hearing.status === 'UPCOMING' || hearing.status === 'PENDING') && (
+                            )}
+                            {/* Delete is admin-only — destructive ops are
+                                gated tighter than edits/closes */}
+                            {isAdmin && (
+                              <Popconfirm
+                                title="Delete Hearing"
+                                description="Are you sure you want to delete this hearing?"
+                                onConfirm={async () => {
+                                  await handleDeleteHearing(hearing.id);
+                                }}
+                                okText="Yes, Delete"
+                                cancelText="Cancel"
+                                okButtonProps={{ danger: true }}
+                              >
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  danger
+                                  icon={<DeleteOutlined />}
+                                >
+                                  Delete
+                                </Button>
+                              </Popconfirm>
+                            )}
+                            {canActOnHearing(hearing) && (hearing.status === 'UPCOMING' || hearing.status === 'PENDING') && (
                               <Button
                                 type="text"
                                 size="small"

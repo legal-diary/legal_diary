@@ -112,10 +112,33 @@ export default function CreateCasePage() {
   const onFinish = async (values: any) => {
     setLoading(true);
     try {
+      // Petitioner/respondent numbers are a UI-only convenience: if the user
+      // typed a number, prefix it to the corresponding name (e.g. "1. John
+      // Doe") before sending. The number fields themselves never go to the
+      // server.
+      const {
+        petitionerNumber,
+        respondentNumber,
+        petitionerName,
+        respondentName,
+        ...rest
+      } = values;
+
+      const prefixed = (n: unknown, name: string) => {
+        const num = typeof n === 'string' ? n.trim() : n != null ? String(n).trim() : '';
+        return num ? `${num}. ${name}` : name;
+      };
+
+      const payload = {
+        ...rest,
+        petitionerName: prefixed(petitionerNumber, petitionerName),
+        respondentName: prefixed(respondentNumber, respondentName),
+      };
+
       const caseResponse = await fetch('/api/cases', {
         method: 'POST',
         headers: authHeaders(token),
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       });
 
       if (!caseResponse.ok) {
@@ -336,16 +359,30 @@ export default function CreateCasePage() {
                     </span>
                   </div>
 
-                  <Form.Item
-                    name="petitionerName"
-                    rules={[{ required: true, message: 'Please enter petitioner name' }]}
-                    style={{ marginBottom: 0 }}
-                  >
-                    <Input
-                      placeholder="Full name of the petitioner"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </Form.Item>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <Form.Item
+                      name="petitionerNumber"
+                      style={{ marginBottom: 0, width: 72, flexShrink: 0 }}
+                      getValueFromEvent={(e) => e.target.value.replace(/\D/g, '')}
+                    >
+                      <Input
+                        placeholder="No."
+                        inputMode="numeric"
+                        maxLength={4}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      name="petitionerName"
+                      rules={[{ required: true, message: 'Please enter petitioner name' }]}
+                      style={{ marginBottom: 0, flex: 1 }}
+                    >
+                      <Input
+                        placeholder="Full name of the petitioner"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </Form.Item>
+                  </div>
 
                   <div className={`phone-reveal ${isPetitionerClient ? 'open' : ''}`}>
                     <Form.Item
@@ -385,16 +422,30 @@ export default function CreateCasePage() {
                     </span>
                   </div>
 
-                  <Form.Item
-                    name="respondentName"
-                    rules={[{ required: true, message: 'Please enter respondent name' }]}
-                    style={{ marginBottom: 0 }}
-                  >
-                    <Input
-                      placeholder="Full name of the respondent"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </Form.Item>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <Form.Item
+                      name="respondentNumber"
+                      style={{ marginBottom: 0, width: 72, flexShrink: 0 }}
+                      getValueFromEvent={(e) => e.target.value.replace(/\D/g, '')}
+                    >
+                      <Input
+                        placeholder="No."
+                        inputMode="numeric"
+                        maxLength={4}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      name="respondentName"
+                      rules={[{ required: true, message: 'Please enter respondent name' }]}
+                      style={{ marginBottom: 0, flex: 1 }}
+                    >
+                      <Input
+                        placeholder="Full name of the respondent"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </Form.Item>
+                  </div>
 
                   <div className={`phone-reveal ${isRespondentClient ? 'open' : ''}`}>
                     <Form.Item
@@ -476,11 +527,7 @@ export default function CreateCasePage() {
 
             <Row gutter={[16, 0]}>
               <Col xs={24} md={12}>
-                <Form.Item
-                  name="priority"
-                  label="Priority"
-                  rules={[{ required: true, message: 'Please select priority' }]}
-                >
+                <Form.Item name="priority" label="Priority (optional)">
                   <Select>
                     <Select.Option value="LOW">Low</Select.Option>
                     <Select.Option value="MEDIUM">Medium</Select.Option>
@@ -499,6 +546,17 @@ export default function CreateCasePage() {
               <Input.TextArea
                 rows={4}
                 placeholder="Detailed description of the case, facts, and legal issues..."
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="tasks"
+              label="Tasks"
+              rules={[{ required: true, message: 'Please enter at least one task' }]}
+            >
+              <Input.TextArea
+                rows={3}
+                placeholder="List the initial action items for this case — drafting, notices, filings, etc."
               />
             </Form.Item>
 

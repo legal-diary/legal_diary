@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { writeCaseFilter } from '@/lib/access';
 import { uploadFile, getStoragePath } from '@/lib/supabase';
 
 // Allowed MIME types for file uploads
@@ -51,16 +52,12 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based case access verification
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = {
-      id: caseId,
-      firmId: user.firmId,
-      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
-    };
-
+    // Uploading documents is a write — advocates must be assigned.
     const caseRecord = await prisma.case.findFirst({
-      where: caseFilter,
+      where: {
+        id: caseId,
+        ...writeCaseFilter({ id: user.id, firmId: user.firmId, role: user.role }),
+      },
     });
 
     if (!caseRecord) {

@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Modal, Upload, Button, message, Alert, Typography } from 'antd';
+import { Modal, Upload, Button, message, Alert, Typography, Input } from 'antd';
 import { UploadOutlined, LockOutlined } from '@ant-design/icons';
 import type { UploadFile } from 'antd/es/upload/interface';
-import { apiHeaders } from '@/lib/apiClient';
 
 const { Text } = Typography;
 
@@ -26,9 +25,14 @@ const CloseCaseModal: React.FC<CloseCaseModalProps> = ({
   onSuccess,
 }) => {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [closureReason, setClosureReason] = useState('');
   const [closing, setClosing] = useState(false);
 
   const handleClose = async () => {
+    if (!closureReason.trim()) {
+      message.error('Please enter a reason for closure');
+      return;
+    }
     if (fileList.length === 0) {
       message.error('Please upload the final order document');
       return;
@@ -44,11 +48,15 @@ const CloseCaseModal: React.FC<CloseCaseModalProps> = ({
     try {
       const formData = new FormData();
       formData.append('finalOrder', file);
+      formData.append('closureReason', closureReason.trim());
 
+      // NOTE: do NOT set Content-Type here. When the body is a FormData, the
+      // browser generates it with the correct multipart boundary; setting it
+      // manually (e.g. to application/json) causes request.formData() on the
+      // server to throw "Content-Type was not multipart/form-data…".
       const response = await fetch(`/api/cases/${caseId}/close`, {
         method: 'POST',
         headers: {
-          ...apiHeaders(),
           Authorization: `Bearer ${token}`,
         },
         body: formData,
@@ -62,6 +70,7 @@ const CloseCaseModal: React.FC<CloseCaseModalProps> = ({
 
       message.success('Case closed successfully');
       setFileList([]);
+      setClosureReason('');
       onSuccess();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to close case';
@@ -73,6 +82,7 @@ const CloseCaseModal: React.FC<CloseCaseModalProps> = ({
 
   const handleCancel = () => {
     setFileList([]);
+    setClosureReason('');
     onClose();
   };
 
@@ -96,7 +106,7 @@ const CloseCaseModal: React.FC<CloseCaseModalProps> = ({
           danger
           onClick={handleClose}
           loading={closing}
-          disabled={fileList.length === 0}
+          disabled={fileList.length === 0 || !closureReason.trim()}
           icon={<LockOutlined />}
         >
           Close Case
@@ -110,6 +120,20 @@ const CloseCaseModal: React.FC<CloseCaseModalProps> = ({
         style={{ marginBottom: '16px' }}
         message="This action will make the case read-only"
         description="Once closed, no further edits, hearings, or document uploads will be allowed. An admin can re-open the case later if needed."
+      />
+
+      <div style={{ marginBottom: '8px' }}>
+        <Text strong>Reason for Closure <Text type="danger">*</Text></Text>
+      </div>
+      <Input.TextArea
+        value={closureReason}
+        onChange={(e) => setClosureReason(e.target.value)}
+        rows={3}
+        maxLength={1000}
+        showCount
+        placeholder="Why is this case being closed? e.g. Final judgment delivered, settlement reached, withdrawn by client..."
+        style={{ marginBottom: '16px' }}
+        disabled={closing}
       />
 
       <div style={{ marginBottom: '8px' }}>

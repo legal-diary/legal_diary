@@ -1,18 +1,27 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   Form,
   Input,
   DatePicker,
   Select,
-  Switch,
+  Radio,
   Descriptions,
   Divider,
+  Alert,
+  Tooltip,
   App,
 } from 'antd';
+import {
+  InfoCircleOutlined,
+  ArrowRightOutlined,
+  LockOutlined,
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
+import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
 import { STAGE_OPTIONS, STAGE_LABEL_MAP } from '@/lib/constants';
 import { authHeaders } from '@/lib/apiClient';
 
@@ -30,6 +39,7 @@ interface HearingForClosure {
     petitionerName?: string;
     respondentName?: string;
     courtName?: string | null;
+    status?: string;
   };
 }
 
@@ -41,6 +51,8 @@ interface HearingClosureModalProps {
   token: string | null;
 }
 
+type ClosureMode = 'next' | 'final';
+
 export default function HearingClosureModal({
   open,
   onClose,
@@ -49,18 +61,47 @@ export default function HearingClosureModal({
   token,
 }: HearingClosureModalProps) {
   const { message } = App.useApp();
+  const { user } = useAuth();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
-  const [scheduleNext, setScheduleNext] = useState(false);
+  const [closureMode, setClosureMode] = useState<ClosureMode>('next');
+
+  const isAdmin = user?.role === 'ADMIN';
+  const isCaseClosed = hearing?.Case.status === 'CLOSED';
+  const caseDetailHref = hearing
+    ? `/cases/${hearing.Case.id || hearing.caseId}`
+    : '#';
 
   useEffect(() => {
     if (open) {
       form.resetFields();
-      setScheduleNext(false);
+      setClosureMode('next');
     }
   }, [open, form]);
 
+  const submitBlocked = !isCaseClosed && closureMode === 'final';
+
+  const okText = useMemo(() => {
+    if (isCaseClosed) return 'Close Final Hearing';
+    if (submitBlocked && isAdmin) return 'Close the case first';
+    if (submitBlocked) return 'Ask admin to close case';
+    return 'Close Hearing';
+  }, [isCaseClosed, submitBlocked, isAdmin]);
+
   const handleSubmit = async () => {
+    if (submitBlocked) {
+      if (isAdmin) {
+        message.warning(
+          'Please close the case first before closing this hearing as the final hearing.'
+        );
+      } else {
+        message.warning(
+          'Only admins can close cases. Ask your firm admin to close this case first.'
+        );
+      }
+      return;
+    }
+
     try {
       const values = await form.validateFields();
       setSubmitting(true);
@@ -69,7 +110,11 @@ export default function HearingClosureModal({
         closureNote: values.closureNote,
       };
 
-      if (scheduleNext) {
+      // Only attach next-hearing payload when the case is still open and the
+      // user chose to schedule the next hearing. When the case is CLOSED we
+      // intentionally omit nextHearing — the server accepts that as "final
+      // hearing" and the existing check blocks scheduling on a closed case.
+      if (!isCaseClosed && closureMode === 'next') {
         body.nextHearing = {
           hearingDate: values.nextHearingDate.toISOString(),
           hearingType: values.nextHearingType || 'ARGUMENTS',
@@ -85,7 +130,11 @@ export default function HearingClosureModal({
       });
 
       if (response.ok) {
-        message.success('Hearing closed successfully');
+        message.success(
+          isCaseClosed
+            ? 'Final hearing closed successfully'
+            : 'Hearing closed successfully'
+        );
         onSuccess();
         onClose();
       } else {
@@ -93,7 +142,6 @@ export default function HearingClosureModal({
         message.error(error.error || 'Failed to close hearing');
       }
     } catch (error) {
-      // Form validation error — do nothing
       if (error && typeof error === 'object' && 'errorFields' in error) return;
       message.error('Failed to close hearing');
     } finally {
@@ -107,22 +155,22 @@ export default function HearingClosureModal({
     <Modal
       title={
         <span style={{ color: '#d4af37', fontWeight: 600 }}>
-          Close Hearing
+          {isCaseClosed ? 'Close Final Hearing' : 'Close Hearing'}
         </span>
       }
       open={open}
       onCancel={onClose}
       onOk={handleSubmit}
       confirmLoading={submitting}
-      okText="Close Hearing"
+      okText={okText}
       okButtonProps={{
         style: { backgroundColor: '#d4af37', borderColor: '#d4af37' },
+        disabled: submitBlocked,
       }}
       cancelText="Cancel"
       width={600}
       destroyOnClose
     >
-      {/* Hearing Summary */}
       <Descriptions
         size="small"
         column={2}
@@ -151,8 +199,18 @@ export default function HearingClosureModal({
         )}
       </Descriptions>
 
+      {isCaseClosed && (
+        <Alert
+          type="info"
+          showIcon
+          icon={<LockOutlined />}
+          message="Case has been closed"
+          description="This is the final hearing — no further hearings needed."
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       <Form form={form} layout="vertical">
-        {/* Closure Note */}
         <Form.Item
           name="closureNote"
           label="Closure Note"
@@ -166,72 +224,116 @@ export default function HearingClosureModal({
           />
         </Form.Item>
 
-        <Divider style={{ margin: '12px 0' }} />
+        {!isCaseClosed && (
+          <>
+            <Divider style={{ margin: '12px 0' }} />
 
-        {/* Schedule Next Hearing Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: scheduleNext ? 16 : 0 }}>
-          <Switch
-            checked={scheduleNext}
-            onChange={setScheduleNext}
-            size="small"
-          />
-          <span style={{ fontWeight: 500 }}>Schedule next hearing for this case</span>
-        </div>
+            <Form.Item label="After this hearing" style={{ marginBottom: 12 }}>
+              <Radio.Group
+                value={closureMode}
+                onChange={(e) => setClosureMode(e.target.value)}
+              >
+                <Radio value="next">Schedule next hearing</Radio>
+                {isAdmin ? (
+                  <Radio value="final">This is the final hearing</Radio>
+                ) : (
+                  <Tooltip
+                    title="Only admins can close cases. Ask your firm admin to close this case first."
+                    placement="right"
+                  >
+                    <span>
+                      <Radio value="final" disabled>
+                        This is the final hearing
+                      </Radio>
+                    </span>
+                  </Tooltip>
+                )}
+              </Radio.Group>
+            </Form.Item>
 
-        {scheduleNext && (
-          <div
-            style={{
-              padding: 16,
-              background: '#f5f7fa',
-              borderRadius: 8,
-              border: '1px solid #e8e8e8',
-            }}
-          >
-            <Form.Item
-              name="nextHearingDate"
-              label="Next Hearing Date"
-              rules={[{ required: true, message: 'Please select a date' }]}
-            >
-              <DatePicker
-                format="DD/MM/YYYY"
-                style={{ width: '100%' }}
-                disabledDate={(current) =>
-                  current && current < dayjs().startOf('day')
+            {closureMode === 'next' && (
+              <div
+                style={{
+                  padding: 16,
+                  background: '#f5f7fa',
+                  borderRadius: 8,
+                  border: '1px solid #e8e8e8',
+                }}
+              >
+                <Form.Item
+                  name="nextHearingDate"
+                  label="Next Hearing Date"
+                  rules={[{ required: true, message: 'Please select a date' }]}
+                >
+                  <DatePicker
+                    format="DD/MM/YYYY"
+                    style={{ width: '100%' }}
+                    disabledDate={(current) =>
+                      current && current < dayjs().startOf('day')
+                    }
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name="nextHearingType"
+                  label="Stage"
+                  initialValue="ARGUMENTS"
+                  rules={[{ required: true, message: 'Please select a stage' }]}
+                >
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    options={STAGE_OPTIONS.map((s) => ({
+                      value: s.value,
+                      label: s.label,
+                    }))}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name="nextCourtHall"
+                  label="Court Hall"
+                  rules={[
+                    { required: true, message: 'Please enter the court hall' },
+                  ]}
+                  initialValue={hearing.courtHall}
+                >
+                  <Input placeholder="e.g., Court Hall 5" />
+                </Form.Item>
+
+                <Form.Item name="nextNotes" label="Notes">
+                  <Input.TextArea
+                    rows={2}
+                    placeholder="Any notes for the next hearing..."
+                  />
+                </Form.Item>
+              </div>
+            )}
+
+            {closureMode === 'final' && isAdmin && (
+              <Alert
+                type="warning"
+                showIcon
+                icon={<InfoCircleOutlined />}
+                message="Close the case first"
+                description={
+                  <>
+                    <div style={{ marginBottom: 8 }}>
+                      To mark this as the final hearing, close the case first by
+                      uploading the final order. Once the case is closed, come
+                      back here to close this hearing.
+                    </div>
+                    <Link
+                      href={caseDetailHref}
+                      style={{ color: '#d4af37', fontWeight: 600 }}
+                    >
+                      Go to case details <ArrowRightOutlined />
+                    </Link>
+                  </>
                 }
               />
-            </Form.Item>
-
-            <Form.Item
-              name="nextHearingType"
-              label="Stage"
-              initialValue="ARGUMENTS"
-            >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                options={STAGE_OPTIONS.map((s) => ({
-                  value: s.value,
-                  label: s.label,
-                }))}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="nextCourtHall"
-              label="Court Hall"
-              rules={[{ required: true, message: 'Please enter the court hall' }]}
-              initialValue={hearing.courtHall}
-            >
-              <Input placeholder="e.g., Court Hall 5" />
-            </Form.Item>
-
-            <Form.Item name="nextNotes" label="Notes">
-              <Input.TextArea
-                rows={2}
-                placeholder="Any notes for the next hearing..."
-              />
-            </Form.Item>
-          </div>
+            )}
+          </>
         )}
       </Form>
     </Modal>

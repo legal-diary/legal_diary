@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { readCaseFilter, writeCaseFilter } from '@/lib/access';
 import { deleteFile, deleteFiles } from '@/lib/supabase';
 import { ActivityLogger } from '@/lib/activityLog';
 
@@ -12,6 +13,7 @@ const ALLOWED_UPDATE_FIELDS = [
   'clientParty',
   'vakalat',
   'description',
+  'tasks',
   'status',
   'priority',
   'courtTypeId',
@@ -40,18 +42,9 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based access:
-    // - ADMIN can access any case in their firm
-    // - ADVOCATE can only access cases they're assigned to
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = {
-      id: caseId,
-      firmId: user.firmId,
-      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
-    };
-
+    // Read is firm-wide; the page derives canWrite client-side from `assignments`.
     const caseRecord = await prisma.case.findFirst({
-      where: caseFilter,
+      where: { id: caseId, ...readCaseFilter({ firmId: user.firmId }) },
       include: {
         User: true,
         Hearing: true,
@@ -102,18 +95,12 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based access:
-    // - ADMIN can update any case in their firm
-    // - ADVOCATE can only update cases they're assigned to
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = {
-      id: caseId,
-      firmId: user.firmId,
-      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
-    };
-
+    // Write requires assignment for advocates; admins can update any firm case.
     const caseRecord = await prisma.case.findFirst({
-      where: caseFilter,
+      where: {
+        id: caseId,
+        ...writeCaseFilter({ id: user.id, firmId: user.firmId, role: user.role }),
+      },
     });
 
     if (!caseRecord) {
@@ -130,9 +117,21 @@ export async function PUT(
 
     const updates = await request.json();
 
-    // Extract document IDs to delete (not part of case update)
-    const documentsToDelete = updates.documentsToDelete || [];
+    // Extract document IDs to delete (not part of case update). Document
+    // deletion is admin-only; reject the request outright if a non-admin
+    // tries to slip docsToDelete through the edit-case payload.
+    const requestedDocumentsToDelete: string[] = Array.isArray(updates.documentsToDelete)
+      ? updates.documentsToDelete
+      : [];
     delete updates.documentsToDelete;
+    const isAdmin = user.role === 'ADMIN';
+    if (requestedDocumentsToDelete.length > 0 && !isAdmin) {
+      return NextResponse.json(
+        { error: 'Only administrators can delete documents' },
+        { status: 403 }
+      );
+    }
+    const documentsToDelete = isAdmin ? requestedDocumentsToDelete : [];
 
     // Validate and filter updates (whitelist approach)
     const validatedUpdates: Record<string, any> = {};

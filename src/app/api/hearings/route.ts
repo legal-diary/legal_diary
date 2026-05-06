@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { readCaseFilter, writeCaseFilter } from '@/lib/access';
 import { generateHearingInsights } from '@/lib/openai';
 import { createCalendarEvent, isGoogleCalendarConnected } from '@/lib/googleCalendar';
 import { ActivityLogger } from '@/lib/activityLog';
@@ -20,13 +21,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based filtering:
-    // - ADMIN sees hearings from all cases in their firm
-    // - ADVOCATE sees hearings only from cases they're assigned to
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = isAdmin
-      ? { firmId: user.firmId }
-      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+    // Read is firm-wide for everyone; the calendar/dashboard surfaces show
+    // assignee chips so advocates can tell whose hearing each row is.
+    const caseFilter = readCaseFilter({ firmId: user.firmId });
 
     // Check if calendar mode is requested (optimized for calendar view)
     const url = new URL(request.url);
@@ -57,11 +54,19 @@ export async function GET(request: NextRequest) {
           closedAt: true,
           Case: {
             select: {
+              id: true,
               caseNumber: true,
               caseTitle: true,
               petitionerName: true,
               respondentName: true,
               courtName: true,
+              status: true,
+              assignments: {
+                select: {
+                  userId: true,
+                  user: { select: { id: true, name: true, email: true } },
+                },
+              },
             },
           },
           CalendarSync: {
@@ -99,6 +104,12 @@ export async function GET(request: NextRequest) {
             petitionerName: true,
             respondentName: true,
             status: true,
+            assignments: {
+              select: {
+                userId: true,
+                user: { select: { id: true, name: true, email: true } },
+              },
+            },
           },
         },
         Reminder: true,
@@ -146,23 +157,19 @@ export async function POST(request: NextRequest) {
       notes,
     } = await request.json();
 
-    if (!caseId || !hearingDate || !courtHall) {
+    if (!caseId || !hearingDate) {
       return NextResponse.json(
-        { error: 'caseId, hearingDate, and courtHall are required' },
+        { error: 'caseId and hearingDate are required' },
         { status: 400 }
       );
     }
 
-    // Role-based case access verification
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = {
-      id: caseId,
-      firmId: user.firmId,
-      ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
-    };
-
+    // Creating a hearing is a write — advocates must be assigned to the case.
     const caseRecord = await prisma.case.findFirst({
-      where: caseFilter,
+      where: {
+        id: caseId,
+        ...writeCaseFilter({ id: user.id, firmId: user.firmId, role: user.role }),
+      },
     });
 
     if (!caseRecord) {
@@ -182,7 +189,7 @@ export async function POST(request: NextRequest) {
         caseId,
         hearingDate: new Date(hearingDate),
         hearingType: hearingType || 'ARGUMENTS',
-        courtHall,
+        courtHall: courtHall || '',
         notes,
       },
       include: {

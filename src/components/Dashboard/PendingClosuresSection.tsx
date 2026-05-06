@@ -25,17 +25,26 @@ interface PendingClosure {
     petitionerName: string;
     respondentName: string;
     courtName: string | null;
+    status?: string;
+    assignments?: Array<{
+      userId: string;
+      user: { id: string; name: string | null; email: string };
+    }>;
   };
 }
 
 interface PendingClosuresSectionProps {
   pendingClosures: PendingClosure[];
   onCloseHearing: (hearing: PendingClosure) => void;
+  currentUserId: string;
+  isAdmin: boolean;
 }
 
 export default function PendingClosuresSection({
   pendingClosures,
   onCloseHearing,
+  currentUserId,
+  isAdmin,
 }: PendingClosuresSectionProps) {
   const isMobile = useIsMobile();
 
@@ -120,23 +129,30 @@ export default function PendingClosuresSection({
         key: 'action',
         width: 70,
         fixed: 'right' as const,
-        render: (_: unknown, record: PendingClosure) => (
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => onCloseHearing(record)}
-            style={{
-              backgroundColor: '#d4af37',
-              borderColor: '#d4af37',
-              fontSize: '0.75rem',
-            }}
-          >
-            Close
-          </Button>
-        ),
+        render: (_: unknown, record: PendingClosure) => {
+          // Only show Close for admin or assigned advocate. Unassigned advocates
+          // see the row (firm-wide read) but can't act on it.
+          const canClose =
+            isAdmin || !!record.Case.assignments?.some((a) => a.userId === currentUserId);
+          if (!canClose) return null;
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => onCloseHearing(record)}
+              style={{
+                backgroundColor: '#d4af37',
+                borderColor: '#d4af37',
+                fontSize: '0.75rem',
+              }}
+            >
+              Close
+            </Button>
+          );
+        },
       },
     ],
-    [onCloseHearing]
+    [onCloseHearing, isAdmin, currentUserId]
   );
 
   if (pendingClosures.length === 0) return null;

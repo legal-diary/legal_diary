@@ -6,7 +6,7 @@ import { ActivityLogger } from '@/lib/activityLog';
 
 /**
  * DELETE /api/documents/[id]
- * Delete a document from both Supabase storage and database
+ * Delete a document from both Supabase storage and database. ADMIN only.
  */
 export async function DELETE(
   request: NextRequest,
@@ -27,15 +27,19 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based document access verification
-    const isAdmin = user.role === 'ADMIN';
+    // Document deletion is destructive and admin-only. Advocates can upload
+    // new documents on assigned cases but cannot remove existing ones.
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Only administrators can delete documents' },
+        { status: 403 }
+      );
+    }
+
     const document = await prisma.fileDocument.findFirst({
       where: {
         id: documentId,
-        Case: {
-          firmId: user.firmId,
-          ...(isAdmin ? {} : { assignments: { some: { userId: user.id } } }),
-        },
+        Case: { firmId: user.firmId },
       },
       include: {
         Case: {
@@ -48,18 +52,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
 
-    // Guard: Final Order documents cannot be deleted
+    // Guard: Final Order documents cannot be deleted (admin or otherwise)
     if (document.isFinalOrder) {
       return NextResponse.json(
         { error: 'Cannot delete a Final Order document' },
-        { status: 403 }
-      );
-    }
-
-    // Guard: Only admins can delete documents from closed cases
-    if (document.Case.status === 'CLOSED' && !isAdmin) {
-      return NextResponse.json(
-        { error: 'Only admins can delete documents from closed cases' },
         { status: 403 }
       );
     }

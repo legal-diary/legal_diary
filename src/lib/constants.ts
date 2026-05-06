@@ -46,7 +46,7 @@ export const HEARING_STATUS_OPTIONS = [
   { value: 'UPCOMING', label: 'Upcoming' },
   { value: 'PENDING', label: 'Pending Closure' },
   { value: 'CLOSED', label: 'Closed' },
-  { value: 'POSTPONED', label: 'Postponed' },
+  { value: 'POSTPONED', label: 'Adjourned' },
   { value: 'CANCELLED', label: 'Cancelled' },
 ] as const;
 

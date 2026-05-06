@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/middleware';
+import { readCaseFilter, writeCaseFilter } from '@/lib/access';
 import {
   updateCalendarEvent,
   deleteCalendarEvent,
@@ -27,19 +28,23 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based filtering through case assignments
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = isAdmin
-      ? { firmId: user.firmId }
-      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
-
+    // Read is firm-wide for everyone.
     const hearing = await prisma.hearing.findFirst({
       where: {
         id,
-        Case: caseFilter,
+        Case: readCaseFilter({ firmId: user.firmId }),
       },
       include: {
-        Case: true,
+        Case: {
+          include: {
+            assignments: {
+              select: {
+                userId: true,
+                user: { select: { id: true, name: true, email: true } },
+              },
+            },
+          },
+        },
         Reminder: true,
         closedBy: {
           select: { id: true, name: true, email: true },
@@ -80,16 +85,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based access verification
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = isAdmin
-      ? { firmId: user.firmId }
-      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
-
+    // Write requires assignment for advocates; admins can act on any firm hearing.
     const existingHearing = await prisma.hearing.findFirst({
       where: {
         id,
-        Case: caseFilter,
+        Case: writeCaseFilter({ id: user.id, firmId: user.firmId, role: user.role }),
       },
       include: {
         Case: { select: { status: true } },
@@ -184,7 +184,7 @@ export async function PUT(
   }
 }
 
-// DELETE - Delete a hearing (role-based access)
+// DELETE - Delete a hearing (ADMIN only)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -203,17 +203,18 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Role-based access verification
-    const isAdmin = user.role === 'ADMIN';
-    const caseFilter = isAdmin
-      ? { firmId: user.firmId }
-      : { firmId: user.firmId, assignments: { some: { userId: user.id } } };
+    // Hearing deletion is destructive and admin-only. Advocates can close or
+    // cancel a hearing on their assigned case but cannot remove the row.
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Only administrators can delete hearings' },
+        { status: 403 }
+      );
+    }
 
+    // Admin can act on any hearing in the firm.
     const existingHearing = await prisma.hearing.findFirst({
-      where: {
-        id,
-        Case: caseFilter,
-      },
+      where: { id, Case: { firmId: user.firmId } },
       include: {
         Case: {
           select: { caseNumber: true },

@@ -76,6 +76,20 @@ export async function POST(
       );
     }
 
+    const isCaseClosed = hearing.Case.status === 'CLOSED';
+
+    // Next hearing is mandatory unless the case is already closed
+    // (i.e. this is the final hearing and the case has been concluded)
+    if (!nextHearing && !isCaseClosed) {
+      return NextResponse.json(
+        {
+          error:
+            'Next hearing is required. If this is the final hearing, close the case first, then close this hearing.',
+        },
+        { status: 400 }
+      );
+    }
+
     // Validate next hearing data if provided
     if (nextHearing) {
       if (!nextHearing.hearingDate || !nextHearing.courtHall) {
@@ -86,7 +100,7 @@ export async function POST(
       }
 
       // Prevent scheduling hearings for closed cases
-      if (hearing.Case.status === 'CLOSED') {
+      if (isCaseClosed) {
         return NextResponse.json(
           { error: 'Cannot schedule hearings for a closed case' },
           { status: 403 }

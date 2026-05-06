@@ -99,7 +99,7 @@ export default function HearingFormModal({
           caseId: values.caseId,
           hearingDate: values.hearingDate.toISOString(),
           hearingType: values.hearingType,
-          courtHall: values.courtHall,
+          courtHall: values.courtHall || '',
           notes: values.notes || null,
         };
 
@@ -248,11 +248,7 @@ export default function HearingFormModal({
             )}
           </Row>
 
-          <Form.Item
-            name="courtHall"
-            label="Court Hall"
-            rules={[{ required: true, message: 'Please enter court hall' }]}
-          >
+          <Form.Item name="courtHall" label="Court Hall">
             <Input placeholder="e.g., Court Hall 5" />
           </Form.Item>
 

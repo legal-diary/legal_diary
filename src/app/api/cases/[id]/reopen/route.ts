@@ -53,6 +53,7 @@ export async function POST(
         status: 'ACTIVE',
         closedAt: null,
         closedById: null,
+        closureReason: null,
       },
       include: {
         FileDocument: true,
